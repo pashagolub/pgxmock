@@ -1,7 +1,7 @@
-package sqlmock
+package pgxmock
 
 import (
-	"database/sql/driver"
+	"context"
 	"errors"
 	"fmt"
 	"reflect"
@@ -10,7 +10,7 @@ import (
 
 type CustomConverter struct{}
 
-func (s CustomConverter) ConvertValue(v interface{}) (driver.Value, error) {
+func (s CustomConverter) ConvertValue(v interface{}) (interface{}, error) {
 	switch v.(type) {
 	case string:
 		return v.(string), nil
@@ -24,17 +24,17 @@ func (s CustomConverter) ConvertValue(v interface{}) (driver.Value, error) {
 }
 
 func ExampleExpectedExec() {
-	db, mock, _ := New()
+	mock, _ := New()
 	result := NewErrorResult(fmt.Errorf("some error"))
 	mock.ExpectExec("^INSERT (.+)").WillReturnResult(result)
-	res, _ := db.Exec("INSERT something")
-	_, err := res.LastInsertId()
-	fmt.Println(err)
+	res, _ := mock.Exec(context.Background(), "INSERT something")
+	s := res.String()
+	fmt.Println(s)
 	// Output: some error
 }
 
 func TestBuildQuery(t *testing.T) {
-	db, mock, _ := New()
+	mock, _ := New()
 	query := `
 		SELECT
 			name,
@@ -53,9 +53,9 @@ func TestBuildQuery(t *testing.T) {
 	mock.ExpectExec(query)
 	mock.ExpectPrepare(query)
 
-	db.QueryRow(query)
-	db.Exec(query)
-	db.Prepare(query)
+	mock.QueryRow(context.Background(), query)
+	mock.Exec(context.Background(), query)
+	mock.Prepare(context.Background(), "foo", query)
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Error(err)
@@ -63,7 +63,7 @@ func TestBuildQuery(t *testing.T) {
 }
 
 func TestCustomValueConverterQueryScan(t *testing.T) {
-	db, mock, _ := New(ValueConverterOption(CustomConverter{}))
+	mock, _ := New() // New(ValueConverterOption(CustomConverter{}))
 	query := `
 		SELECT
 			name,
@@ -81,7 +81,7 @@ func TestCustomValueConverterQueryScan(t *testing.T) {
 	expectedIntValue := 2
 	expectedArrayValue := []string{"Three", "Four"}
 	mock.ExpectQuery(query).WillReturnRows(mock.NewRows([]string{"One", "Two", "Three"}).AddRow(expectedStringValue, expectedIntValue, []string{"Three", "Four"}))
-	row := db.QueryRow(query)
+	row := mock.QueryRow(context.Background(), query)
 	var stringValue string
 	var intValue int
 	var arrayValue []string

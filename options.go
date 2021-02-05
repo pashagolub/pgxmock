@@ -1,21 +1,19 @@
-package sqlmock
-
-import "database/sql/driver"
+package pgxmock
 
 // ValueConverterOption allows to create a sqlmock connection
 // with a custom ValueConverter to support drivers with special data types.
-func ValueConverterOption(converter driver.ValueConverter) func(*sqlmock) error {
-	return func(s *sqlmock) error {
-		s.converter = converter
-		return nil
-	}
-}
+// func ValueConverterOption(converter driver.ValueConverter) func(*pgxmock) error {
+// 	return func(s *pgxmock) error {
+// 		s.converter = converter
+// 		return nil
+// 	}
+// }
 
 // QueryMatcherOption allows to customize SQL query matcher
 // and match SQL query strings in more sophisticated ways.
 // The default QueryMatcher is QueryMatcherRegexp.
-func QueryMatcherOption(queryMatcher QueryMatcher) func(*sqlmock) error {
-	return func(s *sqlmock) error {
+func QueryMatcherOption(queryMatcher QueryMatcher) func(*pgxmock) error {
+	return func(s *pgxmock) error {
 		s.queryMatcher = queryMatcher
 		return nil
 	}
@@ -30,8 +28,8 @@ func QueryMatcherOption(queryMatcher QueryMatcher) func(*sqlmock) error {
 // If false is passed or this option is omitted, calls to Ping will not be
 // considered when determining expectations and calls to ExpectPing will have
 // no effect.
-func MonitorPingsOption(monitorPings bool) func(*sqlmock) error {
-	return func(s *sqlmock) error {
+func MonitorPingsOption(monitorPings bool) func(*pgxmock) error {
+	return func(s *pgxmock) error {
 		s.monitorPings = monitorPings
 		return nil
 	}

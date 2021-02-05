@@ -1,12 +1,10 @@
-package sqlmock
-
-import "database/sql/driver"
+package pgxmock
 
 // Argument interface allows to match
 // any argument in specific way when used with
 // ExpectedQuery and ExpectedExec expectations.
 type Argument interface {
-	Match(driver.Value) bool
+	Match(interface{}) bool
 }
 
 // AnyArg will return an Argument which can
@@ -19,6 +17,6 @@ func AnyArg() Argument {
 
 type anyArgument struct{}
 
-func (a anyArgument) Match(_ driver.Value) bool {
+func (a anyArgument) Match(_ interface{}) bool {
 	return true
 }

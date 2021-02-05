@@ -1,6 +1,7 @@
-package sqlmock
+package pgxmock
 
 import (
+	"context"
 	"database/sql"
 	"database/sql/driver"
 	"errors"
@@ -12,62 +13,62 @@ import (
 	"time"
 )
 
-func cancelOrder(db *sql.DB, orderID int) error {
-	tx, _ := db.Begin()
-	_, _ = tx.Query("SELECT * FROM orders {0} FOR UPDATE", orderID)
-	err := tx.Rollback()
-	if err != nil {
-		return err
-	}
-	return nil
-}
+// func cancelOrder(db *sql.DB, orderID int) error {
+// 	tx, _ := db.Begin()
+// 	_, _ = tx.Query("SELECT * FROM orders {0} FOR UPDATE", orderID)
+// 	err := tx.Rollback()
+// 	if err != nil {
+// 		return err
+// 	}
+// 	return nil
+// }
 
-func Example() {
-	// Open new mock database
-	db, mock, err := New()
-	if err != nil {
-		fmt.Println("error creating mock database")
-		return
-	}
-	// columns to be used for result
-	columns := []string{"id", "status"}
-	// expect transaction begin
-	mock.ExpectBegin()
-	// expect query to fetch order, match it with regexp
-	mock.ExpectQuery("SELECT (.+) FROM orders (.+) FOR UPDATE").
-		WithArgs(1).
-		WillReturnRows(NewRows(columns).AddRow(1, 1))
-	// expect transaction rollback, since order status is "cancelled"
-	mock.ExpectRollback()
+// func Example() {
+// 	// Open new mock database
+// 	mock, err := New()
+// 	if err != nil {
+// 		fmt.Println("error creating mock database")
+// 		return
+// 	}
+// 	// columns to be used for result
+// 	columns := []string{"id", "status"}
+// 	// expect transaction begin
+// 	mock.ExpectBegin()
+// 	// expect query to fetch order, match it with regexp
+// 	mock.ExpectQuery("SELECT (.+) FROM orders (.+) FOR UPDATE").
+// 		WithArgs(1).
+// 		WillReturnRows(NewRows(columns).AddRow(1, 1))
+// 	// expect transaction rollback, since order status is "cancelled"
+// 	mock.ExpectRollback()
 
-	// run the cancel order function
-	someOrderID := 1
-	// call a function which executes expected database operations
-	err = cancelOrder(db, someOrderID)
-	if err != nil {
-		fmt.Printf("unexpected error: %s", err)
-		return
-	}
+// 	// run the cancel order function
+// 	someOrderID := 1
+// 	// call a function which executes expected database operations
+// 	err = cancelOrder(db, someOrderID)
+// 	if err != nil {
+// 		fmt.Printf("unexpected error: %s", err)
+// 		return
+// 	}
 
-	// ensure all expectations have been met
-	if err = mock.ExpectationsWereMet(); err != nil {
-		fmt.Printf("unmet expectation error: %s", err)
-	}
-	// Output:
-}
+// 	// ensure all expectations have been met
+// 	if err = mock.ExpectationsWereMet(); err != nil {
+// 		fmt.Printf("unmet expectation error: %s", err)
+// 	}
+// 	// Output:
+// }
 
 func TestIssue14EscapeSQL(t *testing.T) {
 	t.Parallel()
-	db, mock, err := New()
+	mock, err := New()
 	if err != nil {
 		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
 	}
-	defer db.Close()
+	defer mock.Close()
 	mock.ExpectExec("INSERT INTO mytable\\(a, b\\)").
 		WithArgs("A", "B").
 		WillReturnResult(NewResult(1, 1))
 
-	_, err = db.Exec("INSERT INTO mytable(a, b) VALUES (?, ?)", "A", "B")
+	_, err = mock.Exec(context.Background(), "INSERT INTO mytable(a, b) VALUES (?, ?)", "A", "B")
 	if err != nil {
 		t.Errorf("error '%s' was not expected, while inserting a row", err)
 	}
@@ -81,11 +82,11 @@ func TestIssue14EscapeSQL(t *testing.T) {
 // are not asserted on close
 func TestIssue4(t *testing.T) {
 	t.Parallel()
-	db, mock, err := New()
+	mock, err := New()
 	if err != nil {
 		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
 	}
-	defer db.Close()
+	defer mock.Close()
 
 	mock.ExpectQuery("some sql query which will not be called").
 		WillReturnRows(NewRows([]string{"id"}))
@@ -97,11 +98,11 @@ func TestIssue4(t *testing.T) {
 
 func TestMockQuery(t *testing.T) {
 	t.Parallel()
-	db, mock, err := New()
+	mock, err := New()
 	if err != nil {
 		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
 	}
-	defer db.Close()
+	defer mock.Close()
 
 	rs := NewRows([]string{"id", "title"}).FromCSVString("5,hello world")
 
@@ -109,16 +110,12 @@ func TestMockQuery(t *testing.T) {
 		WithArgs(5).
 		WillReturnRows(rs)
 
-	rows, err := db.Query("SELECT (.+) FROM articles WHERE id = ?", 5)
+	rows, err := mock.Query(context.Background(), "SELECT (.+) FROM articles WHERE id = ?", 5)
 	if err != nil {
 		t.Errorf("error '%s' was not expected while retrieving mock rows", err)
 	}
 
-	defer func() {
-		if er := rows.Close(); er != nil {
-			t.Error("unexpected error while trying to close rows")
-		}
-	}()
+	defer rows.Close()
 
 	if !rows.Next() {
 		t.Error("it must have had one row as result, but got empty result set instead")
@@ -147,11 +144,11 @@ func TestMockQuery(t *testing.T) {
 
 func TestMockQueryTypes(t *testing.T) {
 	t.Parallel()
-	db, mock, err := New()
+	mock, err := New()
 	if err != nil {
 		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
 	}
-	defer db.Close()
+	defer mock.Close()
 
 	columns := []string{"id", "timestamp", "sold"}
 
@@ -163,15 +160,11 @@ func TestMockQueryTypes(t *testing.T) {
 		WithArgs(5).
 		WillReturnRows(rs)
 
-	rows, err := db.Query("SELECT (.+) FROM sales WHERE id = ?", 5)
+	rows, err := mock.Query(context.Background(), "SELECT (.+) FROM sales WHERE id = ?", 5)
 	if err != nil {
 		t.Errorf("error '%s' was not expected while retrieving mock rows", err)
 	}
-	defer func() {
-		if er := rows.Close(); er != nil {
-			t.Error("unexpected error while trying to close rows")
-		}
-	}()
+	defer rows.Close()
 	if !rows.Next() {
 		t.Error("it must have had one row as result, but got empty result set instead")
 	}
@@ -204,22 +197,22 @@ func TestMockQueryTypes(t *testing.T) {
 
 func TestTransactionExpectations(t *testing.T) {
 	t.Parallel()
-	db, mock, err := New()
+	mock, err := New()
 	if err != nil {
 		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
 	}
-	defer db.Close()
+	defer mock.Close()
 
 	// begin and commit
 	mock.ExpectBegin()
 	mock.ExpectCommit()
 
-	tx, err := db.Begin()
+	tx, err := mock.Begin(context.Background())
 	if err != nil {
 		t.Errorf("an error '%s' was not expected when beginning a transaction", err)
 	}
 
-	err = tx.Commit()
+	err = tx.Commit(context.Background())
 	if err != nil {
 		t.Errorf("an error '%s' was not expected when committing a transaction", err)
 	}
@@ -228,7 +221,7 @@ func TestTransactionExpectations(t *testing.T) {
 	mock.ExpectBegin()
 	mock.ExpectRollback()
 
-	tx, err = db.Begin()
+	tx, err = mock.Begin(context.Background())
 	if err != nil {
 		t.Errorf("an error '%s' was not expected when beginning a transaction", err)
 	}
@@ -241,7 +234,7 @@ func TestTransactionExpectations(t *testing.T) {
 	// begin with an error
 	mock.ExpectBegin().WillReturnError(fmt.Errorf("some err"))
 
-	tx, err = db.Begin()
+	tx, err = mock.Begin(context.Background())
 	if err == nil {
 		t.Error("an error was expected when beginning a transaction, but got none")
 	}
@@ -1145,7 +1138,7 @@ func TestExecExpectationErrorDelay(t *testing.T) {
 func TestOptionsFail(t *testing.T) {
 	t.Parallel()
 	expected := errors.New("failing option")
-	option := func(*sqlmock) error {
+	option := func(*pgxmock) error {
 		return expected
 	}
 	db, _, err := New(option)
@@ -1235,7 +1228,7 @@ func Test_sqlmock_Prepare_and_Exec(t *testing.T) {
 	expectedRows := mock.NewRows([]string{"id", "name", "email"}).AddRow(1, "test", "test@example.com")
 	mock.ExpectQuery("SELECT (.+) FROM users WHERE (.+)").WillReturnRows(expectedRows)
 
-	got, err := mock.(*sqlmock).Prepare(query)
+	got, err := mock.(*pgxmock).Prepare(query)
 	if err != nil {
 		t.Error(err)
 		return
@@ -1275,7 +1268,7 @@ func Test_sqlmock_Exec(t *testing.T) {
 	defer db.Close()
 
 	mock.ExpectBegin()
-	_, err = mock.(*sqlmock).Exec("", []driver.Value{})
+	_, err = mock.(*pgxmock).Exec("", []driver.Value{})
 	if err == nil {
 		t.Errorf("error expected")
 		return
@@ -1293,9 +1286,9 @@ func Test_sqlmock_Exec(t *testing.T) {
 
 	mock.ExpectExec("").WithArgs(failArgument{})
 
-	mock.(*sqlmock).expected = mock.(*sqlmock).expected[1:]
+	mock.(*pgxmock).expected = mock.(*pgxmock).expected[1:]
 	query := "SELECT name, email FROM users WHERE name = ?"
-	result, err := mock.(*sqlmock).Exec(query, []driver.Value{"test"})
+	result, err := mock.(*pgxmock).Exec(query, []driver.Value{"test"})
 	if err != nil {
 		t.Error(err)
 		return
@@ -1306,13 +1299,13 @@ func Test_sqlmock_Exec(t *testing.T) {
 	}
 
 	failQuery := "SELECT name, sex FROM animals WHERE sex = ?"
-	_, err = mock.(*sqlmock).Exec(failQuery, []driver.Value{failArgument{}})
+	_, err = mock.(*pgxmock).Exec(failQuery, []driver.Value{failArgument{}})
 	if err == nil {
 		t.Errorf("error expected")
 		return
 	}
-	mock.(*sqlmock).ordered = false
-	_, err = mock.(*sqlmock).Exec("", []driver.Value{failArgument{}})
+	mock.(*pgxmock).ordered = false
+	_, err = mock.(*pgxmock).Exec("", []driver.Value{failArgument{}})
 	if err == nil {
 		t.Errorf("error expected")
 		return
@@ -1328,13 +1321,13 @@ func Test_sqlmock_Query(t *testing.T) {
 	expectedRows := mock.NewRows([]string{"id", "name", "email"}).AddRow(1, "test", "test@example.com")
 	mock.ExpectQuery("SELECT (.+) FROM users WHERE (.+)").WillReturnRows(expectedRows)
 	query := "SELECT name, email FROM users WHERE name = ?"
-	rows, err := mock.(*sqlmock).Query(query, []driver.Value{"test"})
+	rows, err := mock.(*pgxmock).Query(query, []driver.Value{"test"})
 	if err != nil {
 		t.Error(err)
 		return
 	}
 	defer rows.Close()
-	_, err = mock.(*sqlmock).Query(query, []driver.Value{failArgument{}})
+	_, err = mock.(*pgxmock).Query(query, []driver.Value{failArgument{}})
 	if err == nil {
 		t.Errorf("error expected")
 		return

@@ -1,4 +1,4 @@
-package sqlmock
+package pgxmock
 
 import "reflect"
 

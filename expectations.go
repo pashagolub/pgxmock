@@ -1,4 +1,4 @@
-package sqlmock
+package pgxmock
 
 import (
 	"database/sql/driver"
@@ -6,6 +6,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/jackc/pgconn"
+	pgx "github.com/jackc/pgx/v4"
 )
 
 // an expectation interface
@@ -125,7 +128,8 @@ func (e *ExpectedRollback) String() string {
 // Returned by *Sqlmock.ExpectQuery.
 type ExpectedQuery struct {
 	queryBasedExpectation
-	rows             driver.Rows
+	rows             pgx.Rows
+	row              pgx.Row
 	delay            time.Duration
 	rowsMustBeClosed bool
 	rowsWereClosed   bool
@@ -134,7 +138,7 @@ type ExpectedQuery struct {
 // WithArgs will match given expected args to actual database query arguments.
 // if at least one argument does not match, it will return an error. For specific
 // arguments an sqlmock.Argument interface can be used to match an argument.
-func (e *ExpectedQuery) WithArgs(args ...driver.Value) *ExpectedQuery {
+func (e *ExpectedQuery) WithArgs(args ...interface{}) *ExpectedQuery {
 	e.args = args
 	return e
 }
@@ -188,14 +192,14 @@ func (e *ExpectedQuery) String() string {
 // Returned by *Sqlmock.ExpectExec.
 type ExpectedExec struct {
 	queryBasedExpectation
-	result driver.Result
+	result pgconn.CommandTag
 	delay  time.Duration
 }
 
 // WithArgs will match given expected args to actual database exec operation arguments.
 // if at least one argument does not match, it will return an error. For specific
 // arguments an sqlmock.Argument interface can be used to match an argument.
-func (e *ExpectedExec) WithArgs(args ...driver.Value) *ExpectedExec {
+func (e *ExpectedExec) WithArgs(args ...interface{}) *ExpectedExec {
 	e.args = args
 	return e
 }
@@ -230,13 +234,8 @@ func (e *ExpectedExec) String() string {
 	}
 
 	if e.result != nil {
-		res, _ := e.result.(*result)
 		msg += "\n  - should return Result having:"
-		msg += fmt.Sprintf("\n      LastInsertId: %d", res.insertID)
-		msg += fmt.Sprintf("\n      RowsAffected: %d", res.rowsAffected)
-		if res.err != nil {
-			msg += fmt.Sprintf("\n      Error: %s", res.err)
-		}
+		msg += fmt.Sprintf("\n      RowsAffected: %d", e.result.RowsAffected())
 	}
 
 	if e.err != nil {
@@ -250,7 +249,7 @@ func (e *ExpectedExec) String() string {
 // result, there is sqlmock.NewResult(lastInsertID int64, affectedRows int64) method
 // to build a corresponding result. Or if actions needs to be tested against errors
 // sqlmock.NewErrorResult(err error) to return a given error.
-func (e *ExpectedExec) WillReturnResult(result driver.Result) *ExpectedExec {
+func (e *ExpectedExec) WillReturnResult(result pgconn.CommandTag) *ExpectedExec {
 	e.result = result
 	return e
 }
@@ -259,7 +258,7 @@ func (e *ExpectedExec) WillReturnResult(result driver.Result) *ExpectedExec {
 // Returned by *Sqlmock.ExpectPrepare.
 type ExpectedPrepare struct {
 	commonExpectation
-	mock         *sqlmock
+	mock         *pgxmock
 	expectSQL    string
 	statement    driver.Stmt
 	closeErr     error
@@ -299,7 +298,7 @@ func (e *ExpectedPrepare) WillBeClosed() *ExpectedPrepare {
 func (e *ExpectedPrepare) ExpectQuery() *ExpectedQuery {
 	eq := &ExpectedQuery{}
 	eq.expectSQL = e.expectSQL
-	eq.converter = e.mock.converter
+	// eq.converter = e.mock.converter
 	e.mock.expected = append(e.mock.expected, eq)
 	return eq
 }
@@ -309,7 +308,7 @@ func (e *ExpectedPrepare) ExpectQuery() *ExpectedQuery {
 func (e *ExpectedPrepare) ExpectExec() *ExpectedExec {
 	eq := &ExpectedExec{}
 	eq.expectSQL = e.expectSQL
-	eq.converter = e.mock.converter
+	// eq.converter = e.mock.converter
 	e.mock.expected = append(e.mock.expected, eq)
 	return eq
 }
@@ -335,8 +334,8 @@ func (e *ExpectedPrepare) String() string {
 type queryBasedExpectation struct {
 	commonExpectation
 	expectSQL string
-	converter driver.ValueConverter
-	args      []driver.Value
+	// converter driver.ValueConverter
+	args []interface{}
 }
 
 // ExpectedPing is used to manage *sql.DB.Ping expectations.
@@ -366,4 +365,81 @@ func (e *ExpectedPing) String() string {
 		msg += fmt.Sprintf(", which should return error: %s", e.err)
 	}
 	return msg
+}
+
+// WillReturnRows specifies the set of resulting rows that will be returned
+// by the triggered query
+func (e *ExpectedQuery) WillReturnRows(rows ...*Rows) *ExpectedQuery {
+	defs := 0
+	sets := make([]*Rows, len(rows))
+	for i, r := range rows {
+		sets[i] = r
+		if r.def != nil {
+			defs++
+		}
+	}
+	if defs > 0 && defs == len(sets) {
+		e.rows = nil // &rowSetsWithDefinition{&rowSets{sets: sets, ex: e}}
+	} else {
+		e.rows = nil //&rowSets{sets: sets, ex: e}
+	}
+	return e
+}
+
+func (e *queryBasedExpectation) argsMatches(args []interface{}) error {
+	return nil
+
+	// if nil == e.args {
+	// 	return nil
+	// }
+	// if len(args) != len(e.args) {
+	// 	return fmt.Errorf("expected %d, but got %d arguments", len(e.args), len(args))
+	// }
+	// // @TODO should we assert either all args are named or ordinal?
+	// for k, v := range args {
+	// 	// custom argument matcher
+	// 	matcher, ok := e.args[k].(Argument)
+	// 	if ok {
+	// 		if !matcher.Match(v.Value) {
+	// 			return fmt.Errorf("matcher %T could not match %d argument %T - %+v", matcher, k, args[k], args[k])
+	// 		}
+	// 		continue
+	// 	}
+
+	// 	dval := e.args[k]
+	// 	if named, isNamed := dval.(sql.NamedArg); isNamed {
+	// 		dval = named.Value
+	// 		if v.Name != named.Name {
+	// 			return fmt.Errorf("named argument %d: name: \"%s\" does not match expected: \"%s\"", k, v.Name, named.Name)
+	// 		}
+	// 	} else if k+1 != v.Ordinal {
+	// 		return fmt.Errorf("argument %d: ordinal position: %d does not match expected: %d", k, k+1, v.Ordinal)
+	// 	}
+
+	// 	// convert to driver converter
+	// 	darg, err := e.converter.ConvertValue(dval)
+	// 	if err != nil {
+	// 		return fmt.Errorf("could not convert %d argument %T - %+v to driver value: %s", k, e.args[k], e.args[k], err)
+	// 	}
+
+	// 	if !reflect.DeepEqual(darg, v.Value) {
+	// 		return fmt.Errorf("argument %d expected [%T - %+v] does not match actual [%T - %+v]", k, darg, darg, v.Value, v.Value)
+	// 	}
+	// }
+	// return nil
+}
+
+func (e *queryBasedExpectation) attemptArgMatch(args []interface{}) (err error) {
+	// catch panic
+	defer func() {
+		if e := recover(); e != nil {
+			_, ok := e.(error)
+			if !ok {
+				err = fmt.Errorf(e.(string))
+			}
+		}
+	}()
+
+	err = e.argsMatches(args)
+	return
 }
