@@ -17,7 +17,7 @@ func (a AnyTime) Match(v driver.Value) bool {
 
 func TestAnyTimeArgument(t *testing.T) {
 	t.Parallel()
-	mock, err := New()
+	mock, err := NewConn()
 	if err != nil {
 		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
 	}
@@ -39,7 +39,7 @@ func TestAnyTimeArgument(t *testing.T) {
 
 func TestByteSliceArgument(t *testing.T) {
 	t.Parallel()
-	mock, err := New()
+	mock, err := NewConn()
 	if err != nil {
 		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
 	}

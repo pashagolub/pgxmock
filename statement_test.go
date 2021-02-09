@@ -9,7 +9,7 @@ import (
 )
 
 func TestExpectedPreparedStatementCloseError(t *testing.T) {
-	mock, err := New()
+	mock, err := NewConn()
 	if err != nil {
 		t.Fatal("failed to open sqlmock database:", err)
 	}

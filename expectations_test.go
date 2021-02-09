@@ -24,7 +24,7 @@ func (s CustomConverter) ConvertValue(v interface{}) (interface{}, error) {
 }
 
 func ExampleExpectedExec() {
-	mock, _ := New()
+	mock, _ := NewConn()
 	result := NewErrorResult(fmt.Errorf("some error"))
 	mock.ExpectExec("^INSERT (.+)").WillReturnResult(result)
 	res, _ := mock.Exec(context.Background(), "INSERT something")
@@ -34,7 +34,7 @@ func ExampleExpectedExec() {
 }
 
 func TestBuildQuery(t *testing.T) {
-	mock, _ := New()
+	mock, _ := NewConn()
 	query := `
 		SELECT
 			name,
@@ -63,7 +63,7 @@ func TestBuildQuery(t *testing.T) {
 }
 
 func TestCustomValueConverterQueryScan(t *testing.T) {
-	mock, _ := New() // New(ValueConverterOption(CustomConverter{}))
+	mock, _ := NewConn() // New(ValueConverterOption(CustomConverter{}))
 	query := `
 		SELECT
 			name,

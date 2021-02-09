@@ -9,7 +9,7 @@ import (
 const invalid = `☠☠☠ MEMORY OVERWRITTEN ☠☠☠ `
 
 func ExampleRows() {
-	mock, err := New()
+	mock, err := NewConn()
 	if err != nil {
 		fmt.Println("failed to open sqlmock database:", err)
 	}
@@ -39,7 +39,7 @@ func ExampleRows() {
 }
 
 func ExampleRows_rowError() {
-	mock, err := New()
+	mock, err := NewConn()
 	if err != nil {
 		fmt.Println("failed to open sqlmock database:", err)
 	}
@@ -69,7 +69,7 @@ func ExampleRows_rowError() {
 }
 
 func ExampleRows_closeError() {
-	mock, err := New()
+	mock, err := NewConn()
 	if err != nil {
 		fmt.Println("failed to open sqlmock database:", err)
 	}
@@ -130,7 +130,7 @@ func ExampleRows_closeError() {
 // }
 
 func ExampleRows_expectToBeClosed() {
-	mock, err := New()
+	mock, err := NewConn()
 	if err != nil {
 		fmt.Println("failed to open sqlmock database:", err)
 	}
@@ -186,7 +186,7 @@ func ExampleRows_expectToBeClosed() {
 
 func TestAllowsToSetRowsErrors(t *testing.T) {
 	t.Parallel()
-	mock, err := New()
+	mock, err := NewConn()
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
@@ -225,7 +225,7 @@ func TestAllowsToSetRowsErrors(t *testing.T) {
 
 func TestRowsCloseError(t *testing.T) {
 	t.Parallel()
-	mock, err := New()
+	mock, err := NewConn()
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
@@ -247,7 +247,7 @@ func TestRowsCloseError(t *testing.T) {
 
 func TestRowsClosed(t *testing.T) {
 	t.Parallel()
-	mock, err := New()
+	mock, err := NewConn()
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
@@ -381,7 +381,7 @@ func TestRowsClosed(t *testing.T) {
 
 func TestRowsScanError(t *testing.T) {
 	t.Parallel()
-	mock, err := New()
+	mock, err := NewConn()
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
@@ -418,7 +418,7 @@ func TestRowsScanError(t *testing.T) {
 func TestCSVRowParser(t *testing.T) {
 	t.Parallel()
 	rs := NewRows([]string{"col1", "col2"}).FromCSVString("a,NULL")
-	mock, err := New()
+	mock, err := NewConn()
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
@@ -448,7 +448,7 @@ func TestCSVRowParser(t *testing.T) {
 
 func TestWrongNumberOfValues(t *testing.T) {
 	// Open new mock database
-	mock, err := New()
+	mock, err := NewConn()
 	if err != nil {
 		fmt.Println("error creating mock database")
 		return

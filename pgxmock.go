@@ -99,7 +99,6 @@ type PgxMockIface interface {
 
 type PgxIface interface {
 	Begin(context.Context) (pgx.Tx, error)
-	Commit(context.Context) error
 	Exec(context.Context, string, ...interface{}) (pgconn.CommandTag, error)
 	QueryRow(context.Context, string, ...interface{}) pgx.Row
 	Query(context.Context, string, ...interface{}) (pgx.Rows, error)
@@ -111,13 +110,13 @@ type PgxIface interface {
 type Pgxmock interface {
 	PgxIface
 	PgxMockIface
+	pgx.Tx
 }
 
 type pgxmock struct {
 	ordered bool
 	dsn     string
 	opened  int
-	drv     *mockDriver
 	// converter    driver.ValueConverter
 	queryMatcher QueryMatcher
 	monitorPings bool
@@ -165,14 +164,6 @@ func (c *pgxmock) MatchExpectationsInOrder(b bool) {
 // there must be an *ExpectedClose expectation satisfied.
 // meets http://golang.org/pkg/database/sql/driver/#Conn interface
 func (c *pgxmock) Close(context.Context) error {
-	c.drv.Lock()
-	defer c.drv.Unlock()
-
-	c.opened--
-	if c.opened == 0 {
-		delete(c.drv.conns, c.dsn)
-	}
-
 	var expected *ExpectedClose
 	var fulfilled int
 	var ok bool

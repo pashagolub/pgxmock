@@ -11,7 +11,7 @@ import (
 // will test that order with a different status, cannot be cancelled
 func TestShouldNotCancelOrderWithNonPendingStatus(t *testing.T) {
 	// open database stub
-	mock, err := pgxmock.New()
+	mock, err := pgxmock.NewConn()
 	if err != nil {
 		t.Errorf("An error '%s' was not expected when opening a stub database connection", err)
 	}
@@ -42,7 +42,7 @@ func TestShouldNotCancelOrderWithNonPendingStatus(t *testing.T) {
 // will test order cancellation
 func TestShouldRefundUserWhenOrderIsCancelled(t *testing.T) {
 	// open database stub
-	mock, err := pgxmock.New()
+	mock, err := pgxmock.NewConn()
 	if err != nil {
 		t.Errorf("An error '%s' was not expected when opening a stub database connection", err)
 	}
@@ -81,7 +81,7 @@ func TestShouldRefundUserWhenOrderIsCancelled(t *testing.T) {
 // will test order cancellation
 func TestShouldRollbackOnError(t *testing.T) {
 	// open database stub
-	mock, err := pgxmock.New()
+	mock, err := pgxmock.NewConn()
 	if err != nil {
 		t.Errorf("An error '%s' was not expected when opening a stub database connection", err)
 	}

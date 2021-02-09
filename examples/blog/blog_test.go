@@ -24,7 +24,7 @@ func (a *api) assertJSON(actual []byte, data interface{}, t *testing.T) {
 }
 
 func TestShouldGetPosts(t *testing.T) {
-	mock, err := pgxmock.New()
+	mock, err := pgxmock.NewConn()
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
@@ -67,7 +67,7 @@ func TestShouldGetPosts(t *testing.T) {
 }
 
 func TestShouldRespondWithErrorOnFailure(t *testing.T) {
-	mock, err := pgxmock.New()
+	mock, err := pgxmock.NewConn()
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}

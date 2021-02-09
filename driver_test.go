@@ -18,7 +18,7 @@ func (c *converter) ConvertValue(v interface{}) (driver.Value, error) {
 }
 
 func TestShouldOpenConnectionIssue15(t *testing.T) {
-	mock, err := New()
+	mock, err := NewConn()
 	if err != nil {
 		t.Errorf("expected no error, but got: %s", err)
 	}
@@ -67,11 +67,11 @@ func TestShouldOpenConnectionIssue15(t *testing.T) {
 }
 
 func TestTwoOpenConnectionsOnTheSameDSN(t *testing.T) {
-	mock, err := New()
+	mock, err := NewConn()
 	if err != nil {
 		t.Errorf("expected no error, but got: %s", err)
 	}
-	mock2, err := New()
+	mock2, err := NewConn()
 	if err != nil {
 		t.Errorf("expected no error, but got: %s", err)
 	}

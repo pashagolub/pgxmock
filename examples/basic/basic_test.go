@@ -9,7 +9,7 @@ import (
 
 // a successful case
 func TestShouldUpdateStats(t *testing.T) {
-	mock, err := pgxmock.New()
+	mock, err := pgxmock.NewConn()
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
@@ -33,7 +33,7 @@ func TestShouldUpdateStats(t *testing.T) {
 
 // a failing test case
 func TestShouldRollbackStatUpdatesOnFailure(t *testing.T) {
-	db, mock, err := pgxmock.New()
+	db, mock, err := pgxmock.NewConn()
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}

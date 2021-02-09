@@ -10,7 +10,7 @@ import (
 var mock = &pgxmock{}
 
 func ExampleNewErrorResult() {
-	mock, _ := New()
+	mock, _ := NewConn()
 	result := NewErrorResult(fmt.Errorf("some error"))
 	mock.ExpectExec("^INSERT (.+)").WillReturnResult(result)
 	res, _ := mock.Exec(context.Background(), "INSERT something")

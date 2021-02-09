@@ -59,7 +59,7 @@ import (
 
 func TestIssue14EscapeSQL(t *testing.T) {
 	t.Parallel()
-	mock, err := New()
+	mock, err := NewConn()
 	if err != nil {
 		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
 	}
@@ -82,7 +82,7 @@ func TestIssue14EscapeSQL(t *testing.T) {
 // are not asserted on close
 func TestIssue4(t *testing.T) {
 	t.Parallel()
-	mock, err := New()
+	mock, err := NewConn()
 	if err != nil {
 		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
 	}
@@ -98,7 +98,7 @@ func TestIssue4(t *testing.T) {
 
 func TestMockQuery(t *testing.T) {
 	t.Parallel()
-	mock, err := New()
+	mock, err := NewConn()
 	if err != nil {
 		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
 	}
@@ -144,7 +144,7 @@ func TestMockQuery(t *testing.T) {
 
 func TestMockQueryTypes(t *testing.T) {
 	t.Parallel()
-	mock, err := New()
+	mock, err := NewConn()
 	if err != nil {
 		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
 	}
@@ -197,7 +197,7 @@ func TestMockQueryTypes(t *testing.T) {
 
 func TestTransactionExpectations(t *testing.T) {
 	t.Parallel()
-	mock, err := New()
+	mock, err := NewConn()
 	if err != nil {
 		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
 	}
@@ -246,7 +246,7 @@ func TestTransactionExpectations(t *testing.T) {
 
 func TestPrepareExpectations(t *testing.T) {
 	t.Parallel()
-	db, mock, err := New()
+	db, mock, err := NewConn()
 	if err != nil {
 		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
 	}
@@ -294,7 +294,7 @@ func TestPrepareExpectations(t *testing.T) {
 
 func TestPreparedQueryExecutions(t *testing.T) {
 	t.Parallel()
-	db, mock, err := New()
+	db, mock, err := NewConn()
 	if err != nil {
 		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
 	}
@@ -352,7 +352,7 @@ func TestPreparedQueryExecutions(t *testing.T) {
 
 func TestUnorderedPreparedQueryExecutions(t *testing.T) {
 	t.Parallel()
-	db, mock, err := New()
+	db, mock, err := NewConn()
 	if err != nil {
 		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
 	}
@@ -389,7 +389,7 @@ func TestUnorderedPreparedQueryExecutions(t *testing.T) {
 
 func TestUnexpectedOperations(t *testing.T) {
 	t.Parallel()
-	db, mock, err := New()
+	db, mock, err := NewConn()
 	if err != nil {
 		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
 	}
@@ -418,7 +418,7 @@ func TestUnexpectedOperations(t *testing.T) {
 
 func TestWrongExpectations(t *testing.T) {
 	t.Parallel()
-	db, mock, err := New()
+	db, mock, err := NewConn()
 	if err != nil {
 		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
 	}
@@ -465,7 +465,7 @@ func TestWrongExpectations(t *testing.T) {
 
 func TestExecExpectations(t *testing.T) {
 	t.Parallel()
-	db, mock, err := New()
+	db, mock, err := NewConn()
 	if err != nil {
 		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
 	}
@@ -506,7 +506,7 @@ func TestExecExpectations(t *testing.T) {
 
 func TestRowBuilderAndNilTypes(t *testing.T) {
 	t.Parallel()
-	db, mock, err := New()
+	db, mock, err := NewConn()
 	if err != nil {
 		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
 	}
@@ -598,7 +598,7 @@ func TestRowBuilderAndNilTypes(t *testing.T) {
 
 func TestArgumentReflectValueTypeError(t *testing.T) {
 	t.Parallel()
-	db, mock, err := New()
+	db, mock, err := NewConn()
 	if err != nil {
 		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
 	}
@@ -616,7 +616,7 @@ func TestArgumentReflectValueTypeError(t *testing.T) {
 
 func TestGoroutineExecutionWithUnorderedExpectationMatching(t *testing.T) {
 	t.Parallel()
-	db, mock, err := New()
+	db, mock, err := NewConn()
 	if err != nil {
 		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
 	}
@@ -656,7 +656,7 @@ func TestGoroutineExecutionWithUnorderedExpectationMatching(t *testing.T) {
 }
 
 func ExampleSqlmock_goroutines() {
-	db, mock, err := New()
+	db, mock, err := NewConn()
 	if err != nil {
 		fmt.Println("failed to open sqlmock database:", err)
 	}
@@ -699,7 +699,7 @@ func ExampleSqlmock_goroutines() {
 // False Positive - passes despite mismatched Exec
 // see #37 issue
 func TestRunExecsWithOrderedShouldNotMeetAllExpectations(t *testing.T) {
-	db, dbmock, _ := New()
+	db, dbmock, _ := NewConn()
 	dbmock.ExpectExec("THE FIRST EXEC")
 	dbmock.ExpectExec("THE SECOND EXEC")
 
@@ -715,7 +715,7 @@ func TestRunExecsWithOrderedShouldNotMeetAllExpectations(t *testing.T) {
 // False Positive - passes despite mismatched Exec
 // see #37 issue
 func TestRunQueriesWithOrderedShouldNotMeetAllExpectations(t *testing.T) {
-	db, dbmock, _ := New()
+	db, dbmock, _ := NewConn()
 	dbmock.ExpectQuery("THE FIRST QUERY")
 	dbmock.ExpectQuery("THE SECOND QUERY")
 
@@ -729,7 +729,7 @@ func TestRunQueriesWithOrderedShouldNotMeetAllExpectations(t *testing.T) {
 }
 
 func TestRunExecsWithExpectedErrorMeetsExpectations(t *testing.T) {
-	db, dbmock, _ := New()
+	db, dbmock, _ := NewConn()
 	dbmock.ExpectExec("THE FIRST EXEC").WillReturnError(fmt.Errorf("big bad bug"))
 	dbmock.ExpectExec("THE SECOND EXEC").WillReturnResult(NewResult(0, 0))
 
@@ -743,7 +743,7 @@ func TestRunExecsWithExpectedErrorMeetsExpectations(t *testing.T) {
 }
 
 func TestRunQueryWithExpectedErrorMeetsExpectations(t *testing.T) {
-	db, dbmock, _ := New()
+	db, dbmock, _ := NewConn()
 	dbmock.ExpectQuery("THE FIRST QUERY").WillReturnError(fmt.Errorf("big bad bug"))
 	dbmock.ExpectQuery("THE SECOND QUERY").WillReturnRows(NewRows([]string{"col"}).AddRow(1))
 
@@ -758,7 +758,7 @@ func TestRunQueryWithExpectedErrorMeetsExpectations(t *testing.T) {
 
 func TestEmptyRowSet(t *testing.T) {
 	t.Parallel()
-	db, mock, err := New()
+	db, mock, err := NewConn()
 	if err != nil {
 		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
 	}
@@ -794,7 +794,7 @@ func TestEmptyRowSet(t *testing.T) {
 // Based on issue #50
 func TestPrepareExpectationNotFulfilled(t *testing.T) {
 	t.Parallel()
-	db, mock, err := New()
+	db, mock, err := NewConn()
 	if err != nil {
 		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
 	}
@@ -813,7 +813,7 @@ func TestPrepareExpectationNotFulfilled(t *testing.T) {
 
 func TestRollbackThrow(t *testing.T) {
 	// Open new mock database
-	db, mock, err := New()
+	db, mock, err := NewConn()
 	if err != nil {
 		fmt.Println("error creating mock database")
 		return
@@ -846,7 +846,7 @@ func TestRollbackThrow(t *testing.T) {
 
 func TestUnexpectedBegin(t *testing.T) {
 	// Open new mock database
-	db, _, err := New()
+	db, _, err := NewConn()
 	if err != nil {
 		fmt.Println("error creating mock database")
 		return
@@ -858,7 +858,7 @@ func TestUnexpectedBegin(t *testing.T) {
 
 func TestUnexpectedExec(t *testing.T) {
 	// Open new mock database
-	db, mock, err := New()
+	db, mock, err := NewConn()
 	if err != nil {
 		fmt.Println("error creating mock database")
 		return
@@ -872,7 +872,7 @@ func TestUnexpectedExec(t *testing.T) {
 
 func TestUnexpectedCommit(t *testing.T) {
 	// Open new mock database
-	db, mock, err := New()
+	db, mock, err := NewConn()
 	if err != nil {
 		fmt.Println("error creating mock database")
 		return
@@ -886,7 +886,7 @@ func TestUnexpectedCommit(t *testing.T) {
 
 func TestUnexpectedCommitOrder(t *testing.T) {
 	// Open new mock database
-	db, mock, err := New()
+	db, mock, err := NewConn()
 	if err != nil {
 		fmt.Println("error creating mock database")
 		return
@@ -901,7 +901,7 @@ func TestUnexpectedCommitOrder(t *testing.T) {
 
 func TestExpectedCommitOrder(t *testing.T) {
 	// Open new mock database
-	db, mock, err := New()
+	db, mock, err := NewConn()
 	if err != nil {
 		fmt.Println("error creating mock database")
 		return
@@ -914,7 +914,7 @@ func TestExpectedCommitOrder(t *testing.T) {
 
 func TestUnexpectedRollback(t *testing.T) {
 	// Open new mock database
-	db, mock, err := New()
+	db, mock, err := NewConn()
 	if err != nil {
 		fmt.Println("error creating mock database")
 		return
@@ -928,7 +928,7 @@ func TestUnexpectedRollback(t *testing.T) {
 
 func TestUnexpectedRollbackOrder(t *testing.T) {
 	// Open new mock database
-	db, mock, err := New()
+	db, mock, err := NewConn()
 	if err != nil {
 		fmt.Println("error creating mock database")
 		return
@@ -943,7 +943,7 @@ func TestUnexpectedRollbackOrder(t *testing.T) {
 
 func TestPrepareExec(t *testing.T) {
 	// Open new mock database
-	db, mock, err := New()
+	db, mock, err := NewConn()
 	if err != nil {
 		fmt.Println("error creating mock database")
 		return
@@ -975,7 +975,7 @@ func TestPrepareExec(t *testing.T) {
 
 func TestPrepareQuery(t *testing.T) {
 	// Open new mock database
-	db, mock, err := New()
+	db, mock, err := NewConn()
 	if err != nil {
 		fmt.Println("error creating mock database")
 		return
@@ -1014,7 +1014,7 @@ func TestPrepareQuery(t *testing.T) {
 
 func TestExpectedCloseError(t *testing.T) {
 	// Open new mock database
-	db, mock, err := New()
+	db, mock, err := NewConn()
 	if err != nil {
 		fmt.Println("error creating mock database")
 		return
@@ -1030,7 +1030,7 @@ func TestExpectedCloseError(t *testing.T) {
 
 func TestExpectedCloseOrder(t *testing.T) {
 	// Open new mock database
-	db, mock, err := New()
+	db, mock, err := NewConn()
 	if err != nil {
 		fmt.Println("error creating mock database")
 		return
@@ -1045,7 +1045,7 @@ func TestExpectedCloseOrder(t *testing.T) {
 
 func TestExpectedBeginOrder(t *testing.T) {
 	// Open new mock database
-	db, mock, err := New()
+	db, mock, err := NewConn()
 	if err != nil {
 		fmt.Println("error creating mock database")
 		return
@@ -1058,7 +1058,7 @@ func TestExpectedBeginOrder(t *testing.T) {
 
 func TestPreparedStatementCloseExpectation(t *testing.T) {
 	// Open new mock database
-	db, mock, err := New()
+	db, mock, err := NewConn()
 	if err != nil {
 		fmt.Println("error creating mock database")
 		return
@@ -1088,7 +1088,7 @@ func TestPreparedStatementCloseExpectation(t *testing.T) {
 
 func TestExecExpectationErrorDelay(t *testing.T) {
 	t.Parallel()
-	db, mock, err := New()
+	db, mock, err := NewConn()
 	if err != nil {
 		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
 	}
@@ -1141,7 +1141,7 @@ func TestOptionsFail(t *testing.T) {
 	option := func(*pgxmock) error {
 		return expected
 	}
-	db, _, err := New(option)
+	db, _, err := NewConn(option)
 	defer db.Close()
 	if err == nil {
 		t.Errorf("missing expecting error '%s' when opening a stub database connection", expected)
@@ -1150,7 +1150,7 @@ func TestOptionsFail(t *testing.T) {
 
 func TestNewRows(t *testing.T) {
 	t.Parallel()
-	db, mock, err := New()
+	db, mock, err := NewConn()
 	if err != nil {
 		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
 	}
@@ -1167,7 +1167,7 @@ func TestNewRows(t *testing.T) {
 // ExpectationWereMet, the race detector complains if e.triggered is being read while it is also
 // being written by the query running in another goroutine.
 func TestQueryWithTimeout(t *testing.T) {
-	db, mock, err := New()
+	db, mock, err := NewConn()
 	if err != nil {
 		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
 	}
@@ -1214,7 +1214,7 @@ func queryWithTimeout(t time.Duration, db *sql.DB, query string, args ...interfa
 }
 
 func Test_sqlmock_Prepare_and_Exec(t *testing.T) {
-	db, mock, err := New()
+	db, mock, err := NewConn()
 	if err != nil {
 		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
 	}
@@ -1261,7 +1261,7 @@ func (f failArgument) Match(_ driver.Value) bool {
 }
 
 func Test_sqlmock_Exec(t *testing.T) {
-	db, mock, err := New()
+	db, mock, err := NewConn()
 	if err != nil {
 		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
 	}
@@ -1313,7 +1313,7 @@ func Test_sqlmock_Exec(t *testing.T) {
 }
 
 func Test_sqlmock_Query(t *testing.T) {
-	db, mock, err := New()
+	db, mock, err := NewConn()
 	if err != nil {
 		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
 	}

@@ -9,7 +9,7 @@ import (
 func ExampleQueryMatcher() {
 	// configure to use case sensitive SQL query matcher
 	// instead of default regular expression matcher
-	mock, err := New(QueryMatcherOption(QueryMatcherEqual))
+	mock, err := NewConn(QueryMatcherOption(QueryMatcherEqual))
 	if err != nil {
 		fmt.Println("failed to open sqlmock database:", err)
 	}
