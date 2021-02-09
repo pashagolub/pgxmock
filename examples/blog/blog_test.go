@@ -2,13 +2,14 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/pashagolub/pgxmock"
 )
 
 func (a *api) assertJSON(actual []byte, data interface{}, t *testing.T) {
@@ -23,14 +24,14 @@ func (a *api) assertJSON(actual []byte, data interface{}, t *testing.T) {
 }
 
 func TestShouldGetPosts(t *testing.T) {
-	db, mock, err := sqlmock.New()
+	mock, err := pgxmock.New()
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
-	defer db.Close()
+	defer mock.Close(context.Background())
 
 	// create app with mocked db, request and response to test
-	app := &api{db}
+	app := &api{mock}
 	req, err := http.NewRequest("GET", "http://localhost/posts", nil)
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected while creating request", err)
@@ -38,7 +39,7 @@ func TestShouldGetPosts(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	// before we actually execute our api function, we need to expect required DB actions
-	rows := sqlmock.NewRows([]string{"id", "title", "body"}).
+	rows := mock.NewRows([]string{"id", "title", "body"}).
 		AddRow(1, "post 1", "hello").
 		AddRow(2, "post 2", "world")
 
@@ -66,14 +67,14 @@ func TestShouldGetPosts(t *testing.T) {
 }
 
 func TestShouldRespondWithErrorOnFailure(t *testing.T) {
-	db, mock, err := sqlmock.New()
+	mock, err := pgxmock.New()
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
-	defer db.Close()
+	defer mock.Close(context.Background())
 
 	// create app with mocked db, request and response to test
-	app := &api{db}
+	app := &api{mock}
 	req, err := http.NewRequest("GET", "http://localhost/posts", nil)
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected while creating request", err)

@@ -9,7 +9,6 @@ import (
 
 type PgxIface interface {
 	Begin(context.Context) (pgx.Tx, error)
-	Commit(context.Context) error
 	Exec(context.Context, string, ...interface{}) (pgconn.CommandTag, error)
 	QueryRow(context.Context, string, ...interface{}) pgx.Row
 	Query(context.Context, string, ...interface{}) (pgx.Rows, error)

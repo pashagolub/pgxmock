@@ -1,13 +1,26 @@
 package main
 
 import (
-	"database/sql"
+	"context"
 	"encoding/json"
 	"net/http"
+
+	pgconn "github.com/jackc/pgconn"
+	pgx "github.com/jackc/pgx/v4"
 )
 
+type PgxIface interface {
+	Begin(context.Context) (pgx.Tx, error)
+	Exec(context.Context, string, ...interface{}) (pgconn.CommandTag, error)
+	QueryRow(context.Context, string, ...interface{}) pgx.Row
+	Query(context.Context, string, ...interface{}) (pgx.Rows, error)
+	Ping(context.Context) error
+	Prepare(context.Context, string, string) (*pgconn.StatementDescription, error)
+	Close(context.Context) error
+}
+
 type api struct {
-	db *sql.DB
+	db PgxIface
 }
 
 type post struct {
@@ -17,7 +30,7 @@ type post struct {
 }
 
 func (a *api) posts(w http.ResponseWriter, r *http.Request) {
-	rows, err := a.db.Query("SELECT id, title, body FROM posts")
+	rows, err := a.db.Query(context.Background(), "SELECT id, title, body FROM posts")
 	if err != nil {
 		a.fail(w, "failed to fetch posts: "+err.Error(), 500)
 		return
@@ -47,7 +60,7 @@ func (a *api) posts(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	// @NOTE: the real connection is not required for tests
-	db, err := sql.Open("mysql", "root@/blog")
+	db, err := pgx.Connect(context.Background(), "postgres://postgres@localhost/blog")
 	if err != nil {
 		panic(err)
 	}
