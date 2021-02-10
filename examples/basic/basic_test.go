@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -13,7 +14,7 @@ func TestShouldUpdateStats(t *testing.T) {
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
-	defer mock.Close()
+	defer mock.Close(context.Background())
 
 	mock.ExpectBegin()
 	mock.ExpectExec("UPDATE products").WillReturnResult(pgxmock.NewResult("UPDATE", 1))
@@ -21,7 +22,7 @@ func TestShouldUpdateStats(t *testing.T) {
 	mock.ExpectCommit()
 
 	// now we execute our method
-	if err = recordStats(db, 2, 3); err != nil {
+	if err = recordStats(mock, 2, 3); err != nil {
 		t.Errorf("error was not expected while updating stats: %s", err)
 	}
 
@@ -33,11 +34,11 @@ func TestShouldUpdateStats(t *testing.T) {
 
 // a failing test case
 func TestShouldRollbackStatUpdatesOnFailure(t *testing.T) {
-	db, mock, err := pgxmock.NewConn()
+	mock, err := pgxmock.NewConn()
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
-	defer db.Close()
+	defer mock.Close(context.Background())
 
 	mock.ExpectBegin()
 	mock.ExpectExec("UPDATE products").WillReturnResult(pgxmock.NewResult("UPDATE", 1))
@@ -47,7 +48,7 @@ func TestShouldRollbackStatUpdatesOnFailure(t *testing.T) {
 	mock.ExpectRollback()
 
 	// now we execute our method
-	if err = recordStats(db, 2, 3); err == nil {
+	if err = recordStats(mock, 2, 3); err == nil {
 		t.Errorf("was expecting an error, but there was none")
 	}
 
