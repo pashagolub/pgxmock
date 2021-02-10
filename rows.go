@@ -5,6 +5,7 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
+	"reflect"
 	"strings"
 
 	"github.com/jackc/pgconn"
@@ -59,17 +60,6 @@ func (rs *rowSets) Next() bool {
 	r.pos++
 	rs.invalidateRaw()
 	return r.pos <= len(r.rows)
-
-	// for i, col := range r.rows[r.pos-1] {
-	// 	if b, ok := rawBytes(col); ok {
-	// 		rs.raw = append(rs.raw, b)
-	// 		dest[i] = b
-	// 		continue
-	// 	}
-	// 	dest[i] = col
-	// }
-
-	// return r.nextErr[r.pos-1]
 }
 
 func (rs *rowSets) Values() ([]interface{}, error) {
@@ -77,7 +67,24 @@ func (rs *rowSets) Values() ([]interface{}, error) {
 }
 
 func (rs *rowSets) Scan(dest ...interface{}) error {
-	return nil
+	r := rs.sets[rs.pos]
+	if len(dest) != len(r.cols) {
+		return fmt.Errorf("Incorrect argument number %d for columns %d", len(dest), len(r.cols))
+	}
+	for i, col := range r.rows[r.pos-1] {
+		destVal := reflect.ValueOf(dest[i])
+		val := reflect.ValueOf(col)
+		if destVal.Kind() == reflect.Ptr && destVal.Elem().Kind() == val.Kind() {
+			if destElem := destVal.Elem(); destElem.CanSet() {
+				destElem.Set(val)
+			} else {
+				return fmt.Errorf("Cannot set destination value for column %s", r.cols[i])
+			}
+		} else {
+			return fmt.Errorf("Destination kind not supported for column %s", r.cols[i])
+		}
+	}
+	return r.nextErr[r.pos-1]
 }
 
 func (rs *rowSets) RawValues() [][]byte {
