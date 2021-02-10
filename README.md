@@ -6,7 +6,8 @@
 # pgx driver mock for Golang
 
 **pgxmock** is a mock library implementing [pgx - PostgreSQL Driver and Toolkit](https://github.com/jackc/pgx/). 
-It's bases on a well-known [sqlmock](https://github.com/DATA-DOG/go-sqlmock) library for `sql/driver`.  
+It's based on the well-known [sqlmock](https://github.com/DATA-DOG/go-sqlmock) library for `sql/driver`.
+
 **pgxmock** has one and only purpose - to simulate **pgx** behavior in tests, without needing a real database connection. It helps to maintain correct **TDD** workflow.
 
 - this library is **not** complete and **not** stable (issues and pull requests are welcome);
@@ -14,11 +15,6 @@ It's bases on a well-known [sqlmock](https://github.com/DATA-DOG/go-sqlmock) lib
 - does not require any modifications to your source code;
 - has strict by default expectation order matching;
 - has no third party dependencies except **pgx** packages.
-
-## Looking for maintainers
-
-I do not have much spare time for this library and willing to transfer the repository ownership
-to person or an organization motivated to maintain it. Open up a conversation if you are interested. See #230.
 
 ## Install
 
