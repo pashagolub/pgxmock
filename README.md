@@ -5,21 +5,15 @@
 
 # Sql driver mock for Golang
 
-**sqlmock** is a mock library implementing [sql/driver](https://godoc.org/database/sql/driver). Which has one and only
-purpose - to simulate any **sql** driver behavior in tests, without needing a real database connection. It helps to
-maintain correct **TDD** workflow.
+**pgxmock** is a mock library implementing [pgx - PostgreSQL Driver and Toolkit](https://github.com/jackc/pgx/). 
+It's bases on a well-known [sqlmock](https://github.com/DATA-DOG/go-sqlmock) library for `sql/driver`.  
+**pgxmock** has one and only purpose - to simulate **pgx** behavior in tests, without needing a real database connection. It helps to maintain correct **TDD** workflow.
 
-- this library is now complete and stable. (you may not find new changes for this reason)
-- supports concurrency and multiple connections.
-- supports **go1.8** Context related feature mocking and Named sql parameters.
-- does not require any modifications to your source code.
-- the driver allows to mock any sql driver method behavior.
-- has strict by default expectation order matching.
-- has no third party dependencies.
-
-**NOTE:** in **v1.2.0** **sqlmock.Rows** has changed to struct from interface, if you were using any type references to that
-interface, you will need to switch it to a pointer struct type. Also, **sqlmock.Rows** were used to implement **driver.Rows**
-interface, which was not required or useful for mocking and was removed. Hope it will not cause issues.
+- this library is **not** complete and **not** stable (issues and pull requests are welcome);
+- written based on **go1.15** bersion, however, should be compatible with **go1.11** and above;
+- does not require any modifications to your source code;
+- has strict by default expectation order matching;
+- has no third party dependencies except **pgx** packages.
 
 ## Looking for maintainers
 
@@ -28,33 +22,35 @@ to person or an organization motivated to maintain it. Open up a conversation if
 
 ## Install
 
-    go get github.com/DATA-DOG/go-sqlmock
+    go get github.com/pashagolub/pgxmock
 
 ## Documentation and Examples
 
-Visit [godoc](http://godoc.org/github.com/DATA-DOG/go-sqlmock) for general examples and public api reference.
-See **.travis.yml** for supported **go** versions.
-Different use case, is to functionally test with a real database - [go-txdb](https://github.com/DATA-DOG/go-txdb)
-all database related actions are isolated within a single transaction so the database can remain in the same state.
+Visit [godoc](http://pkg.go.dev/github.com/pashagolub/pgxmock) for general examples and public api reference.
 
 See implementation examples:
 
-- [blog API server](https://github.com/DATA-DOG/go-sqlmock/tree/master/examples/blog)
-- [the same orders example](https://github.com/DATA-DOG/go-sqlmock/tree/master/examples/orders)
+- [blog API server](https://github.com/pashagolub/pgxmock/tree/master/examples/blog)
+- [the same orders example](https://github.com/pashagolub/pgxmock/tree/master/examples/orders)
 
-### Something you may want to test, assuming you use the [go-mysql-driver](https://github.com/go-sql-driver/mysql)
+### Something you may want to test
 
 ``` go
 package main
 
 import (
-	"database/sql"
+	"context"
 
-	_ "github.com/go-sql-driver/mysql"
+	pgx "github.com/jackc/pgx/v4"
 )
 
-func recordStats(db *sql.DB, userID, productID int64) (err error) {
-	tx, err = db.Begin()
+type PgxIface interface {
+	Begin(context.Context) (pgx.Tx, error)
+	Close(context.Context) error
+}
+
+func recordStats(db PgxIface, userID, productID int64) (err error) {
+	tx, err := db.Begin(context.Background())
 	if err != nil {
 		return
 	}
@@ -62,16 +58,16 @@ func recordStats(db *sql.DB, userID, productID int64) (err error) {
 	defer func() {
 		switch err {
 		case nil:
-			err = tx.Commit()
+			err = tx.Commit(context.Background())
 		default:
-			tx.Rollback()
+			_ = tx.Rollback(context.Background())
 		}
 	}()
 
-	if _, err = tx.Exec("UPDATE products SET views = views + 1"); err != nil {
+	if _, err = tx.Exec(context.Background(), "UPDATE products SET views = views + 1"); err != nil {
 		return
 	}
-	if _, err = tx.Exec("INSERT INTO product_viewers (user_id, product_id) VALUES (?, ?)", userID, productID); err != nil {
+	if _, err = tx.Exec(context.Background(), "INSERT INTO product_viewers (user_id, product_id) VALUES (?, ?)", userID, productID); err != nil {
 		return
 	}
 	return
@@ -79,11 +75,11 @@ func recordStats(db *sql.DB, userID, productID int64) (err error) {
 
 func main() {
 	// @NOTE: the real connection is not required for tests
-	db, err := sql.Open("mysql", "root@/blog")
+	db, err := pgx.Connect(context.Background(), "postgres://rolname@hostname/dbname")
 	if err != nil {
 		panic(err)
 	}
-	defer db.Close()
+	defer db.Close(context.Background())
 
 	if err = recordStats(db, 1 /*some user id*/, 5 /*some product id*/); err != nil {
 		panic(err)
@@ -91,33 +87,34 @@ func main() {
 }
 ```
 
-### Tests with sqlmock
+### Tests with pgxmock
 
 ``` go
 package main
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
-	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/pashagolub/pgxmock"
 )
 
 // a successful case
 func TestShouldUpdateStats(t *testing.T) {
-	db, mock, err := sqlmock.New()
+	mock, err := pgxmock.NewConn()
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
-	defer db.Close()
+	defer mock.Close(context.Background())
 
 	mock.ExpectBegin()
-	mock.ExpectExec("UPDATE products").WillReturnResult(sqlmock.NewResult(1, 1))
-	mock.ExpectExec("INSERT INTO product_viewers").WithArgs(2, 3).WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectExec("UPDATE products").WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+	mock.ExpectExec("INSERT INTO product_viewers").WithArgs(2, 3).WillReturnResult(pgxmock.NewResult("INSERT", 1))
 	mock.ExpectCommit()
 
 	// now we execute our method
-	if err = recordStats(db, 2, 3); err != nil {
+	if err = recordStats(mock, 2, 3); err != nil {
 		t.Errorf("error was not expected while updating stats: %s", err)
 	}
 
@@ -129,21 +126,21 @@ func TestShouldUpdateStats(t *testing.T) {
 
 // a failing test case
 func TestShouldRollbackStatUpdatesOnFailure(t *testing.T) {
-	db, mock, err := sqlmock.New()
+	mock, err := pgxmock.NewConn()
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
-	defer db.Close()
+	defer mock.Close(context.Background())
 
 	mock.ExpectBegin()
-	mock.ExpectExec("UPDATE products").WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectExec("UPDATE products").WillReturnResult(pgxmock.NewResult("UPDATE", 1))
 	mock.ExpectExec("INSERT INTO product_viewers").
 		WithArgs(2, 3).
 		WillReturnError(fmt.Errorf("some error"))
 	mock.ExpectRollback()
 
 	// now we execute our method
-	if err = recordStats(db, 2, 3); err == nil {
+	if err = recordStats(mock, 2, 3); err == nil {
 		t.Errorf("was expecting an error, but there was none")
 	}
 
@@ -158,28 +155,28 @@ func TestShouldRollbackStatUpdatesOnFailure(t *testing.T) {
 
 There were plenty of requests from users regarding SQL query string validation or different matching option.
 We have now implemented the `QueryMatcher` interface, which can be passed through an option when calling
-`sqlmock.New` or `sqlmock.NewWithDSN`.
+`pgxmock.New` or `pgxmock.NewWithDSN`.
 
-This now allows to include some library, which would allow for example to parse and validate `mysql` SQL AST.
+This now allows to include some library, which would allow for example to parse and validate SQL AST.
 And create a custom QueryMatcher in order to validate SQL in sophisticated ways.
 
-By default, **sqlmock** is preserving backward compatibility and default query matcher is `sqlmock.QueryMatcherRegexp`
+By default, **pgxmock** is preserving backward compatibility and default query matcher is `pgxmock.QueryMatcherRegexp`
 which uses expected SQL string as a regular expression to match incoming query string. There is an equality matcher:
 `QueryMatcherEqual` which will do a full case sensitive match.
 
 In order to customize the QueryMatcher, use the following:
 
 ``` go
-	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+	mock, err := pgxmock.New(context.Background(), sqlmock.QueryMatcherOption(pgxmock.QueryMatcherEqual))
 ```
 
-The query matcher can be fully customized based on user needs. **sqlmock** will not
-provide a standard sql parsing matchers, since various drivers may not follow the same SQL standard.
+The query matcher can be fully customized based on user needs. **pgxmock** will not
+provide a standard sql parsing matchers.
 
 ## Matching arguments like time.Time
 
 There may be arguments which are of `struct` type and cannot be compared easily by value like `time.Time`. In this case
-**sqlmock** provides an [Argument](https://godoc.org/github.com/DATA-DOG/go-sqlmock#Argument) interface which
+**pgxmock** provides an [Argument](https://pkg.go.dev/github.com/pashagolub/pgxmock#Argument) interface which
 can be used in more sophisticated matching. Here is a simple example of time argument matching:
 
 ``` go
@@ -221,7 +218,9 @@ It only asserts that argument is of `time.Time` type.
     go test -race
 
 ## Change Log
+- **2021-02-10** - public release of **pgxmock**.
 
+Derived from **sqlmock**:
 - **2019-04-06** - added functionality to mock a sql MetaData request
 - **2019-02-13** - added `go.mod` removed the references and suggestions using `gopkg.in`.
 - **2018-12-11** - added expectation of Rows to be closed, while mocking expected query.

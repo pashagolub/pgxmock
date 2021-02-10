@@ -3,17 +3,11 @@ package main
 import (
 	"context"
 
-	"github.com/jackc/pgconn"
 	pgx "github.com/jackc/pgx/v4"
 )
 
 type PgxIface interface {
 	Begin(context.Context) (pgx.Tx, error)
-	Exec(context.Context, string, ...interface{}) (pgconn.CommandTag, error)
-	QueryRow(context.Context, string, ...interface{}) pgx.Row
-	Query(context.Context, string, ...interface{}) (pgx.Rows, error)
-	Ping(context.Context) error
-	Prepare(context.Context, string, string) (*pgconn.StatementDescription, error)
 	Close(context.Context) error
 }
 
@@ -28,7 +22,7 @@ func recordStats(db PgxIface, userID, productID int64) (err error) {
 		case nil:
 			err = tx.Commit(context.Background())
 		default:
-			tx.Rollback(context.Background())
+			_ = tx.Rollback(context.Background())
 		}
 	}()
 
@@ -43,7 +37,7 @@ func recordStats(db PgxIface, userID, productID int64) (err error) {
 
 func main() {
 	// @NOTE: the real connection is not required for tests
-	db, err := pgx.Connect(context.Background(), "root@/blog")
+	db, err := pgx.Connect(context.Background(), "postgres://rolname@hostname/dbname")
 	if err != nil {
 		panic(err)
 	}
