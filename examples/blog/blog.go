@@ -66,7 +66,7 @@ func main() {
 	}
 	app := &api{db: db}
 	http.HandleFunc("/posts", app.posts)
-	http.ListenAndServe(":8080", nil)
+	_ = http.ListenAndServe(":8080", nil)
 }
 
 func (a *api) fail(w http.ResponseWriter, msg string, status int) {
@@ -78,7 +78,7 @@ func (a *api) fail(w http.ResponseWriter, msg string, status int) {
 
 	resp, _ := json.Marshal(data)
 	w.WriteHeader(status)
-	w.Write(resp)
+	_, _ = w.Write(resp)
 }
 
 func (a *api) ok(w http.ResponseWriter, data interface{}) {
@@ -90,5 +90,5 @@ func (a *api) ok(w http.ResponseWriter, data interface{}) {
 		a.fail(w, "oops something evil has happened", 500)
 		return
 	}
-	w.Write(resp)
+	_, _ = w.Write(resp)
 }

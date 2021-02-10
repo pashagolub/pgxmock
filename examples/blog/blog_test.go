@@ -18,7 +18,7 @@ func (a *api) assertJSON(actual []byte, data interface{}, t *testing.T) {
 		t.Fatalf("an error '%s' was not expected when marshaling expected json data", err)
 	}
 
-	if bytes.Compare(expected, actual) != 0 {
+	if !bytes.Equal(expected, actual) {
 		t.Errorf("the expected json: %s is different from actual %s", expected, actual)
 	}
 }
@@ -49,7 +49,7 @@ func TestShouldGetPosts(t *testing.T) {
 	app.posts(w, req)
 
 	if w.Code != 200 {
-		t.Fatalf("expected status code to be 200, but got: %d", w.Code)
+		t.Fatalf("expected status code to be 200, but got: %d\nBody: %v", w.Code, w.Body)
 	}
 
 	data := struct {

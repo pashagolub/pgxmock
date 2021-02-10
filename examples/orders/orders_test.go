@@ -58,17 +58,17 @@ func TestShouldRefundUserWhenOrderIsCancelled(t *testing.T) {
 		WillReturnRows(mock.NewRows(columns).AddRow(1, 0, 25.75, 3.25, 2, 10.00))
 	// expect user balance update
 	mock.ExpectPrepare("UPDATE users SET balance").ExpectExec().
-		WithArgs(25.75+3.25, 2).               // refund amount, user id
-		WillReturnResult(mock.NewResult(0, 1)) // no insert id, 1 affected row
+		WithArgs(25.75+3.25, 2).                         // refund amount, user id
+		WillReturnResult(pgxmock.NewResult("UPDATE", 1)) // no insert id, 1 affected row
 	// expect order status update
 	mock.ExpectPrepare("UPDATE orders SET status").ExpectExec().
-		WithArgs(ORDER_CANCELLED, 1).          // status, id
-		WillReturnResult(mock.NewResult(0, 1)) // no insert id, 1 affected row
+		WithArgs(ORDER_CANCELLED, 1).                    // status, id
+		WillReturnResult(pgxmock.NewResult("UPDATE", 1)) // no insert id, 1 affected row
 	// expect a transaction commit
 	mock.ExpectCommit()
 
 	// run the cancel order function
-	err = cancelOrder(1, db)
+	err = cancelOrder(1, mock)
 	if err != nil {
 		t.Errorf("Expected no error, but got %s instead", err)
 	}
