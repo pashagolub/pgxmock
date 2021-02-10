@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgconn"
+	"github.com/jackc/pgproto3/v2"
 	pgx "github.com/jackc/pgx/v4"
 )
 
@@ -91,7 +92,7 @@ type PgxMockIface interface {
 
 	// NewRowsWithColumnDefinition allows Rows to be created from a
 	// sql driver.Value slice with a definition of sql metadata
-	NewRowsWithColumnDefinition(columns ...*Column) *Rows
+	NewRowsWithColumnDefinition(columns ...pgproto3.FieldDescription) *Rows
 
 	// New Column allows to create a Column
 	NewColumn(name string) *Column
@@ -656,7 +657,7 @@ func (c *pgxmock) query(query string, args []interface{}) (*ExpectedQuery, error
 	}
 
 	if expected.rows == nil {
-		return nil, fmt.Errorf("Query '%s' with args %+v, must return a database/sql/driver.Rows, but it was not set for expectation %T as %+v", query, args, expected, expected)
+		return nil, fmt.Errorf("Query '%s' with args %+v, must return a pgx.Rows, but it was not set for expectation %T as %+v", query, args, expected, expected)
 	}
 	return expected, nil
 }
@@ -726,7 +727,7 @@ func (c *pgxmock) exec(query string, args []interface{}) (*ExpectedExec, error) 
 
 // NewRowsWithColumnDefinition allows Rows to be created from a
 // sql driver.Value slice with a definition of sql metadata
-func (c *pgxmock) NewRowsWithColumnDefinition(columns ...*Column) *Rows {
+func (c *pgxmock) NewRowsWithColumnDefinition(columns ...pgproto3.FieldDescription) *Rows {
 	r := NewRowsWithColumnDefinition(columns...)
 	// r.converter = c.converter
 	return r

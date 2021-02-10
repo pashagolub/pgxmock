@@ -379,9 +379,9 @@ func (e *ExpectedQuery) WillReturnRows(rows ...*Rows) *ExpectedQuery {
 		}
 	}
 	if defs > 0 && defs == len(sets) {
-		e.rows = nil // &rowSetsWithDefinition{&rowSets{sets: sets, ex: e}}
+		e.rows = &rowSetsWithDefinition{&rowSets{sets: sets, ex: e}}
 	} else {
-		e.rows = nil //&rowSets{sets: sets, ex: e}
+		e.rows = &rowSets{sets: sets, ex: e}
 	}
 	return e
 }

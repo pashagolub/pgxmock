@@ -2,12 +2,13 @@ package pgxmock
 
 import (
 	"bytes"
-	"database/sql/driver"
 	"encoding/csv"
 	"fmt"
 	"io"
-	"reflect"
 	"strings"
+
+	"github.com/jackc/pgconn"
+	"github.com/jackc/pgproto3/v2"
 )
 
 const invalidate = "☠☠☠ MEMORY OVERWRITTEN ☠☠☠ "
@@ -30,24 +31,58 @@ type rowSets struct {
 	raw  [][]byte
 }
 
+func (rs *rowSets) Err() error {
+	return rs.sets[rs.pos].closeErr
+}
+
+func (rs *rowSets) CommandTag() pgconn.CommandTag {
+	return pgconn.CommandTag("")
+}
+
+func (rs *rowSets) FieldDescriptions() []pgproto3.FieldDescription {
+	return rs.sets[rs.pos].def
+}
+
 func (rs *rowSets) Columns() []string {
 	return rs.sets[rs.pos].cols
 }
 
-func (rs *rowSets) Close() error {
+func (rs *rowSets) Close() {
 	rs.invalidateRaw()
 	rs.ex.rowsWereClosed = true
-	return rs.sets[rs.pos].closeErr
+	// return rs.sets[rs.pos].closeErr
 }
 
 // advances to next row
-func (rs *rowSets) Next(dest []driver.Value) error {
+func (rs *rowSets) Next() bool {
 	r := rs.sets[rs.pos]
 	r.pos++
 	rs.invalidateRaw()
-	if r.pos > len(r.rows) {
-		return io.EOF // per interface spec
-	}
+	return r.pos <= len(r.rows)
+
+	// for i, col := range r.rows[r.pos-1] {
+	// 	if b, ok := rawBytes(col); ok {
+	// 		rs.raw = append(rs.raw, b)
+	// 		dest[i] = b
+	// 		continue
+	// 	}
+	// 	dest[i] = col
+	// }
+
+	// return r.nextErr[r.pos-1]
+}
+
+func (rs *rowSets) Values() ([]interface{}, error) {
+	return nil, nil
+}
+
+func (rs *rowSets) Scan(dest ...interface{}) error {
+	return nil
+}
+
+func (rs *rowSets) RawValues() [][]byte {
+	r := rs.sets[rs.pos]
+	dest := make([][]byte, len(r.cols))
 
 	for i, col := range r.rows[r.pos-1] {
 		if b, ok := rawBytes(col); ok {
@@ -55,10 +90,10 @@ func (rs *rowSets) Next(dest []driver.Value) error {
 			dest[i] = b
 			continue
 		}
-		dest[i] = col
+		dest[i] = col.([]byte)
 	}
 
-	return r.nextErr[r.pos-1]
+	return dest
 }
 
 // transforms to debuggable printable string
@@ -92,7 +127,7 @@ func (rs *rowSets) empty() bool {
 	return true
 }
 
-func rawBytes(col driver.Value) (_ []byte, ok bool) {
+func rawBytes(col interface{}) (_ []byte, ok bool) {
 	val, ok := col.([]byte)
 	if !ok || len(val) == 0 {
 		return nil, false
@@ -119,24 +154,24 @@ func (rs *rowSets) invalidateRaw() {
 // Rows is a mocked collection of rows to
 // return for Query result
 type Rows struct {
-	converter driver.ValueConverter
-	cols      []string
-	def       []*Column
-	rows      [][]driver.Value
-	pos       int
-	nextErr   map[int]error
-	closeErr  error
+	// converter interface{}Converter
+	cols     []string
+	def      []pgproto3.FieldDescription
+	rows     [][]interface{}
+	pos      int
+	nextErr  map[int]error
+	closeErr error
 }
 
 // NewRows allows Rows to be created from a
-// sql driver.Value slice or from the CSV string and
+// sql interface{} slice or from the CSV string and
 // to be used as sql driver.Rows.
 // Use Sqlmock.NewRows instead if using a custom converter
 func NewRows(columns []string) *Rows {
 	return &Rows{
-		cols:      columns,
-		nextErr:   make(map[int]error),
-		converter: driver.DefaultParameterConverter,
+		cols:    columns,
+		nextErr: make(map[int]error),
+		// converter: driver.DefaultParameterConverter,
 	}
 }
 
@@ -160,27 +195,27 @@ func (r *Rows) RowError(row int, err error) *Rows {
 	return r
 }
 
-// AddRow composed from database driver.Value slice
+// AddRow composed from database interface{} slice
 // return the same instance to perform subsequent actions.
 // Note that the number of values must match the number
 // of columns
-func (r *Rows) AddRow(values ...driver.Value) *Rows {
+func (r *Rows) AddRow(values ...interface{}) *Rows {
 	if len(values) != len(r.cols) {
 		panic("Expected number of values to match number of columns")
 	}
 
-	row := make([]driver.Value, len(r.cols))
+	row := make([]interface{}, len(r.cols))
 	for i, v := range values {
-		// Convert user-friendly values (such as int or driver.Valuer)
-		// to database/sql native value (driver.Value such as int64)
-		var err error
-		v, err = r.converter.ConvertValue(v)
-		if err != nil {
-			panic(fmt.Errorf(
-				"row #%d, column #%d (%q) type %T: %s",
-				len(r.rows)+1, i, r.cols[i], values[i], err,
-			))
-		}
+		// Convert user-friendly values (such as int or interface{}r)
+		// to database/sql native value (interface{} such as int64)
+		// var err error
+		// v, err = r.converter.ConvertValue(v)
+		// if err != nil {
+		// 	panic(fmt.Errorf(
+		// 		"row #%d, column #%d (%q) type %T: %s",
+		// 		len(r.rows)+1, i, r.cols[i], values[i], err,
+		// 	))
+		// }
 
 		row[i] = v
 	}
@@ -203,7 +238,7 @@ func (r *Rows) FromCSVString(s string) *Rows {
 			break
 		}
 
-		row := make([]driver.Value, len(r.cols))
+		row := make([]interface{}, len(r.cols))
 		for i, v := range res {
 			row[i] = CSVColumnParser(strings.TrimSpace(v))
 		}
@@ -232,47 +267,47 @@ type rowSetsWithDefinition struct {
 	*rowSets
 }
 
-// Implement the "RowsColumnTypeDatabaseTypeName" interface
-func (rs *rowSetsWithDefinition) ColumnTypeDatabaseTypeName(index int) string {
-	return rs.getDefinition(index).DbType()
-}
+// // Implement the "RowsColumnTypeDatabaseTypeName" interface
+// func (rs *rowSetsWithDefinition) ColumnTypeDatabaseTypeName(index int) string {
+// 	return rs.getDefinition(index).DbType()
+// }
 
-// Implement the "RowsColumnTypeLength" interface
-func (rs *rowSetsWithDefinition) ColumnTypeLength(index int) (length int64, ok bool) {
-	return rs.getDefinition(index).Length()
-}
+// // Implement the "RowsColumnTypeLength" interface
+// func (rs *rowSetsWithDefinition) ColumnTypeLength(index int) (length int64, ok bool) {
+// 	return rs.getDefinition(index).Length()
+// }
 
-// Implement the "RowsColumnTypeNullable" interface
-func (rs *rowSetsWithDefinition) ColumnTypeNullable(index int) (nullable, ok bool) {
-	return rs.getDefinition(index).IsNullable()
-}
+// // Implement the "RowsColumnTypeNullable" interface
+// func (rs *rowSetsWithDefinition) ColumnTypeNullable(index int) (nullable, ok bool) {
+// 	return rs.getDefinition(index).IsNullable()
+// }
 
-// Implement the "RowsColumnTypePrecisionScale" interface
-func (rs *rowSetsWithDefinition) ColumnTypePrecisionScale(index int) (precision, scale int64, ok bool) {
-	return rs.getDefinition(index).PrecisionScale()
-}
+// // Implement the "RowsColumnTypePrecisionScale" interface
+// func (rs *rowSetsWithDefinition) ColumnTypePrecisionScale(index int) (precision, scale int64, ok bool) {
+// 	return rs.getDefinition(index).PrecisionScale()
+// }
 
-// ColumnTypeScanType is defined from driver.RowsColumnTypeScanType
-func (rs *rowSetsWithDefinition) ColumnTypeScanType(index int) reflect.Type {
-	return rs.getDefinition(index).ScanType()
-}
+// // ColumnTypeScanType is defined from driver.RowsColumnTypeScanType
+// func (rs *rowSetsWithDefinition) ColumnTypeScanType(index int) reflect.Type {
+// 	return rs.getDefinition(index).ScanType()
+// }
 
 // return column definition from current set metadata
-func (rs *rowSetsWithDefinition) getDefinition(index int) *Column {
+func (rs *rowSetsWithDefinition) getDefinition(index int) pgproto3.FieldDescription {
 	return rs.sets[rs.pos].def[index]
 }
 
 // NewRowsWithColumnDefinition return rows with columns metadata
-func NewRowsWithColumnDefinition(columns ...*Column) *Rows {
+func NewRowsWithColumnDefinition(columns ...pgproto3.FieldDescription) *Rows {
 	cols := make([]string, len(columns))
 	for i, column := range columns {
-		cols[i] = column.Name()
+		cols[i] = string(column.Name)
 	}
 
 	return &Rows{
-		cols:      cols,
-		def:       columns,
-		nextErr:   make(map[int]error),
-		converter: driver.DefaultParameterConverter,
+		cols:    cols,
+		def:     columns,
+		nextErr: make(map[int]error),
+		// converter: driver.DefaultParameterConverter,
 	}
 }
