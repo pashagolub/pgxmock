@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-const invalid = `☠☠☠ MEMORY OVERWRITTEN ☠☠☠ `
+// const invalid = `☠☠☠ MEMORY OVERWRITTEN ☠☠☠ `
 
 func ExampleRows() {
 	mock, err := NewConn()
@@ -27,7 +27,7 @@ func ExampleRows() {
 	for rs.Next() {
 		var id int
 		var title string
-		rs.Scan(&id, &title)
+		_ = rs.Scan(&id, &title)
 		fmt.Println("scanned id:", id, "and title:", title)
 	}
 
@@ -57,7 +57,7 @@ func ExampleRows_rowError() {
 	for rs.Next() {
 		var id int
 		var title string
-		rs.Scan(&id, &title)
+		_ = rs.Scan(&id, &title)
 		fmt.Println("scanned id:", id, "and title:", title)
 	}
 
@@ -139,7 +139,7 @@ func ExampleRows_expectToBeClosed() {
 	rows := NewRows([]string{"id", "title"}).AddRow(1, "john")
 	mock.ExpectQuery("SELECT").WillReturnRows(rows).RowsWillBeClosed()
 
-	mock.Query(context.Background(), "SELECT")
+	_, _ = mock.Query(context.Background(), "SELECT")
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		fmt.Println("got error:", err)
@@ -455,10 +455,10 @@ func TestWrongNumberOfValues(t *testing.T) {
 	}
 	defer mock.Close(context.Background())
 	defer func() {
-		recover()
+		_ = recover()
 	}()
 	mock.ExpectQuery("SELECT ID FROM TABLE").WithArgs(101).WillReturnRows(NewRows([]string{"ID"}).AddRow(101, "Hello"))
-	mock.Query(context.Background(), "SELECT ID FROM TABLE", 101)
+	_, _ = mock.Query(context.Background(), "SELECT ID FROM TABLE", 101)
 	// shouldn't reach here
 	t.Error("expected panic from query")
 }

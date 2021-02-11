@@ -2,7 +2,6 @@ package pgxmock
 
 import (
 	"context"
-	"database/sql/driver"
 	"testing"
 	"time"
 )
@@ -10,7 +9,7 @@ import (
 type AnyTime struct{}
 
 // Match satisfies sqlmock.Argument interface
-func (a AnyTime) Match(v driver.Value) bool {
+func (a AnyTime) Match(v interface{}) bool {
 	_, ok := v.(time.Time)
 	return ok
 }

@@ -2,26 +2,25 @@ package pgxmock
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"reflect"
 	"testing"
 )
 
-type CustomConverter struct{}
+// type CustomConverter struct{}
 
-func (s CustomConverter) ConvertValue(v interface{}) (interface{}, error) {
-	switch v.(type) {
-	case string:
-		return v.(string), nil
-	case []string:
-		return v.([]string), nil
-	case int:
-		return v.(int), nil
-	default:
-		return nil, errors.New(fmt.Sprintf("cannot convert %T with value %v", v, v))
-	}
-}
+// func (s CustomConverter) ConvertValue(v interface{}) (interface{}, error) {
+// 	switch v.(type) {
+// 	case string:
+// 		return v.(string), nil
+// 	case []string:
+// 		return v.([]string), nil
+// 	case int:
+// 		return v.(int), nil
+// 	default:
+// 		return nil, errors.New(fmt.Sprintf("cannot convert %T with value %v", v, v))
+// 	}
+// }
 
 func ExampleExpectedExec() {
 	mock, _ := NewConn()
@@ -54,8 +53,8 @@ func TestBuildQuery(t *testing.T) {
 	mock.ExpectPrepare("foo", query)
 
 	mock.QueryRow(context.Background(), query)
-	mock.Exec(context.Background(), query)
-	mock.Prepare(context.Background(), "foo", query)
+	_, _ = mock.Exec(context.Background(), query)
+	_, _ = mock.Prepare(context.Background(), "foo", query)
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Error(err)

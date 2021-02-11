@@ -31,7 +31,7 @@ func ExampleQueryMatcher() {
 	for rs.Next() {
 		var id int
 		var title string
-		rs.Scan(&id, &title)
+		_ = rs.Scan(&id, &title)
 		fmt.Println("scanned id:", id, "and title:", title)
 	}
 

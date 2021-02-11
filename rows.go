@@ -212,21 +212,7 @@ func (r *Rows) AddRow(values ...interface{}) *Rows {
 	}
 
 	row := make([]interface{}, len(r.cols))
-	for i, v := range values {
-		// Convert user-friendly values (such as int or interface{}r)
-		// to database/sql native value (interface{} such as int64)
-		// var err error
-		// v, err = r.converter.ConvertValue(v)
-		// if err != nil {
-		// 	panic(fmt.Errorf(
-		// 		"row #%d, column #%d (%q) type %T: %s",
-		// 		len(r.rows)+1, i, r.cols[i], values[i], err,
-		// 	))
-		// }
-
-		row[i] = v
-	}
-
+	copy(row, values)
 	r.rows = append(r.rows, row)
 	return r
 }
@@ -272,36 +258,6 @@ func (rs *rowSets) NextResultSet() error {
 // type for rows with columns definition created with sqlmock.NewRowsWithColumnDefinition
 type rowSetsWithDefinition struct {
 	*rowSets
-}
-
-// // Implement the "RowsColumnTypeDatabaseTypeName" interface
-// func (rs *rowSetsWithDefinition) ColumnTypeDatabaseTypeName(index int) string {
-// 	return rs.getDefinition(index).DbType()
-// }
-
-// // Implement the "RowsColumnTypeLength" interface
-// func (rs *rowSetsWithDefinition) ColumnTypeLength(index int) (length int64, ok bool) {
-// 	return rs.getDefinition(index).Length()
-// }
-
-// // Implement the "RowsColumnTypeNullable" interface
-// func (rs *rowSetsWithDefinition) ColumnTypeNullable(index int) (nullable, ok bool) {
-// 	return rs.getDefinition(index).IsNullable()
-// }
-
-// // Implement the "RowsColumnTypePrecisionScale" interface
-// func (rs *rowSetsWithDefinition) ColumnTypePrecisionScale(index int) (precision, scale int64, ok bool) {
-// 	return rs.getDefinition(index).PrecisionScale()
-// }
-
-// // ColumnTypeScanType is defined from driver.RowsColumnTypeScanType
-// func (rs *rowSetsWithDefinition) ColumnTypeScanType(index int) reflect.Type {
-// 	return rs.getDefinition(index).ScanType()
-// }
-
-// return column definition from current set metadata
-func (rs *rowSetsWithDefinition) getDefinition(index int) pgproto3.FieldDescription {
-	return rs.sets[rs.pos].def[index]
 }
 
 // NewRowsWithColumnDefinition return rows with columns metadata

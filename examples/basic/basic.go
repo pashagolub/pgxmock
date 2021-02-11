@@ -11,7 +11,7 @@ type PgxIface interface {
 	Close(context.Context) error
 }
 
-func recordStats(db PgxIface, userID, productID int64) (err error) {
+func recordStats(db PgxIface, userID, productID int) (err error) {
 	tx, err := db.Begin(context.Background())
 	if err != nil {
 		return

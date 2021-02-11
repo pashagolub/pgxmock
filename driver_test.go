@@ -1,20 +1,8 @@
 package pgxmock
 
 import (
-	"database/sql/driver"
-	"errors"
 	"testing"
 )
-
-type void struct{}
-
-func (void) Print(...interface{}) {}
-
-type converter struct{}
-
-func (c *converter) ConvertValue(v interface{}) (driver.Value, error) {
-	return nil, errors.New("converter disabled")
-}
 
 func TestTwoOpenConnectionsOnTheSameDSN(t *testing.T) {
 	mock, err := NewConn()

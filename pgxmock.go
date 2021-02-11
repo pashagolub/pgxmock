@@ -19,13 +19,13 @@ import (
 
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgproto3/v2"
-	pgx "github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v4"
 )
 
 // Sqlmock interface serves to create expectations
 // for any kind of database action in order to mock
 // and test real database behavior.
-type PgxMockIface interface {
+type pgxMockIface interface {
 	// ExpectClose queues an expectation for this database
 	// action to be triggered. the *ExpectedClose allows
 	// to mock database response
@@ -98,7 +98,7 @@ type PgxMockIface interface {
 	NewColumn(name string) *pgproto3.FieldDescription
 }
 
-type PgxIface interface {
+type pgxIface interface {
 	Begin(context.Context) (pgx.Tx, error)
 	Exec(context.Context, string, ...interface{}) (pgconn.CommandTag, error)
 	QueryRow(context.Context, string, ...interface{}) pgx.Row
@@ -109,8 +109,8 @@ type PgxIface interface {
 }
 
 type Pgxmock interface {
-	PgxIface
-	PgxMockIface
+	pgxIface
+	pgxMockIface
 	pgx.Tx
 }
 
@@ -163,7 +163,6 @@ func (c *pgxmock) MatchExpectationsInOrder(b bool) {
 // Close a mock database driver connection. It may or may not
 // be called depending on the circumstances, but if it is called
 // there must be an *ExpectedClose expectation satisfied.
-// meets http://golang.org/pkg/database/sql/driver/#Conn interface
 func (c *pgxmock) Close(context.Context) error {
 	var expected *ExpectedClose
 	var fulfilled int
@@ -246,7 +245,6 @@ func (c *pgxmock) QueryFunc(ctx context.Context, sql string, args []interface{},
 	return nil, nil
 }
 
-// Begin meets http://golang.org/pkg/database/sql/driver/#Conn interface
 func (c *pgxmock) Begin(ctx context.Context) (pgx.Tx, error) {
 	ex, err := c.begin()
 	if ex != nil {
@@ -472,17 +470,6 @@ func (c *pgxmock) NewRows(columns []string) *Rows {
 	// r.converter = c.converter
 	return r
 }
-
-// CheckNamedValue meets https://golang.org/pkg/database/sql/driver/#NamedValueChecker
-// func (c *pgxmock) CheckNamedValue(nv *driver.NamedValue) (err error) {
-// 	switch nv.Value.(type) {
-// 	case sql.Out:
-// 		return nil
-// 	default:
-// 		nv.Value, err = c.converter.ConvertValue(nv.Value)
-// 		return err
-// 	}
-// }
 
 // ErrCancelled defines an error value, which can be expected in case of
 // such cancellation error.
@@ -720,7 +707,7 @@ func (c *pgxmock) exec(query string, args []interface{}) (*ExpectedExec, error) 
 	}
 
 	if expected.result == nil {
-		return nil, fmt.Errorf("ExecQuery '%s' with args %+v, must return a database/sql/driver.Result, but it was not set for expectation %T as %+v", query, args, expected, expected)
+		return nil, fmt.Errorf("ExecQuery '%s' with args %+v, must return a pgconn.CommandTag, but it was not set for expectation %T as %+v", query, args, expected, expected)
 	}
 
 	return expected, nil

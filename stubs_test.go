@@ -1,7 +1,6 @@
 package pgxmock
 
 import (
-	"database/sql/driver"
 	"errors"
 	"fmt"
 	"strconv"
@@ -51,7 +50,7 @@ func (ni *NullInt) Scan(value interface{}) error {
 }
 
 // Satisfy sql.Valuer interface.
-func (ni NullInt) Value() (driver.Value, error) {
+func (ni NullInt) Value() (interface{}, error) {
 	if !ni.Valid {
 		return nil, nil
 	}
@@ -72,7 +71,7 @@ func (nt *NullTime) Scan(value interface{}) error {
 }
 
 // Satisfy sql.Valuer interface.
-func (nt NullTime) Value() (driver.Value, error) {
+func (nt NullTime) Value() (interface{}, error) {
 	if !nt.Valid {
 		return nil, nil
 	}

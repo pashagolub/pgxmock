@@ -12,7 +12,7 @@ import (
 	pgx "github.com/jackc/pgx/v4"
 )
 
-func cancelOrder(db PgxIface, orderID int) error {
+func cancelOrder(db pgxIface, orderID int) error {
 	tx, _ := db.Begin(context.Background())
 	_, _ = tx.Query(context.Background(), "SELECT * FROM orders {0} FOR UPDATE", orderID)
 	err := tx.Rollback(context.Background())
@@ -233,7 +233,7 @@ func TestTransactionExpectations(t *testing.T) {
 	// begin with an error
 	mock.ExpectBegin().WillReturnError(fmt.Errorf("some err"))
 
-	tx, err = mock.Begin(context.Background())
+	_, err = mock.Begin(context.Background())
 	if err == nil {
 		t.Error("an error was expected when beginning a transaction, but got none")
 	}
@@ -840,7 +840,7 @@ func TestUnexpectedExec(t *testing.T) {
 		return
 	}
 	mock.ExpectBegin()
-	mock.Begin(context.Background())
+	_, _ = mock.Begin(context.Background())
 	if _, err := mock.Exec(context.Background(), "SELECT 1"); err == nil {
 		t.Error("an error was expected when calling exec, but got none")
 	}
@@ -942,7 +942,7 @@ func TestPrepareExec(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	tx.Commit(context.Background())
+	_ = tx.Commit(context.Background())
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("there were unfulfilled expectations: %s", err)
 	}
@@ -975,12 +975,12 @@ func TestPrepareQuery(t *testing.T) {
 			id     int
 			status string
 		)
-		if rows.Scan(&id, &status); id != 101 || status != "Hello" {
+		if _ = rows.Scan(&id, &status); id != 101 || status != "Hello" {
 			t.Fatal("wrong query results")
 		}
 
 	}
-	tx.Commit(context.Background())
+	_ = tx.Commit(context.Background())
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("there were unfulfilled expectations: %s", err)
 	}
@@ -1011,7 +1011,7 @@ func TestExpectedCloseOrder(t *testing.T) {
 	}
 	defer mock.Close(context.Background())
 	mock.ExpectClose().WillReturnError(fmt.Errorf("Close failed"))
-	mock.Begin(context.Background())
+	_, _ = mock.Begin(context.Background())
 	if err := mock.ExpectationsWereMet(); err == nil {
 		t.Error("expected error on ExpectationsWereMet")
 	}
@@ -1065,8 +1065,7 @@ func TestExecExpectationErrorDelay(t *testing.T) {
 	defer mock.Close(context.Background())
 
 	// test that return of error is delayed
-	var delay time.Duration
-	delay = 100 * time.Millisecond
+	delay := time.Millisecond * 100
 	mock.ExpectExec("^INSERT INTO articles").
 		WillReturnError(errors.New("slow fail")).
 		WillDelayFor(delay)
@@ -1096,7 +1095,7 @@ func TestExecExpectationErrorDelay(t *testing.T) {
 	mock.ExpectExec("^INSERT INTO articles").WillReturnError(errors.New("fast fail"))
 
 	start = time.Now()
-	mock.Exec(context.Background(), "INSERT INTO articles (title) VALUES (?)", "hello")
+	_, _ = mock.Exec(context.Background(), "INSERT INTO articles (title) VALUES (?)", "hello")
 	stop = time.Now()
 
 	elapsed = stop.Sub(start)
@@ -1112,7 +1111,7 @@ func TestOptionsFail(t *testing.T) {
 		return expected
 	}
 	mock, err := NewConn(option)
-	defer mock.Close(context.Background())
+	defer func() { _ = mock.Close(context.Background()) }()
 	if err == nil {
 		t.Errorf("missing expecting error '%s' when opening a stub database connection", expected)
 	}
@@ -1160,7 +1159,7 @@ func TestQueryWithTimeout(t *testing.T) {
 	}
 }
 
-func queryWithTimeout(t time.Duration, db PgxIface, query string, args ...interface{}) (pgx.Rows, error) {
+func queryWithTimeout(t time.Duration, db pgxIface, query string, args ...interface{}) (pgx.Rows, error) {
 	rowsChan := make(chan pgx.Rows, 1)
 	errChan := make(chan error, 1)
 
