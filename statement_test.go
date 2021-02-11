@@ -16,7 +16,7 @@ func TestExpectedPreparedStatementCloseError(t *testing.T) {
 
 	mock.ExpectBegin()
 	want := errors.New("STMT ERROR")
-	mock.ExpectPrepare("SELECT").WillReturnCloseError(want)
+	mock.ExpectPrepare("foo", "SELECT").WillReturnCloseError(want)
 
 	txn, err := mock.Begin(context.Background())
 	if err != nil {
@@ -31,8 +31,4 @@ func TestExpectedPreparedStatementCloseError(t *testing.T) {
 	if stmt.Name != "foo" {
 		t.Fatalf("got = %v, want = %v", stmt.Name, "foo")
 	}
-
-	// 	if err := stmt.Close(); err != want {
-	// 		t.Fatalf("got = %v, want = %v", err, want)
-	// 	}
 }

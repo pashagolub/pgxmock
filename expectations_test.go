@@ -51,7 +51,7 @@ func TestBuildQuery(t *testing.T) {
 
 	mock.ExpectQuery(query)
 	mock.ExpectExec(query)
-	mock.ExpectPrepare(query)
+	mock.ExpectPrepare("foo", query)
 
 	mock.QueryRow(context.Background(), query)
 	mock.Exec(context.Background(), query)

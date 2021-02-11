@@ -13,7 +13,7 @@ func ExampleRows() {
 	if err != nil {
 		fmt.Println("failed to open sqlmock database:", err)
 	}
-	// defer mock.Close()
+	// defer mock.Close(context.Background())
 
 	rows := NewRows([]string{"id", "title"}).
 		AddRow(1, "one").
@@ -43,7 +43,7 @@ func ExampleRows_rowError() {
 	if err != nil {
 		fmt.Println("failed to open sqlmock database:", err)
 	}
-	// defer mock.Close()
+	// defer mock.Close(context.Background())
 
 	rows := NewRows([]string{"id", "title"}).
 		AddRow(0, "one").
@@ -73,7 +73,7 @@ func ExampleRows_closeError() {
 	if err != nil {
 		fmt.Println("failed to open sqlmock database:", err)
 	}
-	defer mock.Close()
+	defer mock.Close(context.Background())
 
 	rows := NewRows([]string{"id", "title"}).CloseError(fmt.Errorf("close error"))
 	mock.ExpectQuery("SELECT").WillReturnRows(rows)
@@ -88,7 +88,7 @@ func ExampleRows_closeError() {
 // 	if err != nil {
 // 		fmt.Println("failed to open sqlmock database:", err)
 // 	}
-// 	defer mock.Close()
+// 	defer mock.Close(context.Background())
 
 // 	rows := NewRows([]string{"id", "binary"}).
 // 		AddRow(1, []byte(`one binary value with some text!`)).
@@ -134,7 +134,7 @@ func ExampleRows_expectToBeClosed() {
 	if err != nil {
 		fmt.Println("failed to open sqlmock database:", err)
 	}
-	defer mock.Close()
+	defer mock.Close(context.Background())
 
 	rows := NewRows([]string{"id", "title"}).AddRow(1, "john")
 	mock.ExpectQuery("SELECT").WillReturnRows(rows).RowsWillBeClosed()
@@ -157,7 +157,7 @@ func ExampleRows_expectToBeClosed() {
 // 	if err != nil {
 // 		fmt.Println("failed to open sqlmock database:", err)
 // 	}
-// 	defer mock.Close()
+// 	defer mock.Close(context.Background())
 
 // 	rows := NewRows([]string{"id", "null_int"}).
 // 		AddRow(1, 7).
@@ -190,7 +190,7 @@ func TestAllowsToSetRowsErrors(t *testing.T) {
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
-	defer mock.Close()
+	defer mock.Close(context.Background())
 
 	rows := NewRows([]string{"id", "title"}).
 		AddRow(0, "one").
@@ -229,7 +229,7 @@ func TestRowsCloseError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
-	defer mock.Close()
+	defer mock.Close(context.Background())
 
 	rows := NewRows([]string{"id"}).CloseError(fmt.Errorf("close error"))
 	mock.ExpectQuery("SELECT").WillReturnRows(rows)
@@ -251,7 +251,7 @@ func TestRowsClosed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
-	defer mock.Close()
+	defer mock.Close(context.Background())
 
 	rows := NewRows([]string{"id"}).AddRow(1)
 	mock.ExpectQuery("SELECT").WillReturnRows(rows).RowsWillBeClosed()
@@ -273,7 +273,7 @@ func TestRowsClosed(t *testing.T) {
 // 	if err != nil {
 // 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 // 	}
-// 	defer mock.Close()
+// 	defer mock.Close(context.Background())
 
 // 	rows := NewRows([]string{"id"}).
 // 		AddRow(1).
@@ -385,7 +385,7 @@ func TestRowsScanError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
-	defer mock.Close()
+	defer mock.Close(context.Background())
 
 	r := NewRows([]string{"col1", "col2"}).AddRow("one", "two").AddRow("one", nil)
 	mock.ExpectQuery("SELECT").WillReturnRows(r)
@@ -422,7 +422,7 @@ func TestCSVRowParser(t *testing.T) {
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
-	defer mock.Close()
+	defer mock.Close(context.Background())
 
 	mock.ExpectQuery("SELECT").WillReturnRows(rs)
 
@@ -453,7 +453,7 @@ func TestWrongNumberOfValues(t *testing.T) {
 		fmt.Println("error creating mock database")
 		return
 	}
-	defer mock.Close()
+	defer mock.Close(context.Background())
 	defer func() {
 		recover()
 	}()
@@ -491,7 +491,7 @@ func TestEmptyRowSets(t *testing.T) {
 // 	if err != nil {
 // 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 // 	}
-// 	defer mock.Close()
+// 	defer mock.Close(context.Background())
 // 	mock.ExpectQuery("SELECT").WillReturnRows(rows)
 
 // 	rs, err := mock.Query(context.Background(), "SELECT")
@@ -537,7 +537,7 @@ func TestEmptyRowSets(t *testing.T) {
 // 	if err != nil {
 // 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 // 	}
-// 	defer mock.Close()
+// 	defer mock.Close(context.Background())
 // 	mock.ExpectQuery("SELECT").WillReturnRows(rows)
 
 // 	rs, err := mock.Query(context.Background(), "SELECT")
@@ -586,7 +586,7 @@ func TestEmptyRowSets(t *testing.T) {
 // 	if err != nil {
 // 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 // 	}
-// 	defer mock.Close()
+// 	defer mock.Close(context.Background())
 // 	mock.ExpectQuery("SELECT").WillReturnRows(rows)
 
 // 	rs, err := mock.Query(context.Background(), "SELECT")
@@ -623,7 +623,7 @@ func TestEmptyRowSets(t *testing.T) {
 // 	if err != nil {
 // 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 // 	}
-// 	defer mock.Close()
+// 	defer mock.Close(context.Background())
 // 	mock.ExpectQuery("SELECT").WillReturnRows(rows)
 
 // 	rs, err := mock.Query(context.Background(), "SELECT")
