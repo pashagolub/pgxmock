@@ -104,7 +104,7 @@ FOR UPDATE`)
 	// update order status
 	order.Status = ORDER_CANCELLED
 	sql = "UPDATE orders SET status = ?, updated = NOW() WHERE id = ?"
-	_, err = tx.Prepare(context.Background(), sql, "order_stmt")
+	_, err = tx.Prepare(context.Background(), "order_stmt", sql)
 	if err != nil {
 		tx.Rollback(context.Background())
 		return
