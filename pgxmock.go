@@ -39,7 +39,7 @@ type PgxMockIface interface {
 	// the *ExpectedPrepare allows to mock database response.
 	// Note that you may expect Query() or Exec() on the *ExpectedPrepare
 	// statement to prevent repeating expectedSQL
-	ExpectPrepare(expectedSQL string) *ExpectedPrepare
+	ExpectPrepare(expectedStmtName, expectedSQL string) *ExpectedPrepare
 
 	// ExpectQuery expects Query() or QueryRow() to be called with expectedSQL query.
 	// the *ExpectedQuery allows to mock database response.
@@ -117,7 +117,7 @@ type Pgxmock interface {
 type pgxmock struct {
 	ordered bool
 	dsn     string
-	opened  int
+	// opened  int
 	// converter    driver.ValueConverter
 	queryMatcher QueryMatcher
 	monitorPings bool
@@ -309,7 +309,7 @@ func (c *pgxmock) ExpectExec(expectedSQL string) *ExpectedExec {
 }
 
 func (c *pgxmock) Prepare(ctx context.Context, name, query string) (*pgconn.StatementDescription, error) {
-	ex, err := c.prepare(query)
+	ex, err := c.prepare(name, query)
 	if ex != nil {
 		time.Sleep(ex.delay)
 	}
@@ -320,7 +320,7 @@ func (c *pgxmock) Prepare(ctx context.Context, name, query string) (*pgconn.Stat
 	return &pgconn.StatementDescription{Name: name, SQL: query}, nil
 }
 
-func (c *pgxmock) prepare(query string) (*ExpectedPrepare, error) {
+func (c *pgxmock) prepare(name string, query string) (*ExpectedPrepare, error) {
 	var expected *ExpectedPrepare
 	var fulfilled int
 	var ok bool
@@ -359,6 +359,9 @@ func (c *pgxmock) prepare(query string) (*ExpectedPrepare, error) {
 		return nil, fmt.Errorf(msg, query)
 	}
 	defer expected.Unlock()
+	if expected.expectStmtName != name {
+		return nil, fmt.Errorf("Prepare: prepared statement name '%s' was not expected, expected name is '%s'", name, expected.expectStmtName)
+	}
 	if err := c.queryMatcher.Match(expected.expectSQL, query); err != nil {
 		return nil, fmt.Errorf("Prepare: %v", err)
 	}
@@ -367,8 +370,8 @@ func (c *pgxmock) prepare(query string) (*ExpectedPrepare, error) {
 	return expected, expected.err
 }
 
-func (c *pgxmock) ExpectPrepare(expectedSQL string) *ExpectedPrepare {
-	e := &ExpectedPrepare{expectSQL: expectedSQL, mock: c}
+func (c *pgxmock) ExpectPrepare(expectedStmtName, expectedSQL string) *ExpectedPrepare {
+	e := &ExpectedPrepare{expectSQL: expectedSQL, expectStmtName: expectedStmtName, mock: c}
 	c.expected = append(c.expected, e)
 	return e
 }

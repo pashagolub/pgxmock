@@ -258,13 +258,14 @@ func (e *ExpectedExec) WillReturnResult(result pgconn.CommandTag) *ExpectedExec 
 // Returned by *Sqlmock.ExpectPrepare.
 type ExpectedPrepare struct {
 	commonExpectation
-	mock         *pgxmock
-	expectSQL    string
-	statement    driver.Stmt
-	closeErr     error
-	mustBeClosed bool
-	wasClosed    bool
-	delay        time.Duration
+	mock           *pgxmock
+	expectStmtName string
+	expectSQL      string
+	statement      driver.Stmt
+	closeErr       error
+	mustBeClosed   bool
+	wasClosed      bool
+	delay          time.Duration
 }
 
 // WillReturnError allows to set an error for the expected *sql.DB.Prepare or *sql.Tx.Prepare action.
@@ -297,7 +298,7 @@ func (e *ExpectedPrepare) WillBeClosed() *ExpectedPrepare {
 // This method is convenient in order to prevent duplicating sql query string matching.
 func (e *ExpectedPrepare) ExpectQuery() *ExpectedQuery {
 	eq := &ExpectedQuery{}
-	eq.expectSQL = e.expectSQL
+	eq.expectSQL = e.expectStmtName
 	// eq.converter = e.mock.converter
 	e.mock.expected = append(e.mock.expected, eq)
 	return eq
@@ -307,7 +308,7 @@ func (e *ExpectedPrepare) ExpectQuery() *ExpectedQuery {
 // This method is convenient in order to prevent duplicating sql query string matching.
 func (e *ExpectedPrepare) ExpectExec() *ExpectedExec {
 	eq := &ExpectedExec{}
-	eq.expectSQL = e.expectSQL
+	eq.expectSQL = e.expectStmtName
 	// eq.converter = e.mock.converter
 	e.mock.expected = append(e.mock.expected, eq)
 	return eq
@@ -316,6 +317,7 @@ func (e *ExpectedPrepare) ExpectExec() *ExpectedExec {
 // String returns string representation
 func (e *ExpectedPrepare) String() string {
 	msg := "ExpectedPrepare => expecting Prepare statement which:"
+	msg += "\n  - matches statement name: '" + e.expectStmtName + "'"
 	msg += "\n  - matches sql: '" + e.expectSQL + "'"
 
 	if e.err != nil {

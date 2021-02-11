@@ -11,7 +11,7 @@ on:
 jobs:
 
   build-and-test:
-    if: true # false to skip job during debug
+    if: false # false to skip job during debug
     name: Test and Build on Ubuntu
     runs-on: ubuntu-latest
     steps:
