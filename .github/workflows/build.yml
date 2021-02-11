@@ -1,0 +1,45 @@
+name: Build & Test
+on: 
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+      
+jobs:
+
+  build-and-test:
+    if: true # false to skip job during debug
+    name: Test and Build on Ubuntu
+    runs-on: ubuntu-latest
+    steps:
+
+    - name: Check out code
+      uses: actions/checkout@v2
+
+    - name: Get dependencies
+      run: |
+        go mod download
+        go version
+
+    - name: GolangCI-Lint
+      uses: golangci/golangci-lint-action@v2
+      with:
+        version: v1.36        
+
+    - name: Test
+      run: go test -v -coverprofile=profile.cov ./...
+
+    - name: Convert coverage to lcov
+      uses: jandelgado/gcov2lcov-action@master
+      with:
+          infile: profile.cov
+          outfile: coverage.lcov
+
+    - name: Coveralls
+      uses: coverallsapp/github-action@master
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        path-to-lcov: coverage.lcov
