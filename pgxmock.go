@@ -95,7 +95,7 @@ type PgxMockIface interface {
 	NewRowsWithColumnDefinition(columns ...pgproto3.FieldDescription) *Rows
 
 	// New Column allows to create a Column
-	NewColumn(name string) *Column
+	NewColumn(name string) *pgproto3.FieldDescription
 }
 
 type PgxIface interface {
@@ -738,6 +738,6 @@ func (c *pgxmock) NewRowsWithColumnDefinition(columns ...pgproto3.FieldDescripti
 
 // NewColumn allows to create a Column that can be enhanced with metadata
 // using OfType/Nullable/WithLength/WithPrecisionAndScale methods.
-func (c *pgxmock) NewColumn(name string) *Column {
-	return NewColumn(name)
+func (c *pgxmock) NewColumn(name string) *pgproto3.FieldDescription {
+	return &pgproto3.FieldDescription{Name: []byte(name)}
 }
