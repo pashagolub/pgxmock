@@ -1051,6 +1051,10 @@ func TestPreparedStatementCloseExpectation(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if err := mock.Deallocate(context.Background(), "foo"); err != nil {
+		t.Fatal(err)
+	}
+
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("there were unfulfilled expectations: %s", err)
 	}

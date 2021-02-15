@@ -105,6 +105,7 @@ type pgxIface interface {
 	Query(context.Context, string, ...interface{}) (pgx.Rows, error)
 	Ping(context.Context) error
 	Prepare(context.Context, string, string) (*pgconn.StatementDescription, error)
+	Deallocate(ctx context.Context, name string) error
 	Close(context.Context) error
 }
 
@@ -372,6 +373,24 @@ func (c *pgxmock) ExpectPrepare(expectedStmtName, expectedSQL string) *ExpectedP
 	e := &ExpectedPrepare{expectSQL: expectedSQL, expectStmtName: expectedStmtName, mock: c}
 	c.expected = append(c.expected, e)
 	return e
+}
+
+func (c *pgxmock) Deallocate(ctx context.Context, name string) error {
+	var expected *ExpectedPrepare
+	for _, next := range c.expected {
+		next.Lock()
+		if pr, ok := next.(*ExpectedPrepare); ok && pr.expectStmtName == name {
+			expected = pr
+			next.Unlock()
+			break
+		}
+		next.Unlock()
+	}
+	if expected == nil {
+		return fmt.Errorf("Deallocate: prepared statement name '%s' doesn't exist", name)
+	}
+	expected.wasClosed = true
+	return nil
 }
 
 func (c *pgxmock) ExpectQuery(expectedSQL string) *ExpectedQuery {
