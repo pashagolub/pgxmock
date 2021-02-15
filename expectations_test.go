@@ -7,21 +7,6 @@ import (
 	"testing"
 )
 
-// type CustomConverter struct{}
-
-// func (s CustomConverter) ConvertValue(v interface{}) (interface{}, error) {
-// 	switch v.(type) {
-// 	case string:
-// 		return v.(string), nil
-// 	case []string:
-// 		return v.([]string), nil
-// 	case int:
-// 		return v.(int), nil
-// 	default:
-// 		return nil, errors.New(fmt.Sprintf("cannot convert %T with value %v", v, v))
-// 	}
-// }
-
 func ExampleExpectedExec() {
 	mock, _ := NewConn()
 	result := NewErrorResult(fmt.Errorf("some error"))
@@ -61,8 +46,8 @@ func TestBuildQuery(t *testing.T) {
 	}
 }
 
-func TestCustomValueConverterQueryScan(t *testing.T) {
-	mock, _ := NewConn() // New(ValueConverterOption(CustomConverter{}))
+func TestQueryRowScan(t *testing.T) {
+	mock, _ := NewConn() //TODO New(ValueConverterOption(CustomConverter{}))
 	query := `
 		SELECT
 			name,

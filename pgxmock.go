@@ -498,10 +498,11 @@ func (c *pgxmock) QueryRow(ctx context.Context, sql string, args ...interface{})
 	if ex != nil {
 		select {
 		case <-time.After(ex.delay):
-			if err != nil {
+			if (err != nil) || (ex.rows == nil) {
 				return nil
 			}
-			return ex.row
+			_ = ex.rows.Next()
+			return ex.rows
 		case <-ctx.Done():
 			return nil
 		}

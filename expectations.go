@@ -129,7 +129,6 @@ func (e *ExpectedRollback) String() string {
 type ExpectedQuery struct {
 	queryBasedExpectation
 	rows             pgx.Rows
-	row              pgx.Row
 	delay            time.Duration
 	rowsMustBeClosed bool
 	rowsWereClosed   bool
