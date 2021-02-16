@@ -24,7 +24,7 @@ func TestShouldNotCancelOrderWithNonPendingStatus(t *testing.T) {
 	// expect query to fetch order and user, match it with regexp
 	mock.ExpectQuery("SELECT (.+) FROM orders AS o INNER JOIN users AS u (.+) FOR UPDATE").
 		WithArgs(1).
-		WillReturnRows(mock.NewRows(columns).FromCSVString("1,1"))
+		WillReturnRows(mock.NewRows(columns).AddRow(1, 1))
 	// expect transaction rollback, since order status is "cancelled"
 	mock.ExpectRollback()
 
@@ -62,7 +62,7 @@ func TestShouldRefundUserWhenOrderIsCancelled(t *testing.T) {
 		WillReturnResult(pgxmock.NewResult("UPDATE", 1)) // no insert id, 1 affected row
 	// expect order status update
 	mock.ExpectPrepare("order_stmt", "UPDATE orders SET status").ExpectExec().
-		WithArgs(ORDER_CANCELLED, 1).                    // status, id
+		WithArgs(orderCancelled, 1).                     // status, id
 		WillReturnResult(pgxmock.NewResult("UPDATE", 1)) // no insert id, 1 affected row
 	// expect a transaction commit
 	mock.ExpectCommit()
