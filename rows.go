@@ -41,12 +41,12 @@ func (rs *rowSets) CommandTag() pgconn.CommandTag {
 }
 
 func (rs *rowSets) FieldDescriptions() []pgproto3.FieldDescription {
-	return rs.sets[rs.pos].def
+	return rs.sets[rs.pos].defs
 }
 
-func (rs *rowSets) Columns() []string {
-	return rs.sets[rs.pos].cols
-}
+// func (rs *rowSets) Columns() []string {
+// 	return rs.sets[rs.pos].cols
+// }
 
 func (rs *rowSets) Close() {
 	rs.invalidateRaw()
@@ -68,20 +68,28 @@ func (rs *rowSets) Values() ([]interface{}, error) {
 
 func (rs *rowSets) Scan(dest ...interface{}) error {
 	r := rs.sets[rs.pos]
-	if len(dest) != len(r.cols) {
-		return fmt.Errorf("Incorrect argument number %d for columns %d", len(dest), len(r.cols))
+	if len(dest) != len(r.defs) {
+		return fmt.Errorf("Incorrect argument number %d for columns %d", len(dest), len(r.defs))
 	}
 	for i, col := range r.rows[r.pos-1] {
+		if dest[i] == nil {
+			//behave compatible with pgx
+			continue
+		}
 		destVal := reflect.ValueOf(dest[i])
 		val := reflect.ValueOf(col)
-		if destVal.Kind() == reflect.Ptr && destVal.Elem().Kind() == val.Kind() {
+		if destVal.Kind() != reflect.Ptr {
+			return fmt.Errorf("Destination argument must be a pointer for column %s", r.defs[i].Name)
+		}
+		if destVal.Elem().Kind() == val.Kind() {
 			if destElem := destVal.Elem(); destElem.CanSet() {
 				destElem.Set(val)
 			} else {
-				return fmt.Errorf("Cannot set destination value for column %s", r.cols[i])
+				return fmt.Errorf("Cannot set destination value for column %s", string(r.defs[i].Name))
 			}
 		} else {
-			return fmt.Errorf("Destination kind not supported for column %s", r.cols[i])
+			return fmt.Errorf("Destination kind '%v' not supported for value kind '%v' of column '%s'",
+				destVal.Elem().Kind(), val.Kind(), string(r.defs[i].Name))
 		}
 	}
 	return r.nextErr[r.pos-1]
@@ -89,7 +97,7 @@ func (rs *rowSets) Scan(dest ...interface{}) error {
 
 func (rs *rowSets) RawValues() [][]byte {
 	r := rs.sets[rs.pos]
-	dest := make([][]byte, len(r.cols))
+	dest := make([][]byte, len(r.defs))
 
 	for i, col := range r.rows[r.pos-1] {
 		if b, ok := rawBytes(col); ok {
@@ -161,9 +169,7 @@ func (rs *rowSets) invalidateRaw() {
 // Rows is a mocked collection of rows to
 // return for Query result
 type Rows struct {
-	// converter interface{}Converter
-	cols     []string
-	def      []pgproto3.FieldDescription
+	defs     []pgproto3.FieldDescription
 	rows     [][]interface{}
 	pos      int
 	nextErr  map[int]error
@@ -175,10 +181,13 @@ type Rows struct {
 // to be used as sql driver.Rows.
 // Use Sqlmock.NewRows instead if using a custom converter
 func NewRows(columns []string) *Rows {
+	var coldefs []pgproto3.FieldDescription
+	for _, column := range columns {
+		coldefs = append(coldefs, pgproto3.FieldDescription{Name: []byte(column)})
+	}
 	return &Rows{
-		cols:    columns,
+		defs:    coldefs,
 		nextErr: make(map[int]error),
-		// converter: driver.DefaultParameterConverter,
 	}
 }
 
@@ -207,11 +216,11 @@ func (r *Rows) RowError(row int, err error) *Rows {
 // Note that the number of values must match the number
 // of columns
 func (r *Rows) AddRow(values ...interface{}) *Rows {
-	if len(values) != len(r.cols) {
+	if len(values) != len(r.defs) {
 		panic("Expected number of values to match number of columns")
 	}
 
-	row := make([]interface{}, len(r.cols))
+	row := make([]interface{}, len(r.defs))
 	copy(row, values)
 	r.rows = append(r.rows, row)
 	return r
@@ -231,7 +240,7 @@ func (r *Rows) FromCSVString(s string) *Rows {
 			break
 		}
 
-		row := make([]interface{}, len(r.cols))
+		row := make([]interface{}, len(r.defs))
 		for i, v := range res {
 			row[i] = CSVColumnParser(strings.TrimSpace(v))
 		}
@@ -262,15 +271,8 @@ type rowSetsWithDefinition struct {
 
 // NewRowsWithColumnDefinition return rows with columns metadata
 func NewRowsWithColumnDefinition(columns ...pgproto3.FieldDescription) *Rows {
-	cols := make([]string, len(columns))
-	for i, column := range columns {
-		cols[i] = string(column.Name)
-	}
-
 	return &Rows{
-		cols:    cols,
-		def:     columns,
+		defs:    columns,
 		nextErr: make(map[int]error),
-		// converter: driver.DefaultParameterConverter,
 	}
 }

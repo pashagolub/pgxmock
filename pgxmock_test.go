@@ -1131,8 +1131,8 @@ func TestNewRows(t *testing.T) {
 	columns := []string{"col1", "col2"}
 
 	r := mock.NewRows(columns)
-	if len(r.cols) != len(columns) || r.cols[0] != columns[0] || r.cols[1] != columns[1] {
-		t.Errorf("expecting to create a row with columns %v, actual colmns are %v", r.cols, columns)
+	if len(r.defs) != len(columns) || string(r.defs[0].Name) != columns[0] || string(r.defs[1].Name) != columns[1] {
+		t.Errorf("expecting to create a row with columns %v, actual colmns are %v", r.defs, columns)
 	}
 }
 
