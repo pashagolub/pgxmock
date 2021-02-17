@@ -17,12 +17,12 @@ const invalidate = "☠☠☠ MEMORY OVERWRITTEN ☠☠☠ "
 // CSVColumnParser is a function which converts trimmed csv
 // column string to a []byte representation. Currently
 // transforms NULL to nil
-var CSVColumnParser = func(s string) []byte {
+var CSVColumnParser = func(s string) interface{} {
 	switch {
 	case strings.ToLower(s) == "null":
 		return nil
 	}
-	return []byte(s)
+	return s
 }
 
 type rowSets struct {
@@ -76,11 +76,15 @@ func (rs *rowSets) Scan(dest ...interface{}) error {
 			//behave compatible with pgx
 			continue
 		}
-		destVal := reflect.ValueOf(dest[i])
-		val := reflect.ValueOf(col)
+		destVal := reflect.ValueOf(dest[i]) 
 		if destVal.Kind() != reflect.Ptr {
 			return fmt.Errorf("Destination argument must be a pointer for column %s", r.defs[i].Name)
 		}
+		if col == nil {
+			dest[i] = nil
+			continue
+		}
+		val := reflect.ValueOf(col)
 		if destVal.Elem().Kind() == val.Kind() {
 			if destElem := destVal.Elem(); destElem.CanSet() {
 				destElem.Set(val)

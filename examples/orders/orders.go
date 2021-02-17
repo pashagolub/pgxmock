@@ -14,13 +14,13 @@ const orderPending = 0
 const orderCancelled = 1
 
 type User struct {
-	ID       int     `sql:"u_id"`
+	ID       int     `sql:"id"`
 	Username string  `sql:"username"`
 	Balance  float64 `sql:"balance"`
 }
 
 type Order struct {
-	ID          int     `sql:"o_id"`
+	ID          int     `sql:"id"`
 	Value       float64 `sql:"value"`
 	ReservedFee float64 `sql:"reserved_fee"`
 	Status      int     `sql:"status"`
