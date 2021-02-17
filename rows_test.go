@@ -211,8 +211,8 @@ func TestAllowsToSetRowsErrors(t *testing.T) {
 		t.Fatalf("unexpected error: %s", rs.Err())
 	}
 
-	if rs.Next() {
-		t.Fatal("was not expecting the second row, since there should be an error")
+	if !rs.Next() {
+		t.Fatal("expected the second row to be available, even there should be an error")
 	}
 	if rs.Err() == nil {
 		t.Fatal("expected an error, but got none")

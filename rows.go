@@ -33,7 +33,8 @@ type rowSets struct {
 }
 
 func (rs *rowSets) Err() error {
-	return rs.sets[rs.pos].closeErr
+	r := rs.sets[rs.pos]
+	return r.nextErr[r.pos-1]
 }
 
 func (rs *rowSets) CommandTag() pgconn.CommandTag {
@@ -76,7 +77,7 @@ func (rs *rowSets) Scan(dest ...interface{}) error {
 			//behave compatible with pgx
 			continue
 		}
-		destVal := reflect.ValueOf(dest[i]) 
+		destVal := reflect.ValueOf(dest[i])
 		if destVal.Kind() != reflect.Ptr {
 			return fmt.Errorf("Destination argument must be a pointer for column %s", r.defs[i].Name)
 		}
