@@ -512,6 +512,14 @@ func (c *pgxmock) Query(ctx context.Context, sql string, args ...interface{}) (p
 	return nil, err
 }
 
+type errRow struct {
+	err error
+}
+
+func (er errRow) Scan(dest ...interface{}) error {
+	return er.err
+}
+
 func (c *pgxmock) QueryRow(ctx context.Context, sql string, args ...interface{}) pgx.Row {
 	ex, err := c.query(sql, args)
 	if ex != nil {
@@ -526,8 +534,7 @@ func (c *pgxmock) QueryRow(ctx context.Context, sql string, args ...interface{})
 			return nil
 		}
 	}
-
-	return nil
+	return errRow{err}
 }
 
 // Implement the "ExecerContext" interface

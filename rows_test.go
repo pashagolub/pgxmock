@@ -68,20 +68,20 @@ func ExampleRows_rowError() {
 	// got rows error: row error
 }
 
-func ExampleRows_closeError() {
-	mock, err := NewConn()
-	if err != nil {
-		fmt.Println("failed to open sqlmock database:", err)
-	}
-	defer mock.Close(context.Background())
+// func ExampleRows_closeError() {
+// 	mock, err := NewConn()
+// 	if err != nil {
+// 		fmt.Println("failed to open sqlmock database:", err)
+// 	}
+// 	defer mock.Close(context.Background())
 
-	rows := NewRows([]string{"id", "title"}).CloseError(fmt.Errorf("close error"))
-	mock.ExpectQuery("SELECT").WillReturnRows(rows)
+// 	rows := NewRows([]string{"id", "title"}).CloseError(fmt.Errorf("close error"))
+// 	mock.ExpectQuery("SELECT").WillReturnRows(rows)
 
-	rs, _ := mock.Query(context.Background(), "SELECT")
-	rs.Close()
-	// Output: got error: close error
-}
+// 	rs, _ := mock.Query(context.Background(), "SELECT")
+// 	rs.Close()
+// 	// Output: got error: close error
+// }
 
 // func ExampleRows_rawBytes() {
 // 	mock, err := New()
@@ -405,7 +405,7 @@ func TestRowsScanError(t *testing.T) {
 		t.Fatal("unexpected error on second row read")
 	}
 
-	err = rs.Scan(&one, &two)
+	err = rs.Scan(&one, two)
 	if err == nil {
 		t.Fatal("expected an error for scan, but got none")
 	}

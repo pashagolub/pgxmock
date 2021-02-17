@@ -103,7 +103,7 @@ func TestMockQuery(t *testing.T) {
 	}
 	defer mock.Close(context.Background())
 
-	rs := NewRows([]string{"id", "title"}).FromCSVString("5,hello world")
+	rs := NewRows([]string{"id", "title"}).AddRow(5, "hello world")
 
 	mock.ExpectQuery("SELECT (.+) FROM articles WHERE id = ?").
 		WithArgs(5).
@@ -425,7 +425,7 @@ func TestWrongExpectations(t *testing.T) {
 
 	mock.ExpectBegin()
 
-	rs1 := NewRows([]string{"id", "title"}).FromCSVString("5,hello world")
+	rs1 := NewRows([]string{"id", "title"}).AddRow(5, "hello world")
 	mock.ExpectQuery("SELECT (.+) FROM articles WHERE id = ?").
 		WithArgs(5).
 		WillReturnRows(rs1)
