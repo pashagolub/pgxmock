@@ -7,6 +7,7 @@ import (
 
 	pgconn "github.com/jackc/pgconn"
 	pgx "github.com/jackc/pgx/v4"
+	"github.com/pashagolub/pgxstruct"
 )
 
 const orderPending = 0
@@ -49,8 +50,8 @@ FROM orders AS o
 INNER JOIN users AS u ON o.buyer_id = u.id
 WHERE o.id = ?
 FOR UPDATE`,
-		ColumnsAliased(order, "o"),
-		ColumnsAliased(user, "u"))
+		pgxstruct.ColumnsAliased(order, "o"),
+		pgxstruct.ColumnsAliased(user, "u"))
 
 	// fetch order to cancel
 	rows, err := tx.Query(context.Background(), sql, id)
@@ -67,7 +68,7 @@ FOR UPDATE`,
 	}
 
 	// read order
-	err = ScanAliased(&order, rows, "o")
+	err = pgxstruct.ScanAliased(&order, rows, "o")
 	if err != nil {
 		_ = tx.Rollback(context.Background())
 		return
@@ -80,7 +81,7 @@ FOR UPDATE`,
 	}
 
 	// read user
-	err = ScanAliased(&user, rows, "u")
+	err = pgxstruct.ScanAliased(&user, rows, "u")
 	if err != nil {
 		_ = tx.Rollback(context.Background())
 		return
