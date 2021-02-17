@@ -498,8 +498,8 @@ func TestRowBuilderAndNilTypes(t *testing.T) {
 	defer mock.Close(context.Background())
 
 	rs := NewRows([]string{"id", "active", "created", "status"}).
-		AddRow(1, true, time.Now(), 5).
-		AddRow(2, false, nil, nil)
+		AddRow(1, true, NullTime{time.Now(), true}, NullInt{5, true}).
+		AddRow(2, false, NullTime{Valid: false}, NullInt{Valid: false})
 
 	mock.ExpectQuery("SELECT (.+) FROM sales").WillReturnRows(rs)
 
