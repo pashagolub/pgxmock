@@ -1,4 +1,4 @@
-[![GoDoc](https://pkg.go.dev/github.com/pashagolub/pgxmock?status.svg)](https://pkg.go.dev/github.com/pashagolub/pgxmock)
+[![Go Reference](https://pkg.go.dev/badge/github.com/pashagolub/pgxmock.svg)](https://pkg.go.dev/github.com/pashagolub/pgxmock)
 [![Go Report Card](https://goreportcard.com/badge/github.com/pashagolub/pgxmock)](https://goreportcard.com/report/github.com/pashagolub/pgxmock)
 [![Coverage Status](https://coveralls.io/repos/github/pashagolub/pgxmock/badge.svg?branch=master)](https://coveralls.io/github/pashagolub/pgxmock?branch=master)
 
