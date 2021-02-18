@@ -20,6 +20,7 @@ import (
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgproto3/v2"
 	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v4/pgxpool"
 )
 
 // pgxMockIface interface serves to create expectations
@@ -99,6 +100,7 @@ type pgxMockIface interface {
 }
 
 type pgxIface interface {
+	pgxMockIface
 	Begin(context.Context) (pgx.Tx, error)
 	Exec(context.Context, string, ...interface{}) (pgconn.CommandTag, error)
 	QueryRow(context.Context, string, ...interface{}) pgx.Row
@@ -106,13 +108,18 @@ type pgxIface interface {
 	Ping(context.Context) error
 	Prepare(context.Context, string, string) (*pgconn.StatementDescription, error)
 	Deallocate(ctx context.Context, name string) error
-	Close(context.Context) error
 }
 
-type Pgxmock interface {
+type PgxConnIface interface {
 	pgxIface
-	pgxMockIface
 	pgx.Tx
+	Close(ctx context.Context) error
+}
+type PgxPoolIface interface {
+	pgxIface
+	pgx.Tx
+	Acquire(ctx context.Context) (*pgxpool.Conn, error)
+	Close()
 }
 
 type pgxmock struct {
@@ -126,11 +133,11 @@ type pgxmock struct {
 	expected []expectation
 }
 
-func (c *pgxmock) open(options []func(*pgxmock) error) (Pgxmock, error) {
+func (c *pgxmock) open(options []func(*pgxmock) error) error {
 	for _, option := range options {
 		err := option(c)
 		if err != nil {
-			return c, err
+			return err
 		}
 	}
 	// if c.converter == nil {
@@ -148,7 +155,7 @@ func (c *pgxmock) open(options []func(*pgxmock) error) (Pgxmock, error) {
 		c.monitorPings = false
 		defer func() { c.monitorPings = true }()
 	}
-	return c, c.Ping(context.TODO())
+	return c.Ping(context.TODO())
 }
 
 func (c *pgxmock) ExpectClose() *ExpectedClose {
@@ -164,7 +171,7 @@ func (c *pgxmock) MatchExpectationsInOrder(b bool) {
 // Close a mock database driver connection. It may or may not
 // be called depending on the circumstances, but if it is called
 // there must be an *ExpectedClose expectation satisfied.
-func (c *pgxmock) Close(context.Context) error {
+func (c *pgxmock) close(context.Context) error {
 	var expected *ExpectedClose
 	var fulfilled int
 	var ok bool
