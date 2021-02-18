@@ -264,9 +264,9 @@ func TestPrepareExpectations(t *testing.T) {
 	// expect something else, w/o ExpectPrepare()
 	var id int
 	var title string
-	rs := NewRows([]string{"id", "title"}).FromCSVString("5,hello world")
+	rs := NewRows([]string{"id", "title"}).AddRow(5, "hello world")
 
-	mock.ExpectQuery("SELECT (.+) FROM articles WHERE id = ?").
+	mock.ExpectQuery("foo").
 		WithArgs(5).
 		WillReturnRows(rs)
 
@@ -301,13 +301,13 @@ func TestPreparedQueryExecutions(t *testing.T) {
 
 	mock.ExpectPrepare("foo", "SELECT (.+) FROM articles WHERE id = ?")
 
-	rs1 := NewRows([]string{"id", "title"}).FromCSVString("5,hello world")
-	mock.ExpectQuery("SELECT (.+) FROM articles WHERE id = ?").
+	rs1 := NewRows([]string{"id", "title"}).AddRow(5, "hello world")
+	mock.ExpectQuery("foo").
 		WithArgs(5).
 		WillReturnRows(rs1)
 
-	rs2 := NewRows([]string{"id", "title"}).FromCSVString("2,whoop")
-	mock.ExpectQuery("SELECT (.+) FROM articles WHERE id = ?").
+	rs2 := NewRows([]string{"id", "title"}).AddRow(2, "whoop")
+	mock.ExpectQuery("foo").
 		WithArgs(2).
 		WillReturnRows(rs2)
 
@@ -359,24 +359,24 @@ func TestUnorderedPreparedQueryExecutions(t *testing.T) {
 
 	mock.MatchExpectationsInOrder(false)
 
-	mock.ExpectPrepare("foo", "SELECT (.+) FROM articles WHERE id = ?").
+	mock.ExpectPrepare("articles_stmt", "SELECT (.+) FROM articles WHERE id = ?").
 		ExpectQuery().
 		WithArgs(5).
-		WillReturnRows(NewRows([]string{"id", "title"}).FromCSVString("5,The quick brown fox"))
-	mock.ExpectPrepare("foo", "SELECT (.+) FROM authors WHERE id = ?").
+		WillReturnRows(NewRows([]string{"id", "title"}).AddRow(5, "The quick brown fox"))
+	mock.ExpectPrepare("authors_stmt", "SELECT (.+) FROM authors WHERE id = ?").
 		ExpectQuery().
 		WithArgs(1).
-		WillReturnRows(NewRows([]string{"id", "title"}).FromCSVString("1,Betty B."))
+		WillReturnRows(NewRows([]string{"id", "title"}).AddRow(1, "Betty B."))
 
 	var id int
 	var name string
 
-	_, err = mock.Prepare(context.Background(), "foo", "SELECT id, name FROM authors WHERE id = ?")
+	_, err = mock.Prepare(context.Background(), "authors_stmt", "SELECT id, name FROM authors WHERE id = ?")
 	if err != nil {
 		t.Errorf("error '%s' was not expected while creating a prepared statement", err)
 	}
 
-	err = mock.QueryRow(context.Background(), "foo", 1).Scan(&id, &name)
+	err = mock.QueryRow(context.Background(), "authors_stmt", 1).Scan(&id, &name)
 	if err != nil {
 		t.Errorf("error '%s' was not expected querying row from statement and scanning", err)
 	}
