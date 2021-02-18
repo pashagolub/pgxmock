@@ -59,75 +59,15 @@ func ExampleRows_rowError() {
 		var title string
 		_ = rs.Scan(&id, &title)
 		fmt.Println("scanned id:", id, "and title:", title)
+		if rs.Err() != nil {
+			fmt.Println("got rows error:", rs.Err())
+		}
 	}
 
-	if rs.Err() != nil {
-		fmt.Println("got rows error:", rs.Err())
-	}
 	// Output: scanned id: 0 and title: one
+	// scanned id: 1 and title: two
 	// got rows error: row error
 }
-
-// func ExampleRows_closeError() {
-// 	mock, err := NewConn()
-// 	if err != nil {
-// 		fmt.Println("failed to open sqlmock database:", err)
-// 	}
-// 	defer mock.Close(context.Background())
-
-// 	rows := NewRows([]string{"id", "title"}).CloseError(fmt.Errorf("close error"))
-// 	mock.ExpectQuery("SELECT").WillReturnRows(rows)
-
-// 	rs, _ := mock.Query(context.Background(), "SELECT")
-// 	rs.Close()
-// 	// Output: got error: close error
-// }
-
-// func ExampleRows_rawBytes() {
-// 	mock, err := New()
-// 	if err != nil {
-// 		fmt.Println("failed to open sqlmock database:", err)
-// 	}
-// 	defer mock.Close(context.Background())
-
-// 	rows := NewRows([]string{"id", "binary"}).
-// 		AddRow(1, []byte(`one binary value with some text!`)).
-// 		AddRow(2, []byte(`two binary value with even more text than the first one`))
-
-// 	mock.ExpectQuery("SELECT").WillReturnRows(rows)
-
-// 	rs, _ := mock.Query(context.Background(), "SELECT")
-// 	defer rs.Close()
-
-// 	type scanned struct {
-// 		id  int
-// 		raw sql.RawBytes
-// 	}
-// 	fmt.Println("initial read...")
-// 	var ss []scanned
-// 	for rs.Next() {
-// 		var s scanned
-// 		rs.Scan(&s.id, &s.raw)
-// 		ss = append(ss, s)
-// 		fmt.Println("scanned id:", s.id, "and raw:", string(s.raw))
-// 	}
-
-// 	if rs.Err() != nil {
-// 		fmt.Println("got rows error:", rs.Err())
-// 	}
-
-// 	fmt.Println("after reading all...")
-// 	for _, s := range ss {
-// 		fmt.Println("scanned id:", s.id, "and raw:", string(s.raw))
-// 	}
-// 	// Output:
-// 	// initial read...
-// 	// scanned id: 1 and raw: one binary value with some text!
-// 	// scanned id: 2 and raw: two binary value with even more text than the first one
-// 	// after reading all...
-// 	// scanned id: 1 and raw: ☠☠☠ MEMORY OVERWRITTEN ☠
-// 	// scanned id: 2 and raw: ☠☠☠ MEMORY OVERWRITTEN ☠☠☠ ☠☠☠ MEMORY
-// }
 
 func ExampleRows_expectToBeClosed() {
 	mock, err := NewConn()

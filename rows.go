@@ -1,7 +1,6 @@
 package pgxmock
 
 import (
-	"bytes"
 	"encoding/csv"
 	"fmt"
 	"io"
@@ -11,8 +10,6 @@ import (
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgproto3/v2"
 )
-
-const invalidate = "☠☠☠ MEMORY OVERWRITTEN ☠☠☠ "
 
 // CSVColumnParser is a function which converts trimmed csv
 // column string to a []byte representation. Currently
@@ -29,7 +26,6 @@ type rowSets struct {
 	sets []*Rows
 	pos  int
 	ex   *ExpectedQuery
-	raw  [][]byte
 }
 
 func (rs *rowSets) Err() error {
@@ -50,7 +46,6 @@ func (rs *rowSets) FieldDescriptions() []pgproto3.FieldDescription {
 // }
 
 func (rs *rowSets) Close() {
-	rs.invalidateRaw()
 	rs.ex.rowsWereClosed = true
 	// return rs.sets[rs.pos].closeErr
 }
@@ -59,7 +54,6 @@ func (rs *rowSets) Close() {
 func (rs *rowSets) Next() bool {
 	r := rs.sets[rs.pos]
 	r.pos++
-	rs.invalidateRaw()
 	return r.pos <= len(r.rows)
 }
 
@@ -106,7 +100,6 @@ func (rs *rowSets) RawValues() [][]byte {
 
 	for i, col := range r.rows[r.pos-1] {
 		if b, ok := rawBytes(col); ok {
-			rs.raw = append(rs.raw, b)
 			dest[i] = b
 			continue
 		}
@@ -157,18 +150,6 @@ func rawBytes(col interface{}) (_ []byte, ok bool) {
 	b := make([]byte, len(val))
 	copy(b, val)
 	return b, true
-}
-
-// Bytes that could have been scanned as sql.RawBytes are only valid until the next call to Next, Scan or Close.
-// If those occur, we must replace their content to simulate the shared memory to expose misuse of sql.RawBytes
-func (rs *rowSets) invalidateRaw() {
-	// Replace the content of slices previously returned
-	b := []byte(invalidate)
-	for _, r := range rs.raw {
-		copy(r, bytes.Repeat(b, len(r)/len(b)+1))
-	}
-	// Start with new slices for the next scan
-	rs.raw = nil
 }
 
 // Rows is a mocked collection of rows to

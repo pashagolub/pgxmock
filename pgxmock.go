@@ -1,12 +1,12 @@
 /*
-package pgxmock is a mock library implementing sql driver. Which has one and only
-purpose - to simulate any sql driver behavior in tests, without needing a real
+package pgxmock is a mock library implementing pgx connector. Which has one and only
+purpose - to simulate pgx driver behavior in tests, without needing a real
 database connection. It helps to maintain correct **TDD** workflow.
 
-It does not require any modifications to your source code in order to test
+It does not require (almost) any modifications to your source code in order to test
 and mock database operations. Supports concurrency and multiple database mocking.
 
-The driver allows to mock any sql driver method behavior.
+The driver allows to mock any pgx driver method behavior.
 */
 package pgxmock
 
@@ -22,7 +22,7 @@ import (
 	"github.com/jackc/pgx/v4"
 )
 
-// Sqlmock interface serves to create expectations
+// pgxMockIface interface serves to create expectations
 // for any kind of database action in order to mock
 // and test real database behavior.
 type pgxMockIface interface {
