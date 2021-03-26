@@ -123,10 +123,7 @@ type PgxPoolIface interface {
 }
 
 type pgxmock struct {
-	ordered bool
-	dsn     string
-	// opened  int
-	// converter    driver.ValueConverter
+	ordered      bool
 	queryMatcher QueryMatcher
 	monitorPings bool
 
