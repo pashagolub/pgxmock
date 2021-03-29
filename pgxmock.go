@@ -250,6 +250,26 @@ func (c *pgxmock) QueryFunc(ctx context.Context, sql string, args []interface{},
 	return nil, nil
 }
 
+func (c *pgxmock) BeginFunc(ctx context.Context, f func(pgx.Tx) error) (err error) {
+	var savepoint pgx.Tx
+	savepoint, err = c.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		rollbackErr := savepoint.Rollback(ctx)
+		if !(rollbackErr == nil || errors.Is(rollbackErr, pgx.ErrTxClosed)) {
+			err = rollbackErr
+		}
+	}()
+	fErr := f(savepoint)
+	if fErr != nil {
+		_ = savepoint.Rollback(ctx) // ignore rollback error as there is already an error to return
+		return fErr
+	}
+	return savepoint.Commit(ctx)
+}
+
 func (c *pgxmock) Begin(ctx context.Context) (pgx.Tx, error) {
 	ex, err := c.begin()
 	if ex != nil {
