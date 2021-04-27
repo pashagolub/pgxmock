@@ -231,7 +231,7 @@ func (c *pgxmock) ExpectationsWereMet() error {
 }
 
 func (c *pgxmock) Conn() *pgx.Conn {
-	return nil
+	panic("Conn() is not available in pgxmock")
 }
 
 func (c *pgxmock) CopyFrom(ctx context.Context, tableName pgx.Identifier, columnNames []string, rowSrc pgx.CopyFromSource) (int64, error) {
