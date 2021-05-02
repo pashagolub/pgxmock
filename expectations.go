@@ -123,8 +123,8 @@ func (e *ExpectedRollback) String() string {
 	return msg
 }
 
-// ExpectedQuery is used to manage *sql.DB.Query, *dql.DB.QueryRow, *sql.Tx.Query,
-// *sql.Tx.QueryRow, *sql.Stmt.Query or *sql.Stmt.QueryRow expectations.
+// ExpectedQuery is used to manage *pgx.Conn.Query, *pgx.Conn.QueryRow, *pgx.Tx.Query,
+// *pgx.Tx.QueryRow, *pgx.Stmt.Query or *pgx.Stmt.QueryRow expectations.
 // Returned by *Sqlmock.ExpectQuery.
 type ExpectedQuery struct {
 	queryBasedExpectation
@@ -423,4 +423,49 @@ func (e *queryBasedExpectation) attemptArgMatch(args []interface{}) (err error) 
 
 	err = e.argsMatches(args)
 	return
+}
+
+// ExpectedCopyFrom is used to manage *pgx.Conn.CopyFrom expectations.
+// Returned by *Pgxmock.ExpectCopyFrom.
+type ExpectedCopyFrom struct {
+	commonExpectation
+	expectedTableName string
+	expectedColumns   []string
+	rowsAffected      int64
+	delay             time.Duration
+}
+
+// WillReturnError allows to set an error for expected database exec action
+func (e *ExpectedCopyFrom) WillReturnError(err error) *ExpectedCopyFrom {
+	e.err = err
+	return e
+}
+
+// WillDelayFor allows to specify duration for which it will delay
+// result. May be used together with Context
+func (e *ExpectedCopyFrom) WillDelayFor(duration time.Duration) *ExpectedCopyFrom {
+	e.delay = duration
+	return e
+}
+
+// String returns string representation
+func (e *ExpectedCopyFrom) String() string {
+	msg := "ExpectedCopyFrom => expecting CopyFrom which:"
+	msg += "\n  - matches table name: '" + e.expectedTableName + "'"
+	msg += fmt.Sprintf("\n  - matches column names: '%+v'", e.expectedTableName)
+
+	if e.err != nil {
+		msg += fmt.Sprintf("\n  - should return error: %s", e.err)
+	}
+
+	return msg
+}
+
+// WillReturnResult arranges for an expected Exec() to return a particular
+// result, there is sqlmock.NewResult(lastInsertID int64, affectedRows int64) method
+// to build a corresponding result. Or if actions needs to be tested against errors
+// sqlmock.NewErrorResult(err error) to return a given error.
+func (e *ExpectedCopyFrom) WillReturnResult(result int64) *ExpectedCopyFrom {
+	e.rowsAffected = result
+	return e
 }
