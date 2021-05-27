@@ -135,6 +135,125 @@ type pgxmock struct {
 	expected []expectation
 }
 
+// region Expectations
+func (c *pgxmock) ExpectClose() *ExpectedClose {
+	e := &ExpectedClose{}
+	c.expected = append(c.expected, e)
+	return e
+}
+
+func (c *pgxmock) MatchExpectationsInOrder(b bool) {
+	c.ordered = b
+}
+
+func (c *pgxmock) ExpectationsWereMet() error {
+	for _, e := range c.expected {
+		e.Lock()
+		fulfilled := e.fulfilled()
+		e.Unlock()
+
+		if !fulfilled {
+			return fmt.Errorf("there is a remaining expectation which was not matched: %s", e)
+		}
+
+		// for expected prepared statement check whether it was closed if expected
+		if prep, ok := e.(*ExpectedPrepare); ok {
+			if prep.mustBeClosed && !prep.wasClosed {
+				return fmt.Errorf("expected prepared statement to be closed, but it was not: %s", prep)
+			}
+		}
+
+		// must check whether all expected queried rows are closed
+		if query, ok := e.(*ExpectedQuery); ok {
+			if query.rowsMustBeClosed && !query.rowsWereClosed {
+				return fmt.Errorf("expected query rows to be closed, but it was not: %s", query)
+			}
+		}
+	}
+	return nil
+}
+
+func (c *pgxmock) ExpectQuery(expectedSQL string) *ExpectedQuery {
+	e := &ExpectedQuery{}
+	e.expectSQL = expectedSQL
+	c.expected = append(c.expected, e)
+	return e
+}
+
+func (c *pgxmock) ExpectCommit() *ExpectedCommit {
+	e := &ExpectedCommit{}
+	c.expected = append(c.expected, e)
+	return e
+}
+
+func (c *pgxmock) ExpectRollback() *ExpectedRollback {
+	e := &ExpectedRollback{}
+	c.expected = append(c.expected, e)
+	return e
+}
+
+func (c *pgxmock) ExpectBegin() *ExpectedBegin {
+	e := &ExpectedBegin{}
+	c.expected = append(c.expected, e)
+	return e
+}
+
+func (c *pgxmock) ExpectExec(expectedSQL string) *ExpectedExec {
+	e := &ExpectedExec{}
+	e.expectSQL = expectedSQL
+	// e.converter = c.converter
+	c.expected = append(c.expected, e)
+	return e
+}
+
+func (c *pgxmock) ExpectCopyFrom(expectedTableName string, expectedColumns []string) *ExpectedCopyFrom {
+	e := &ExpectedCopyFrom{}
+	e.expectedTableName = expectedTableName
+	e.expectedColumns = expectedColumns
+	c.expected = append(c.expected, e)
+	return e
+}
+
+func (c *pgxmock) ExpectPing() *ExpectedPing {
+	if !c.monitorPings {
+		log.Println("ExpectPing will have no effect as monitoring pings is disabled. Use MonitorPingsOption to enable.")
+		return nil
+	}
+	e := &ExpectedPing{}
+	c.expected = append(c.expected, e)
+	return e
+}
+
+func (c *pgxmock) ExpectPrepare(expectedStmtName, expectedSQL string) *ExpectedPrepare {
+	e := &ExpectedPrepare{expectSQL: expectedSQL, expectStmtName: expectedStmtName, mock: c}
+	c.expected = append(c.expected, e)
+	return e
+}
+
+//endregion Expectations
+
+// NewRows allows Rows to be created from a
+// atring slice or from the CSV string and
+// to be used as sql driver.Rows.
+func (c *pgxmock) NewRows(columns []string) *Rows {
+	r := NewRows(columns)
+	return r
+}
+
+// NewRowsWithColumnDefinition allows Rows to be created from a
+// sql driver.Value slice with a definition of sql metadata
+func (c *pgxmock) NewRowsWithColumnDefinition(columns ...pgproto3.FieldDescription) *Rows {
+	r := NewRowsWithColumnDefinition(columns...)
+	return r
+}
+
+// NewColumn allows to create a Column that can be enhanced with metadata
+// using OfType/Nullable/WithLength/WithPrecisionAndScale methods.
+func (c *pgxmock) NewColumn(name string) *pgproto3.FieldDescription {
+	return &pgproto3.FieldDescription{Name: []byte(name)}
+}
+
+// open a mock database driver connection
 func (c *pgxmock) open(options []func(*pgxmock) error) error {
 	for _, option := range options {
 		err := option(c)
@@ -158,16 +277,6 @@ func (c *pgxmock) open(options []func(*pgxmock) error) error {
 		defer func() { c.monitorPings = true }()
 	}
 	return c.Ping(context.TODO())
-}
-
-func (c *pgxmock) ExpectClose() *ExpectedClose {
-	e := &ExpectedClose{}
-	c.expected = append(c.expected, e)
-	return e
-}
-
-func (c *pgxmock) MatchExpectationsInOrder(b bool) {
-	c.ordered = b
 }
 
 // Close a mock database driver connection. It may or may not
@@ -206,33 +315,6 @@ func (c *pgxmock) close(context.Context) error {
 	expected.triggered = true
 	expected.Unlock()
 	return expected.err
-}
-
-func (c *pgxmock) ExpectationsWereMet() error {
-	for _, e := range c.expected {
-		e.Lock()
-		fulfilled := e.fulfilled()
-		e.Unlock()
-
-		if !fulfilled {
-			return fmt.Errorf("there is a remaining expectation which was not matched: %s", e)
-		}
-
-		// for expected prepared statement check whether it was closed if expected
-		if prep, ok := e.(*ExpectedPrepare); ok {
-			if prep.mustBeClosed && !prep.wasClosed {
-				return fmt.Errorf("expected prepared statement to be closed, but it was not: %s", prep)
-			}
-		}
-
-		// must check whether all expected queried rows are closed
-		if query, ok := e.(*ExpectedQuery); ok {
-			if query.rowsMustBeClosed && !query.rowsWereClosed {
-				return fmt.Errorf("expected query rows to be closed, but it was not: %s", query)
-			}
-		}
-	}
-	return nil
 }
 
 func (c *pgxmock) Conn() *pgx.Conn {
@@ -384,28 +466,6 @@ func (c *pgxmock) begin() (*ExpectedBegin, error) {
 	return expected, expected.err
 }
 
-func (c *pgxmock) ExpectBegin() *ExpectedBegin {
-	e := &ExpectedBegin{}
-	c.expected = append(c.expected, e)
-	return e
-}
-
-func (c *pgxmock) ExpectExec(expectedSQL string) *ExpectedExec {
-	e := &ExpectedExec{}
-	e.expectSQL = expectedSQL
-	// e.converter = c.converter
-	c.expected = append(c.expected, e)
-	return e
-}
-
-func (c *pgxmock) ExpectCopyFrom(expectedTableName string, expectedColumns []string) *ExpectedCopyFrom {
-	e := &ExpectedCopyFrom{}
-	e.expectedTableName = expectedTableName
-	e.expectedColumns = expectedColumns
-	c.expected = append(c.expected, e)
-	return e
-}
-
 func (c *pgxmock) Prepare(ctx context.Context, name, query string) (*pgconn.StatementDescription, error) {
 	ex, err := c.prepare(name, query)
 	if ex != nil {
@@ -468,12 +528,6 @@ func (c *pgxmock) prepare(name string, query string) (*ExpectedPrepare, error) {
 	return expected, expected.err
 }
 
-func (c *pgxmock) ExpectPrepare(expectedStmtName, expectedSQL string) *ExpectedPrepare {
-	e := &ExpectedPrepare{expectSQL: expectedSQL, expectStmtName: expectedStmtName, mock: c}
-	c.expected = append(c.expected, e)
-	return e
-}
-
 func (c *pgxmock) Deallocate(ctx context.Context, name string) error {
 	var expected *ExpectedPrepare
 	for _, next := range c.expected {
@@ -490,26 +544,6 @@ func (c *pgxmock) Deallocate(ctx context.Context, name string) error {
 	}
 	expected.wasClosed = true
 	return nil
-}
-
-func (c *pgxmock) ExpectQuery(expectedSQL string) *ExpectedQuery {
-	e := &ExpectedQuery{}
-	e.expectSQL = expectedSQL
-	// e.converter = c.converter
-	c.expected = append(c.expected, e)
-	return e
-}
-
-func (c *pgxmock) ExpectCommit() *ExpectedCommit {
-	e := &ExpectedCommit{}
-	c.expected = append(c.expected, e)
-	return e
-}
-
-func (c *pgxmock) ExpectRollback() *ExpectedRollback {
-	e := &ExpectedRollback{}
-	c.expected = append(c.expected, e)
-	return e
 }
 
 func (c *pgxmock) Commit(ctx context.Context) error {
@@ -580,15 +614,6 @@ func (c *pgxmock) Rollback(ctx context.Context) error {
 	return expected.err
 }
 
-// NewRows allows Rows to be created from a
-// sql driver.Value slice or from the CSV string and
-// to be used as sql driver.Rows.
-func (c *pgxmock) NewRows(columns []string) *Rows {
-	r := NewRows(columns)
-	// r.converter = c.converter
-	return r
-}
-
 // ErrCancelled defines an error value, which can be expected in case of
 // such cancellation error.
 var ErrCancelled = errors.New("canceling query due to user request")
@@ -609,112 +634,6 @@ func (c *pgxmock) Query(ctx context.Context, sql string, args ...interface{}) (p
 	}
 
 	return nil, err
-}
-
-type errRow struct {
-	err error
-}
-
-func (er errRow) Scan(dest ...interface{}) error {
-	return er.err
-}
-
-func (c *pgxmock) QueryRow(ctx context.Context, sql string, args ...interface{}) pgx.Row {
-	ex, err := c.query(sql, args)
-	if ex != nil {
-		select {
-		case <-time.After(ex.delay):
-			if (err != nil) || (ex.rows == nil) {
-				return errRow{err}
-			}
-			_ = ex.rows.Next()
-			return ex.rows
-		case <-ctx.Done():
-			return errRow{ctx.Err()}
-		}
-	}
-	return errRow{err}
-}
-
-// Implement the "ExecerContext" interface
-func (c *pgxmock) Exec(ctx context.Context, query string, args ...interface{}) (pgconn.CommandTag, error) {
-	ex, err := c.exec(query, args)
-	if ex != nil {
-		select {
-		case <-time.After(ex.delay):
-			if err != nil {
-				return nil, err
-			}
-			return ex.result, nil
-		case <-ctx.Done():
-			return nil, ErrCancelled
-		}
-	}
-
-	return nil, err
-}
-
-// Implement the "Pinger" interface - the explicit DB driver ping was only added to database/sql in Go 1.8
-func (c *pgxmock) Ping(ctx context.Context) error {
-	if !c.monitorPings {
-		return nil
-	}
-
-	ex, err := c.ping()
-	if ex != nil {
-		select {
-		case <-ctx.Done():
-			return ErrCancelled
-		case <-time.After(ex.delay):
-		}
-	}
-
-	return err
-}
-
-func (c *pgxmock) ping() (*ExpectedPing, error) {
-	var expected *ExpectedPing
-	var fulfilled int
-	var ok bool
-	for _, next := range c.expected {
-		next.Lock()
-		if next.fulfilled() {
-			next.Unlock()
-			fulfilled++
-			continue
-		}
-
-		if expected, ok = next.(*ExpectedPing); ok {
-			break
-		}
-
-		next.Unlock()
-		if c.ordered {
-			return nil, fmt.Errorf("call to database Ping, was not expected, next expectation is: %s", next)
-		}
-	}
-
-	if expected == nil {
-		msg := "call to database Ping was not expected"
-		if fulfilled == len(c.expected) {
-			msg = "all expectations were already fulfilled, " + msg
-		}
-		return nil, fmt.Errorf(msg)
-	}
-
-	expected.triggered = true
-	expected.Unlock()
-	return expected, expected.err
-}
-
-func (c *pgxmock) ExpectPing() *ExpectedPing {
-	if !c.monitorPings {
-		log.Println("ExpectPing will have no effect as monitoring pings is disabled. Use MonitorPingsOption to enable.")
-		return nil
-	}
-	e := &ExpectedPing{}
-	c.expected = append(c.expected, e)
-	return e
 }
 
 func (c *pgxmock) query(query string, args []interface{}) (*ExpectedQuery, error) {
@@ -778,6 +697,49 @@ func (c *pgxmock) query(query string, args []interface{}) (*ExpectedQuery, error
 	return expected, nil
 }
 
+type errRow struct {
+	err error
+}
+
+func (er errRow) Scan(dest ...interface{}) error {
+	return er.err
+}
+
+func (c *pgxmock) QueryRow(ctx context.Context, sql string, args ...interface{}) pgx.Row {
+	ex, err := c.query(sql, args)
+	if ex != nil {
+		select {
+		case <-time.After(ex.delay):
+			if (err != nil) || (ex.rows == nil) {
+				return errRow{err}
+			}
+			_ = ex.rows.Next()
+			return ex.rows
+		case <-ctx.Done():
+			return errRow{ctx.Err()}
+		}
+	}
+	return errRow{err}
+}
+
+// Implement the "ExecerContext" interface
+func (c *pgxmock) Exec(ctx context.Context, query string, args ...interface{}) (pgconn.CommandTag, error) {
+	ex, err := c.exec(query, args)
+	if ex != nil {
+		select {
+		case <-time.After(ex.delay):
+			if err != nil {
+				return nil, err
+			}
+			return ex.result, nil
+		case <-ctx.Done():
+			return nil, ErrCancelled
+		}
+	}
+
+	return nil, err
+}
+
 func (c *pgxmock) exec(query string, args []interface{}) (*ExpectedExec, error) {
 	var expected *ExpectedExec
 	var fulfilled int
@@ -839,18 +801,55 @@ func (c *pgxmock) exec(query string, args []interface{}) (*ExpectedExec, error) 
 	return expected, nil
 }
 
-// @TODO maybe add ExpectedBegin.WithOptions(driver.TxOptions)
+// Implement the "Pinger" interface - the explicit DB driver ping was only added to database/sql in Go 1.8
+func (c *pgxmock) Ping(ctx context.Context) error {
+	if !c.monitorPings {
+		return nil
+	}
 
-// NewRowsWithColumnDefinition allows Rows to be created from a
-// sql driver.Value slice with a definition of sql metadata
-func (c *pgxmock) NewRowsWithColumnDefinition(columns ...pgproto3.FieldDescription) *Rows {
-	r := NewRowsWithColumnDefinition(columns...)
-	// r.converter = c.converter
-	return r
+	ex, err := c.ping()
+	if ex != nil {
+		select {
+		case <-ctx.Done():
+			return ErrCancelled
+		case <-time.After(ex.delay):
+		}
+	}
+
+	return err
 }
 
-// NewColumn allows to create a Column that can be enhanced with metadata
-// using OfType/Nullable/WithLength/WithPrecisionAndScale methods.
-func (c *pgxmock) NewColumn(name string) *pgproto3.FieldDescription {
-	return &pgproto3.FieldDescription{Name: []byte(name)}
+func (c *pgxmock) ping() (*ExpectedPing, error) {
+	var expected *ExpectedPing
+	var fulfilled int
+	var ok bool
+	for _, next := range c.expected {
+		next.Lock()
+		if next.fulfilled() {
+			next.Unlock()
+			fulfilled++
+			continue
+		}
+
+		if expected, ok = next.(*ExpectedPing); ok {
+			break
+		}
+
+		next.Unlock()
+		if c.ordered {
+			return nil, fmt.Errorf("call to database Ping, was not expected, next expectation is: %s", next)
+		}
+	}
+
+	if expected == nil {
+		msg := "call to database Ping was not expected"
+		if fulfilled == len(c.expected) {
+			msg = "all expectations were already fulfilled, " + msg
+		}
+		return nil, fmt.Errorf(msg)
+	}
+
+	expected.triggered = true
+	expected.Unlock()
+	return expected, expected.err
 }
