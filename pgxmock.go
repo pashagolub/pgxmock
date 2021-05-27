@@ -15,6 +15,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"reflect"
 	"time"
 
 	"github.com/jackc/pgconn"
@@ -72,6 +73,10 @@ type pgxMockIface interface {
 	// You must enable pings using MonitorPingsOption for this to register
 	// any expectations.
 	ExpectPing() *ExpectedPing
+
+	// ExpectCopyFrom expects pgx.CopyFrom to be called.
+	// the *ExpectCopyFrom allows to mock database response
+	ExpectCopyFrom(expectedTableName string, expectedColumns []string) *ExpectedCopyFrom
 
 	// MatchExpectationsInOrder gives an option whether to match all
 	// expectations in the order they were set or not.
@@ -235,7 +240,69 @@ func (c *pgxmock) Conn() *pgx.Conn {
 }
 
 func (c *pgxmock) CopyFrom(ctx context.Context, tableName pgx.Identifier, columnNames []string, rowSrc pgx.CopyFromSource) (int64, error) {
-	return 0, nil
+	ex, err := c.copyFrom(tableName.Sanitize(), columnNames)
+	if ex != nil {
+		select {
+		case <-time.After(ex.delay):
+			if err != nil {
+				return ex.rowsAffected, err
+			}
+			return ex.rowsAffected, nil
+		case <-ctx.Done():
+			return -1, ErrCancelled
+		}
+	}
+	return -1, err
+}
+
+func (c *pgxmock) copyFrom(tableName string, columnNames []string) (*ExpectedCopyFrom, error) {
+	var expected *ExpectedCopyFrom
+	var fulfilled int
+	var ok bool
+
+	for _, next := range c.expected {
+		next.Lock()
+		if next.fulfilled() {
+			next.Unlock()
+			fulfilled++
+			continue
+		}
+
+		if c.ordered {
+			if expected, ok = next.(*ExpectedCopyFrom); ok {
+				break
+			}
+
+			next.Unlock()
+			return nil, fmt.Errorf("call to CopyFrom statement with table name '%s', was not expected, next expectation is: %s", tableName, next)
+		}
+
+		if pr, ok := next.(*ExpectedCopyFrom); ok {
+			if pr.expectedTableName == tableName && reflect.DeepEqual(pr.expectedColumns, columnNames) {
+				expected = pr
+				break
+			}
+		}
+		next.Unlock()
+	}
+
+	if expected == nil {
+		msg := "call to CopyFrom table name '%s' was not expected"
+		if fulfilled == len(c.expected) {
+			msg = "all expectations were already fulfilled, " + msg
+		}
+		return nil, fmt.Errorf(msg, tableName)
+	}
+	defer expected.Unlock()
+	if expected.expectedTableName != tableName {
+		return nil, fmt.Errorf("CopyFrom: table name '%s' was not expected, expected table name is '%s'", tableName, expected.expectedTableName)
+	}
+	if !reflect.DeepEqual(expected.expectedColumns, columnNames) {
+		return nil, fmt.Errorf("CopyFrom: column names '%v' were not expected, expected column names are '%v'", columnNames, expected.expectedColumns)
+	}
+
+	expected.triggered = true
+	return expected, expected.err
 }
 
 func (c *pgxmock) SendBatch(ctx context.Context, b *pgx.Batch) pgx.BatchResults {
@@ -327,6 +394,14 @@ func (c *pgxmock) ExpectExec(expectedSQL string) *ExpectedExec {
 	e := &ExpectedExec{}
 	e.expectSQL = expectedSQL
 	// e.converter = c.converter
+	c.expected = append(c.expected, e)
+	return e
+}
+
+func (c *pgxmock) ExpectCopyFrom(expectedTableName string, expectedColumns []string) *ExpectedCopyFrom {
+	e := &ExpectedCopyFrom{}
+	e.expectedTableName = expectedTableName
+	e.expectedColumns = expectedColumns
 	c.expected = append(c.expected, e)
 	return e
 }

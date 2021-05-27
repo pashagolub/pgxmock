@@ -22,40 +22,6 @@ func cancelOrder(db pgxIface, orderID int) error {
 	return nil
 }
 
-// func Example() {
-// 	// Open new mock database
-// 	mock, err := New()
-// 	if err != nil {
-// 		fmt.Println("error creating mock database")
-// 		return
-// 	}
-// 	// columns to be used for result
-// 	columns := []string{"id", "status"}
-// 	// expect transaction begin
-// 	mock.ExpectBegin()
-// 	// expect query to fetch order, match it with regexp
-// 	mock.ExpectQuery("SELECT (.+) FROM orders (.+) FOR UPDATE").
-// 		WithArgs(1).
-// 		WillReturnRows(NewRows(columns).AddRow(1, 1))
-// 	// expect transaction rollback, since order status is "cancelled"
-// 	mock.ExpectRollback()
-
-// 	// run the cancel order function
-// 	someOrderID := 1
-// 	// call a function which executes expected database operations
-// 	err = cancelOrder(db, someOrderID)
-// 	if err != nil {
-// 		fmt.Printf("unexpected error: %s", err)
-// 		return
-// 	}
-
-// 	// ensure all expectations have been met
-// 	if err = mock.ExpectationsWereMet(); err != nil {
-// 		fmt.Printf("unmet expectation error: %s", err)
-// 	}
-// 	// Output:
-// }
-
 func TestIssue14EscapeSQL(t *testing.T) {
 	t.Parallel()
 	mock, err := NewConn()
@@ -134,6 +100,39 @@ func TestMockQuery(t *testing.T) {
 
 	if title != "hello world" {
 		t.Errorf("expected mocked title to be 'hello world', but got '%s' instead", title)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
+}
+
+func TestMockCopyFrom(t *testing.T) {
+	t.Parallel()
+	mock, err := NewConn()
+	if err != nil {
+		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	defer mock.Close(context.Background())
+
+	mock.ExpectCopyFrom(`"fooschema"."baztable"`, []string{"col1"}).
+		WillReturnResult(2)
+
+	_, err = mock.CopyFrom(context.Background(), pgx.Identifier{"error", "error"}, []string{"error"}, nil)
+	if err == nil {
+		t.Error("error is expected while executing CopyFrom")
+	}
+	if mock.ExpectationsWereMet() == nil {
+		t.Error("there must be unfulfilled expectations")
+	}
+
+	rows, err := mock.CopyFrom(context.Background(), pgx.Identifier{"fooschema", "baztable"}, []string{"col1"}, nil)
+	if err != nil {
+		t.Errorf("error '%s' was not expected while executing CopyFrom", err)
+	}
+
+	if rows != 2 {
+		t.Errorf("expected RowsAffected to be 2, but got %d instead", rows)
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {
