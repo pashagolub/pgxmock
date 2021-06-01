@@ -18,8 +18,8 @@ func stripQuery(q string) (s string) {
 // As an example, external library could be used to build
 // and validate SQL ast, columns selected.
 //
-// sqlmock can be customized to implement a different QueryMatcher
-// configured through an option when sqlmock.New or sqlmock.NewWithDSN
+// pgxmock can be customized to implement a different QueryMatcher
+// configured through an option when pgxmock.New or pgxmock.NewWithDSN
 // is called, default QueryMatcher is QueryMatcherRegexp.
 type QueryMatcher interface {
 
@@ -40,7 +40,7 @@ func (f QueryMatcherFunc) Match(expectedSQL, actualSQL string) error {
 }
 
 // QueryMatcherRegexp is the default SQL query matcher
-// used by sqlmock. It parses expectedSQL to a regular
+// used by pgxmock. It parses expectedSQL to a regular
 // expression and attempts to match actualSQL.
 var QueryMatcherRegexp QueryMatcher = QueryMatcherFunc(func(expectedSQL, actualSQL string) error {
 	expect := stripQuery(expectedSQL)

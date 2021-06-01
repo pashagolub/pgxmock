@@ -11,7 +11,7 @@ func ExampleQueryMatcher() {
 	// instead of default regular expression matcher
 	mock, err := NewConn(QueryMatcherOption(QueryMatcherEqual))
 	if err != nil {
-		fmt.Println("failed to open sqlmock database:", err)
+		fmt.Println("failed to open pgxmock database:", err)
 	}
 	// defer db.Close()
 

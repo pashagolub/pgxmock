@@ -8,7 +8,7 @@ import (
 
 type AnyTime struct{}
 
-// Match satisfies sqlmock.Argument interface
+// Match satisfies pgxmock.Argument interface
 func (a AnyTime) Match(v interface{}) bool {
 	_, ok := v.(time.Time)
 	return ok

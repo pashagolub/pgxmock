@@ -137,7 +137,7 @@ type ExpectedQuery struct {
 
 // WithArgs will match given expected args to actual database query arguments.
 // if at least one argument does not match, it will return an error. For specific
-// arguments an sqlmock.Argument interface can be used to match an argument.
+// arguments an pgxmock.Argument interface can be used to match an argument.
 func (e *ExpectedQuery) WithArgs(args ...interface{}) *ExpectedQuery {
 	e.args = args
 	return e
@@ -198,7 +198,7 @@ type ExpectedExec struct {
 
 // WithArgs will match given expected args to actual database exec operation arguments.
 // if at least one argument does not match, it will return an error. For specific
-// arguments an sqlmock.Argument interface can be used to match an argument.
+// arguments an pgxmock.Argument interface can be used to match an argument.
 func (e *ExpectedExec) WithArgs(args ...interface{}) *ExpectedExec {
 	e.args = args
 	return e
@@ -246,9 +246,9 @@ func (e *ExpectedExec) String() string {
 }
 
 // WillReturnResult arranges for an expected Exec() to return a particular
-// result, there is sqlmock.NewResult(lastInsertID int64, affectedRows int64) method
+// result, there is pgxmock.NewResult(lastInsertID int64, affectedRows int64) method
 // to build a corresponding result. Or if actions needs to be tested against errors
-// sqlmock.NewErrorResult(err error) to return a given error.
+// pgxmock.NewErrorResult(err error) to return a given error.
 func (e *ExpectedExec) WillReturnResult(result pgconn.CommandTag) *ExpectedExec {
 	e.result = result
 	return e
@@ -463,9 +463,9 @@ func (e *ExpectedCopyFrom) String() string {
 }
 
 // WillReturnResult arranges for an expected Exec() to return a particular
-// result, there is sqlmock.NewResult(lastInsertID int64, affectedRows int64) method
+// result, there is pgxmock.NewResult(lastInsertID int64, affectedRows int64) method
 // to build a corresponding result. Or if actions needs to be tested against errors
-// sqlmock.NewErrorResult(err error) to return a given error.
+// pgxmock.NewErrorResult(err error) to return a given error.
 func (e *ExpectedCopyFrom) WillReturnResult(result int64) *ExpectedCopyFrom {
 	e.rowsAffected = result
 	return e

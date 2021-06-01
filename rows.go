@@ -165,7 +165,7 @@ type Rows struct {
 // NewRows allows Rows to be created from a
 // sql interface{} slice or from the CSV string and
 // to be used as sql driver.Rows.
-// Use Sqlmock.NewRows instead if using a custom converter
+// Use pgxmock.NewRows instead if using a custom converter
 func NewRows(columns []string) *Rows {
 	var coldefs []pgproto3.FieldDescription
 	for _, column := range columns {
@@ -250,7 +250,7 @@ func (rs *rowSets) NextResultSet() error {
 	return nil
 }
 
-// type for rows with columns definition created with sqlmock.NewRowsWithColumnDefinition
+// type for rows with columns definition created with pgxmock.NewRowsWithColumnDefinition
 type rowSetsWithDefinition struct {
 	*rowSets
 }
