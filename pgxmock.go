@@ -198,6 +198,12 @@ func (c *pgxmock) ExpectBegin() *ExpectedBegin {
 	return e
 }
 
+func (c *pgxmock) ExpectBeginTx(txOptions pgx.TxOptions) *ExpectedBegin {
+	e := &ExpectedBegin{opts: txOptions}
+	c.expected = append(c.expected, e)
+	return e
+}
+
 func (c *pgxmock) ExpectExec(expectedSQL string) *ExpectedExec {
 	e := &ExpectedExec{}
 	e.expectSQL = expectedSQL
@@ -444,8 +450,30 @@ func (c *pgxmock) BeginFunc(ctx context.Context, f func(pgx.Tx) error) (err erro
 	return savepoint.Commit(ctx)
 }
 
-func (c *pgxmock) Begin(ctx context.Context) (pgx.Tx, error) {
-	ex, err := c.begin()
+func (c *pgxmock) BeginTxFunc(ctx context.Context, txOptions pgx.TxOptions, f func(pgx.Tx) error) (err error) {
+	var tx pgx.Tx
+	tx, err = c.BeginTx(ctx, txOptions)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		rollbackErr := tx.Rollback(ctx)
+		if !(rollbackErr == nil || errors.Is(rollbackErr, pgx.ErrTxClosed)) {
+			err = rollbackErr
+		}
+	}()
+
+	fErr := f(tx)
+	if fErr != nil {
+		_ = tx.Rollback(ctx) // ignore rollback error as there is already an error to return
+		return fErr
+	}
+
+	return tx.Commit(ctx)
+}
+
+func (c *pgxmock) BeginTx(ctx context.Context, txOptions pgx.TxOptions) (pgx.Tx, error) {
+	ex, err := c.begin(txOptions)
 	if ex != nil {
 		time.Sleep(ex.delay)
 	}
@@ -456,7 +484,11 @@ func (c *pgxmock) Begin(ctx context.Context) (pgx.Tx, error) {
 	return c, nil
 }
 
-func (c *pgxmock) begin() (*ExpectedBegin, error) {
+func (c *pgxmock) Begin(ctx context.Context) (pgx.Tx, error) {
+	return c.BeginTx(ctx, pgx.TxOptions{})
+}
+
+func (c *pgxmock) begin(txOptions pgx.TxOptions) (*ExpectedBegin, error) {
 	var expected *ExpectedBegin
 	var ok bool
 	var fulfilled int
@@ -484,7 +516,9 @@ func (c *pgxmock) begin() (*ExpectedBegin, error) {
 		}
 		return nil, fmt.Errorf(msg)
 	}
-
+	if expected.opts != txOptions {
+		return nil, fmt.Errorf("Begin: call with transaction options '%v' was not expected, expected name is '%v'", txOptions, expected.opts)
+	}
 	expected.triggered = true
 	expected.Unlock()
 
