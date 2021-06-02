@@ -11,7 +11,7 @@ import (
 func ExampleRows() {
 	mock, err := NewConn()
 	if err != nil {
-		fmt.Println("failed to open sqlmock database:", err)
+		fmt.Println("failed to open pgxmock database:", err)
 	}
 	// defer mock.Close(context.Background())
 
@@ -41,7 +41,7 @@ func ExampleRows() {
 func ExampleRows_rowError() {
 	mock, err := NewConn()
 	if err != nil {
-		fmt.Println("failed to open sqlmock database:", err)
+		fmt.Println("failed to open pgxmock database:", err)
 	}
 	// defer mock.Close(context.Background())
 
@@ -72,7 +72,7 @@ func ExampleRows_rowError() {
 func ExampleRows_expectToBeClosed() {
 	mock, err := NewConn()
 	if err != nil {
-		fmt.Println("failed to open sqlmock database:", err)
+		fmt.Println("failed to open pgxmock database:", err)
 	}
 	defer mock.Close(context.Background())
 
@@ -95,7 +95,7 @@ func ExampleRows_expectToBeClosed() {
 // func ExampleRows_customDriverValue() {
 // 	mock, err := New()
 // 	if err != nil {
-// 		fmt.Println("failed to open sqlmock database:", err)
+// 		fmt.Println("failed to open pgxmock database:", err)
 // 	}
 // 	defer mock.Close(context.Background())
 

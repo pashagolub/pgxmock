@@ -638,7 +638,7 @@ func TestGoroutineExecutionWithUnorderedExpectationMatching(t *testing.T) {
 // func Test_goroutines() {
 // 	mock, err := NewConn()
 // 	if err != nil {
-// 		fmt.Println("failed to open sqlmock database:", err)
+// 		fmt.Println("failed to open pgxmock database:", err)
 // 	}
 // 	defer mock.Close(context.Background())
 

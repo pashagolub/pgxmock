@@ -31,13 +31,13 @@ func (e *commonExpectation) fulfilled() bool {
 	return e.triggered
 }
 
-// ExpectedClose is used to manage *sql.DB.Close expectation
-// returned by *Sqlmock.ExpectClose.
+// ExpectedClose is used to manage pgx.Close expectation
+// returned by pgxmock.ExpectClose.
 type ExpectedClose struct {
 	commonExpectation
 }
 
-// WillReturnError allows to set an error for *sql.DB.Close action
+// WillReturnError allows to set an error for pgx.Close action
 func (e *ExpectedClose) WillReturnError(err error) *ExpectedClose {
 	e.err = err
 	return e
@@ -52,14 +52,15 @@ func (e *ExpectedClose) String() string {
 	return msg
 }
 
-// ExpectedBegin is used to manage *sql.DB.Begin expectation
-// returned by *Sqlmock.ExpectBegin.
+// ExpectedBegin is used to manage *pgx.Begin expectation
+// returned by pgxmock.ExpectBegin.
 type ExpectedBegin struct {
 	commonExpectation
 	delay time.Duration
+	opts  pgx.TxOptions
 }
 
-// WillReturnError allows to set an error for *sql.DB.Begin action
+// WillReturnError allows to set an error for pgx.Begin action
 func (e *ExpectedBegin) WillReturnError(err error) *ExpectedBegin {
 	e.err = err
 	return e
@@ -81,13 +82,13 @@ func (e *ExpectedBegin) WillDelayFor(duration time.Duration) *ExpectedBegin {
 	return e
 }
 
-// ExpectedCommit is used to manage *sql.Tx.Commit expectation
-// returned by *Sqlmock.ExpectCommit.
+// ExpectedCommit is used to manage pgx.Tx.Commit expectation
+// returned by pgxmock.ExpectCommit.
 type ExpectedCommit struct {
 	commonExpectation
 }
 
-// WillReturnError allows to set an error for *sql.Tx.Close action
+// WillReturnError allows to set an error for pgx.Tx.Close action
 func (e *ExpectedCommit) WillReturnError(err error) *ExpectedCommit {
 	e.err = err
 	return e
@@ -102,13 +103,13 @@ func (e *ExpectedCommit) String() string {
 	return msg
 }
 
-// ExpectedRollback is used to manage *sql.Tx.Rollback expectation
-// returned by *Sqlmock.ExpectRollback.
+// ExpectedRollback is used to manage pgx.Tx.Rollback expectation
+// returned by pgxmock.ExpectRollback.
 type ExpectedRollback struct {
 	commonExpectation
 }
 
-// WillReturnError allows to set an error for *sql.Tx.Rollback action
+// WillReturnError allows to set an error for pgx.Tx.Rollback action
 func (e *ExpectedRollback) WillReturnError(err error) *ExpectedRollback {
 	e.err = err
 	return e
@@ -125,7 +126,7 @@ func (e *ExpectedRollback) String() string {
 
 // ExpectedQuery is used to manage *pgx.Conn.Query, *pgx.Conn.QueryRow, *pgx.Tx.Query,
 // *pgx.Tx.QueryRow, *pgx.Stmt.Query or *pgx.Stmt.QueryRow expectations.
-// Returned by *Sqlmock.ExpectQuery.
+// Returned by pgxmock.ExpectQuery.
 type ExpectedQuery struct {
 	queryBasedExpectation
 	rows             pgx.Rows
@@ -136,7 +137,7 @@ type ExpectedQuery struct {
 
 // WithArgs will match given expected args to actual database query arguments.
 // if at least one argument does not match, it will return an error. For specific
-// arguments an sqlmock.Argument interface can be used to match an argument.
+// arguments an pgxmock.Argument interface can be used to match an argument.
 func (e *ExpectedQuery) WithArgs(args ...interface{}) *ExpectedQuery {
 	e.args = args
 	return e
@@ -187,8 +188,8 @@ func (e *ExpectedQuery) String() string {
 	return msg
 }
 
-// ExpectedExec is used to manage *sql.DB.Exec, *sql.Tx.Exec or *sql.Stmt.Exec expectations.
-// Returned by *Sqlmock.ExpectExec.
+// ExpectedExec is used to manage pgx.Exec, pgx.Tx.Exec or pgx.Stmt.Exec expectations.
+// Returned by pgxmock.ExpectExec.
 type ExpectedExec struct {
 	queryBasedExpectation
 	result pgconn.CommandTag
@@ -197,7 +198,7 @@ type ExpectedExec struct {
 
 // WithArgs will match given expected args to actual database exec operation arguments.
 // if at least one argument does not match, it will return an error. For specific
-// arguments an sqlmock.Argument interface can be used to match an argument.
+// arguments an pgxmock.Argument interface can be used to match an argument.
 func (e *ExpectedExec) WithArgs(args ...interface{}) *ExpectedExec {
 	e.args = args
 	return e
@@ -245,16 +246,16 @@ func (e *ExpectedExec) String() string {
 }
 
 // WillReturnResult arranges for an expected Exec() to return a particular
-// result, there is sqlmock.NewResult(lastInsertID int64, affectedRows int64) method
+// result, there is pgxmock.NewResult(lastInsertID int64, affectedRows int64) method
 // to build a corresponding result. Or if actions needs to be tested against errors
-// sqlmock.NewErrorResult(err error) to return a given error.
+// pgxmock.NewErrorResult(err error) to return a given error.
 func (e *ExpectedExec) WillReturnResult(result pgconn.CommandTag) *ExpectedExec {
 	e.result = result
 	return e
 }
 
-// ExpectedPrepare is used to manage *sql.DB.Prepare or *sql.Tx.Prepare expectations.
-// Returned by *Sqlmock.ExpectPrepare.
+// ExpectedPrepare is used to manage pgx.Prepare or pgx.Tx.Prepare expectations.
+// Returned by pgxmock.ExpectPrepare.
 type ExpectedPrepare struct {
 	commonExpectation
 	mock           *pgxmock
@@ -266,7 +267,7 @@ type ExpectedPrepare struct {
 	delay          time.Duration
 }
 
-// WillReturnError allows to set an error for the expected *sql.DB.Prepare or *sql.Tx.Prepare action.
+// WillReturnError allows to set an error for the expected pgx.Prepare or pgx.Tx.Prepare action.
 func (e *ExpectedPrepare) WillReturnError(err error) *ExpectedPrepare {
 	e.err = err
 	return e
@@ -338,8 +339,8 @@ type queryBasedExpectation struct {
 	args []interface{}
 }
 
-// ExpectedPing is used to manage *sql.DB.Ping expectations.
-// Returned by *Sqlmock.ExpectPing.
+// ExpectedPing is used to manage pgx.Ping expectations.
+// Returned by pgxmock.ExpectPing.
 type ExpectedPing struct {
 	commonExpectation
 	delay time.Duration
@@ -462,9 +463,9 @@ func (e *ExpectedCopyFrom) String() string {
 }
 
 // WillReturnResult arranges for an expected Exec() to return a particular
-// result, there is sqlmock.NewResult(lastInsertID int64, affectedRows int64) method
+// result, there is pgxmock.NewResult(lastInsertID int64, affectedRows int64) method
 // to build a corresponding result. Or if actions needs to be tested against errors
-// sqlmock.NewErrorResult(err error) to return a given error.
+// pgxmock.NewErrorResult(err error) to return a given error.
 func (e *ExpectedCopyFrom) WillReturnResult(result int64) *ExpectedCopyFrom {
 	e.rowsAffected = result
 	return e
