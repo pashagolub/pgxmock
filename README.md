@@ -214,6 +214,7 @@ It only asserts that argument is of `time.Time` type.
     go test -race
 
 ## Change Log
+- **2021-06-02** - added `QueryFunc()`, `BeginFunc()`, and `BeginTxFunc()` support
 - **2021-05-27** - added support for `pgx.CopyFrom()`
 - **2021-02-10** - public release of **pgxmock**.
 
