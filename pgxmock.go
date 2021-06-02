@@ -55,6 +55,10 @@ type pgxMockIface interface {
 	// the *ExpectedBegin allows to mock database response
 	ExpectBegin() *ExpectedBegin
 
+	// ExpectBeginTx expects expects BeginTxFunc() to be called with expectedSQL
+	// query. The *ExpectedBegin allows to mock database response.
+	ExpectBeginTx(txOptions pgx.TxOptions) *ExpectedBegin
+
 	// ExpectCommit expects *sql.Tx.Commit to be called.
 	// the *ExpectedCommit allows to mock database response
 	ExpectCommit() *ExpectedCommit
@@ -107,6 +111,7 @@ type pgxMockIface interface {
 type pgxIface interface {
 	pgxMockIface
 	Begin(context.Context) (pgx.Tx, error)
+	BeginTxFunc(ctx context.Context, txOptions pgx.TxOptions, f func(pgx.Tx) error) (err error)
 	Exec(context.Context, string, ...interface{}) (pgconn.CommandTag, error)
 	QueryRow(context.Context, string, ...interface{}) pgx.Row
 	Query(context.Context, string, ...interface{}) (pgx.Rows, error)
@@ -431,23 +436,7 @@ func (c *pgxmock) QueryFunc(ctx context.Context, sql string, args []interface{},
 }
 
 func (c *pgxmock) BeginFunc(ctx context.Context, f func(pgx.Tx) error) (err error) {
-	var savepoint pgx.Tx
-	savepoint, err = c.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		rollbackErr := savepoint.Rollback(ctx)
-		if !(rollbackErr == nil || errors.Is(rollbackErr, pgx.ErrTxClosed)) {
-			err = rollbackErr
-		}
-	}()
-	fErr := f(savepoint)
-	if fErr != nil {
-		_ = savepoint.Rollback(ctx) // ignore rollback error as there is already an error to return
-		return fErr
-	}
-	return savepoint.Commit(ctx)
+	return c.BeginTxFunc(ctx, pgx.TxOptions{}, f)
 }
 
 func (c *pgxmock) BeginTxFunc(ctx context.Context, txOptions pgx.TxOptions, f func(pgx.Tx) error) (err error) {
