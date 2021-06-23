@@ -95,7 +95,7 @@ func (rs *rowSets) Scan(dest ...interface{}) error {
 					destVal.Elem().Kind(), val.Kind(), string(r.defs[i].Name))
 			}
 			if err := scanner.Scan(val.Interface()); err != nil {
-				return fmt.Errorf("Scanning value error for column '%s': %w", r.defs[i].Name, err)
+				return fmt.Errorf("Scanning value error for column '%s': %w", string(r.defs[i].Name), err)
 			}
 
 		}

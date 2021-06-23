@@ -2,6 +2,7 @@ package pgxmock
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 )
@@ -93,7 +94,7 @@ func ExampleRows_expectToBeClosed() {
 }
 
 // func ExampleRows_customDriverValue() {
-// 	mock, err := New()
+// 	mock, err := NewConn()
 // 	if err != nil {
 // 		fmt.Println("failed to open pgxmock database:", err)
 // 	}
@@ -352,6 +353,83 @@ func TestRowsScanError(t *testing.T) {
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+type testScanner struct {
+	Value int64
+}
+
+func (s *testScanner) Scan(src interface{}) error {
+	switch src := src.(type) {
+	case int64:
+		s.Value = src
+		return nil
+	default:
+		return errors.New("a dummy scan error")
+	}
+}
+
+func TestRowsScanWithScannerIface(t *testing.T) {
+	mock, err := NewConn()
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	defer mock.Close(context.Background())
+
+	r := NewRows([]string{"col1"}).AddRow(int64(23))
+	mock.ExpectQuery("SELECT").WillReturnRows(r)
+
+	rs, err := mock.Query(context.Background(), "SELECT")
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+
+	var result testScanner
+	if !rs.Next() || rs.Err() != nil {
+		t.Fatal("unexpected error on first row read")
+	}
+	if rs.Scan(&result) != nil {
+		t.Fatal("unexpected error for scan")
+	}
+
+	if result.Value != int64(23) {
+		t.Fatalf("expected Value to be 23 but got: %d", result.Value)
+	}
+
+}
+
+func TestRowsScanErrorOnScannerIface(t *testing.T) {
+	mock, err := NewConn()
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	defer mock.Close(context.Background())
+
+	r := NewRows([]string{"col1"}).AddRow("one").AddRow("two")
+	mock.ExpectQuery("SELECT").WillReturnRows(r)
+
+	rs, err := mock.Query(context.Background(), "SELECT")
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+
+	var one int64       // No scanner interface
+	var two testScanner // scanner error
+	if !rs.Next() || rs.Err() != nil {
+		t.Fatal("unexpected error on first row read")
+	}
+	if rs.Scan(&one) == nil {
+		t.Fatal("expected an error for first scan (no scanner interface), but got none")
+	}
+
+	if !rs.Next() || rs.Err() != nil {
+		t.Fatal("unexpected error on second row read")
+	}
+
+	err = rs.Scan(&two)
+	if err == nil {
+		t.Fatal("expected an error for second scan (scanner error), but got none")
 	}
 }
 
