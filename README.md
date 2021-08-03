@@ -213,43 +213,6 @@ It only asserts that argument is of `time.Time` type.
 
     go test -race
 
-## Change Log
-- **2021-06-02** - added `QueryFunc()`, `BeginFunc()`, and `BeginTxFunc()` support
-- **2021-05-27** - added support for `pgx.CopyFrom()`
-- **2021-02-10** - public release of **pgxmock**.
-
-Derived from **sqlmock**:
-- **2019-04-06** - added functionality to mock a sql MetaData request
-- **2019-02-13** - added `go.mod` removed the references and suggestions using `gopkg.in`.
-- **2018-12-11** - added expectation of Rows to be closed, while mocking expected query.
-- **2018-12-11** - introduced an option to provide **QueryMatcher** in order to customize SQL query matching.
-- **2017-09-01** - it is now possible to expect that prepared statement will be closed,
-  using **ExpectedPrepare.WillBeClosed**.
-- **2017-02-09** - implemented support for **go1.8** features. **Rows** interface was changed to struct
-  but contains all methods as before and should maintain backwards compatibility. **ExpectedQuery.WillReturnRows** may now
-  accept multiple row sets.
-- **2016-11-02** - `db.Prepare()` was not validating expected prepare SQL
-  query. It should still be validated even if Exec or Query is not
-  executed on that prepared statement.
-- **2016-02-23** - added **sqlmock.AnyArg()** function to provide any kind
-  of argument matcher.
-- **2016-02-23** - convert expected arguments to driver.Value as natural
-  driver does, the change may affect time.Time comparison and will be
-  stricter. See [issue](https://github.com/DATA-DOG/go-sqlmock/issues/31).
-- **2015-08-27** - **v1** api change, concurrency support, all known issues fixed.
-- **2014-08-16** instead of **panic** during reflect type mismatch when comparing query arguments - now return error
-- **2014-08-14** added **sqlmock.NewErrorResult** which gives an option to return driver.Result with errors for
-interface methods, see [issue](https://github.com/DATA-DOG/go-sqlmock/issues/5)
-- **2014-05-29** allow to match arguments in more sophisticated ways, by providing an **sqlmock.Argument** interface
-- **2014-04-21** introduce **sqlmock.New()** to open a mock database connection for tests. This method
-calls sql.DB.Ping to ensure that connection is open, see [issue](https://github.com/DATA-DOG/go-sqlmock/issues/4).
-This way on Close it will surely assert if all expectations are met, even if database was not triggered at all.
-The old way is still available, but it is advisable to call db.Ping manually before asserting with db.Close.
-- **2014-02-14** RowsFromCSVString is now a part of Rows interface named as FromCSVString.
-It has changed to allow more ways to construct rows and to easily extend this API in future.
-See [issue 1](https://github.com/DATA-DOG/go-sqlmock/issues/1)
-**RowsFromCSVString** is deprecated and will be removed in future
-
 ## Contributions
 
 Feel free to open a pull request. Note, if you wish to contribute an extension to public (exported methods or types) -
