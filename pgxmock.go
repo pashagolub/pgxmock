@@ -447,6 +447,9 @@ func (c *pgxmock) BeginTxFunc(ctx context.Context, txOptions pgx.TxOptions, f fu
 		return err
 	}
 	defer func() {
+		if err == nil {
+			return
+		}
 		rollbackErr := tx.Rollback(ctx)
 		if !(rollbackErr == nil || errors.Is(rollbackErr, pgx.ErrTxClosed)) {
 			err = rollbackErr
