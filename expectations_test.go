@@ -17,8 +17,16 @@ func ExampleExpectedExec() {
 	// Output: some error
 }
 
-func TestBuildQuery(t *testing.T) {
+func TestUnmonitoredPing(t *testing.T) {
 	mock, _ := NewConn()
+	p := mock.ExpectPing()
+	if p != nil {
+		t.Error("ExpectPing should return nil since MonitorPingsOption = false ")
+	}
+}
+
+func TestBuildQuery(t *testing.T) {
+	mock, _ := NewConn(MonitorPingsOption(true))
 	query := `
 		SELECT
 			name,
@@ -33,10 +41,12 @@ func TestBuildQuery(t *testing.T) {
 
 	`
 
+	mock.ExpectPing()
 	mock.ExpectQuery(query)
 	mock.ExpectExec(query)
 	mock.ExpectPrepare("foo", query)
 
+	_ = mock.Ping(context.Background())
 	mock.QueryRow(context.Background(), query)
 	_, _ = mock.Exec(context.Background(), query)
 	_, _ = mock.Prepare(context.Background(), "foo", query)
