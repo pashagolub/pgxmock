@@ -28,7 +28,7 @@ jobs:
         version: v1.36        
 
     - name: Test
-      run: go test -v -coverprofile=profile.cov ./...
+      run: go test -v -coverprofile=profile.cov
 
     - name: Convert coverage to lcov
       uses: jandelgado/gcov2lcov-action@master
