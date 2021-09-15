@@ -458,7 +458,6 @@ func (c *pgxmock) BeginTxFunc(ctx context.Context, txOptions pgx.TxOptions, f fu
 
 	fErr := f(tx)
 	if fErr != nil {
-		_ = tx.Rollback(ctx) // ignore rollback error as there is already an error to return
 		return fErr
 	}
 
