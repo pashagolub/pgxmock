@@ -101,3 +101,31 @@ func TestShouldRespondWithErrorOnFailure(t *testing.T) {
 		t.Errorf("there were unfulfilled expectations: %s", err)
 	}
 }
+
+func TestNoPostsReturned(t *testing.T) {
+	mock, err := pgxmock.NewConn()
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	defer mock.Close(context.Background())
+
+	// create app with mocked db, request and response to test
+	app := &api{mock}
+	req, err := http.NewRequest("GET", "http://localhost/posts", nil)
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected while creating request", err)
+	}
+	w := httptest.NewRecorder()
+
+	mock.ExpectQuery("^SELECT (.+) FROM posts$").WillReturnRows(mock.NewRows([]string{"id", "title", "body"}))
+	// now we execute our request
+	app.posts(w, req)
+	if w.Code != 200 {
+		t.Fatalf("expected status code to be 200, but got: %d\nBody: %v", w.Code, w.Body)
+	}
+
+	// we make sure that all expectations were met
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
+}
