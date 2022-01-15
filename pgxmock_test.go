@@ -1148,7 +1148,7 @@ func TestQueryWithTimeout(t *testing.T) {
 	rs := NewRows([]string{"id", "title"}).FromCSVString("5,hello world")
 
 	mock.ExpectQuery("SELECT (.+) FROM articles WHERE id = ?").
-		WillDelayFor(15 * time.Millisecond). // Query will take longer than timeout
+		WillDelayFor(50 * time.Millisecond). // Query will take longer than timeout
 		WithArgs(5).
 		WillReturnRows(rs)
 
