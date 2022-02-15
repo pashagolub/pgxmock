@@ -57,8 +57,12 @@ func (rs *rowSets) Next() bool {
 	return r.pos <= len(r.rows)
 }
 
+// Values returns the decoded row values. As with Scan(), it is an error to
+// call Values without first calling Next() and checking that it returned
+// true.
 func (rs *rowSets) Values() ([]interface{}, error) {
-	return nil, nil
+	r := rs.sets[rs.pos]
+	return r.rows[r.pos-1], r.nextErr[r.pos-1]
 }
 
 func (rs *rowSets) Scan(dest ...interface{}) error {
