@@ -510,11 +510,11 @@ func (c *pgxmock) begin(txOptions pgx.TxOptions) (*ExpectedBegin, error) {
 		}
 		return nil, fmt.Errorf(msg)
 	}
+	defer expected.Unlock()
 	if expected.opts != txOptions {
 		return nil, fmt.Errorf("Begin: call with transaction options '%v' was not expected, expected name is '%v'", txOptions, expected.opts)
 	}
 	expected.triggered = true
-	expected.Unlock()
 
 	return expected, expected.err
 }
