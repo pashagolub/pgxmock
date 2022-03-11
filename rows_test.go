@@ -5,9 +5,31 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+
+	"github.com/jackc/pgconn"
 )
 
-// const invalid = `☠☠☠ MEMORY OVERWRITTEN ☠☠☠ `
+func TestExplicitTypeCasting(t *testing.T) {
+	mock, err := NewPool()
+	if err != nil {
+		panic(err)
+	}
+
+	mock.ExpectQuery("SELECT .+ FROM test WHERE .+").
+		WithArgs(uint64(1)).
+		WillReturnRows(NewRows(
+			[]string{"id"}).
+			AddRow(uint64(1)),
+		)
+
+	rows := mock.QueryRow(context.Background(), "SELECT id FROM test WHERE id = $1", uint64(1))
+
+	var id uint64
+	err = rows.Scan(&id)
+	if err != nil {
+		t.Error(err)
+	}
+}
 
 func ExampleRows() {
 	mock, err := NewConn()
@@ -18,12 +40,18 @@ func ExampleRows() {
 
 	rows := NewRows([]string{"id", "title"}).
 		AddRow(1, "one").
-		AddRow(2, "two")
+		AddRow(2, "two").
+		AddCommandTag(pgconn.CommandTag("SELECT 2"))
 
 	mock.ExpectQuery("SELECT").WillReturnRows(rows)
 
 	rs, _ := mock.Query(context.Background(), "SELECT")
 	defer rs.Close()
+
+	fmt.Println("command tag:", rs.CommandTag())
+	if len(rs.FieldDescriptions()) != 2 {
+		fmt.Println("got wrong number of fields")
+	}
 
 	for rs.Next() {
 		var id int
@@ -35,7 +63,9 @@ func ExampleRows() {
 	if rs.Err() != nil {
 		fmt.Println("got rows error:", rs.Err())
 	}
-	// Output: scanned id: 1 and title: one
+
+	// Output: command tag: SELECT 2
+	// scanned id: 1 and title: one
 	// scanned id: 2 and title: two
 }
 
