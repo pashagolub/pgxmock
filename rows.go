@@ -3,7 +3,6 @@ package pgxmock
 import (
 	"encoding/csv"
 	"fmt"
-	"io"
 	"reflect"
 	"strings"
 
@@ -34,7 +33,7 @@ func (rs *rowSets) Err() error {
 }
 
 func (rs *rowSets) CommandTag() pgconn.CommandTag {
-	return pgconn.CommandTag("")
+	return rs.sets[rs.pos].commandTag
 }
 
 func (rs *rowSets) FieldDescriptions() []pgproto3.FieldDescription {
@@ -168,11 +167,12 @@ func rawBytes(col interface{}) (_ []byte, ok bool) {
 // Rows is a mocked collection of rows to
 // return for Query result
 type Rows struct {
-	defs     []pgproto3.FieldDescription
-	rows     [][]interface{}
-	pos      int
-	nextErr  map[int]error
-	closeErr error
+	commandTag pgconn.CommandTag
+	defs       []pgproto3.FieldDescription
+	rows       [][]interface{}
+	pos        int
+	nextErr    map[int]error
+	closeErr   error
 }
 
 // NewRows allows Rows to be created from a
@@ -225,6 +225,12 @@ func (r *Rows) AddRow(values ...interface{}) *Rows {
 	return r
 }
 
+// AddCommandTag will add a command tag to the result set
+func (r *Rows) AddCommandTag(tag pgconn.CommandTag) *Rows {
+	r.commandTag = tag
+	return r
+}
+
 // FromCSVString build rows from csv string.
 // return the same instance to perform subsequent actions.
 // Note that the number of values must match the number
@@ -248,20 +254,20 @@ func (r *Rows) FromCSVString(s string) *Rows {
 	return r
 }
 
-// Implement the "RowsNextResultSet" interface
-func (rs *rowSets) HasNextResultSet() bool {
-	return rs.pos+1 < len(rs.sets)
-}
+// // Implement the "RowsNextResultSet" interface
+// func (rs *rowSets) HasNextResultSet() bool {
+// 	return rs.pos+1 < len(rs.sets)
+// }
 
-// Implement the "RowsNextResultSet" interface
-func (rs *rowSets) NextResultSet() error {
-	if !rs.HasNextResultSet() {
-		return io.EOF
-	}
+// // Implement the "RowsNextResultSet" interface
+// func (rs *rowSets) NextResultSet() error {
+// 	if !rs.HasNextResultSet() {
+// 		return io.EOF
+// 	}
 
-	rs.pos++
-	return nil
-}
+// 	rs.pos++
+// 	return nil
+// }
 
 // type for rows with columns definition created with pgxmock.NewRowsWithColumnDefinition
 type rowSetsWithDefinition struct {

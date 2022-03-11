@@ -1184,3 +1184,17 @@ func queryWithTimeout(t time.Duration, db pgxIface, query string, args ...interf
 		return nil, fmt.Errorf("query timed out after %v", t)
 	}
 }
+
+func TestCon(t *testing.T) {
+	mock, err := NewConn()
+	if err != nil {
+		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	defer mock.Close(context.Background())
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("The Conn() did not panic")
+		}
+	}()
+	_ = mock.Conn()
+}
