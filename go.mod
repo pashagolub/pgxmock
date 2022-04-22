@@ -4,7 +4,7 @@ go 1.17
 
 require (
 	github.com/jackc/pgconn v1.11.0
-	github.com/jackc/pgproto3/v2 v2.2.0
+	github.com/jackc/pgproto3/v2 v2.3.0
 	github.com/jackc/pgx/v4 v4.15.0
 	github.com/pashagolub/pgxstruct v0.0.0-20210217101842-40d357eec200
 )
