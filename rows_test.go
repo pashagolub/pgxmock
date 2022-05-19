@@ -9,6 +9,25 @@ import (
 	"github.com/jackc/pgconn"
 )
 
+func TestPointerToInterfaceArgument(t *testing.T) {
+	mock, err := NewPool()
+	if err != nil {
+		panic(err)
+	}
+
+	mock.ExpectQuery(`SELECT 123`).
+		WillReturnRows(
+			mock.NewRows([]string{"id"}).
+				AddRow(int64(123))) // Value which should be scanned in *interface{}
+
+	var value interface{}
+	err = mock.QueryRow(context.Background(), `SELECT 123`).Scan(&value)
+	if err != nil || value.(int64) != 123 {
+		t.Error(err)
+	}
+
+}
+
 func TestExplicitTypeCasting(t *testing.T) {
 	mock, err := NewPool()
 	if err != nil {
