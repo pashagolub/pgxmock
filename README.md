@@ -179,7 +179,7 @@ can be used in more sophisticated matching. Here is a simple example of time arg
 type AnyTime struct{}
 
 // Match satisfies sqlmock.Argument interface
-func (a AnyTime) Match(v driver.Value) bool {
+func (a AnyTime) Match(v interface{}) bool {
 	_, ok := v.(time.Time)
 	return ok
 }
@@ -222,4 +222,3 @@ and will be treated cautiously
 ## License
 
 The [three clause BSD license](http://en.wikipedia.org/wiki/BSD_licenses)
-
