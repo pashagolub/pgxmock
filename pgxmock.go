@@ -20,6 +20,7 @@ import (
 
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgproto3/v2"
+	"github.com/jackc/pgtype"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 )
@@ -106,6 +107,8 @@ type pgxMockIface interface {
 
 	// New Column allows to create a Column
 	NewColumn(name string) *pgproto3.FieldDescription
+
+	ConnInfo() *pgtype.ConnInfo
 }
 
 type pgxIface interface {
@@ -120,6 +123,7 @@ type pgxIface interface {
 	Ping(context.Context) error
 	Prepare(context.Context, string, string) (*pgconn.StatementDescription, error)
 	Deallocate(ctx context.Context, name string) error
+	ConnInfo() *pgtype.ConnInfo
 }
 
 type PgxConnIface interface {
@@ -251,6 +255,11 @@ func (c *pgxmock) ExpectPrepare(expectedStmtName, expectedSQL string) *ExpectedP
 func (c *pgxmock) NewRows(columns []string) *Rows {
 	r := NewRows(columns)
 	return r
+}
+
+func (c *pgxmock) ConnInfo() *pgtype.ConnInfo {
+	ci := pgtype.ConnInfo{}
+	return &ci
 }
 
 // NewRowsWithColumnDefinition allows Rows to be created from a
