@@ -257,6 +257,7 @@ func (c *pgxmock) NewRows(columns []string) *Rows {
 	return r
 }
 
+// ConnInfo returns the connection info used for this connection
 func (c *pgxmock) ConnInfo() *pgtype.ConnInfo {
 	ci := pgtype.ConnInfo{}
 	return &ci

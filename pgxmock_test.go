@@ -1198,3 +1198,13 @@ func TestCon(t *testing.T) {
 	}()
 	_ = mock.Conn()
 }
+
+func TestConnInfo(t *testing.T) {
+	mock, err := NewConn()
+	if err != nil {
+		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	defer mock.Close(context.Background())
+
+	_ = mock.ConnInfo()
+}
