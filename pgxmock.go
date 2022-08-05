@@ -266,6 +266,8 @@ func (c *pgxmock) ConnInfo() *pgtype.ConnInfo {
 	return &ci
 }
 
+// PgConn exposes the underlying low level postgres connection
+// This is just here to support interfaces that use it. Here is just returns an empty PgConn
 func (c *pgxmock) PgConn() *pgconn.PgConn {
 	p := pgconn.PgConn{}
 	return &p
