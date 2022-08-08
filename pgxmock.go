@@ -109,6 +109,8 @@ type pgxMockIface interface {
 	NewColumn(name string) *pgproto3.FieldDescription
 
 	ConnInfo() *pgtype.ConnInfo
+
+	PgConn() *pgconn.PgConn
 }
 
 type pgxIface interface {
@@ -124,6 +126,7 @@ type pgxIface interface {
 	Prepare(context.Context, string, string) (*pgconn.StatementDescription, error)
 	Deallocate(ctx context.Context, name string) error
 	ConnInfo() *pgtype.ConnInfo
+	PgConn() *pgconn.PgConn
 }
 
 type PgxConnIface interface {
@@ -261,6 +264,13 @@ func (c *pgxmock) NewRows(columns []string) *Rows {
 func (c *pgxmock) ConnInfo() *pgtype.ConnInfo {
 	ci := pgtype.ConnInfo{}
 	return &ci
+}
+
+// PgConn exposes the underlying low level postgres connection
+// This is just here to support interfaces that use it. Here is just returns an empty PgConn
+func (c *pgxmock) PgConn() *pgconn.PgConn {
+	p := pgconn.PgConn{}
+	return &p
 }
 
 // NewRowsWithColumnDefinition allows Rows to be created from a
