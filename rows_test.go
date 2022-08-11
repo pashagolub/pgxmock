@@ -285,6 +285,35 @@ func TestQuerySingleRow(t *testing.T) {
 	}
 }
 
+func ExampleRows_values() {
+	// t.Parallel()
+	mock, err := NewConn()
+	if err != nil {
+		fmt.Println("failed to open pgxmock database:", err)
+	}
+	defer mock.Close(context.Background())
+
+	rows := NewRows([]string{"raw"}).
+		AddRow(`one string value with some text!`).
+		AddRow(`two string value with even more text than the first one`).
+		AddRow([]byte{})
+	mock.ExpectQuery("SELECT").WillReturnRows(rows)
+
+	rs, err := mock.Query(context.Background(), "SELECT")
+	if err != nil {
+		fmt.Print(err)
+	}
+	defer rs.Close()
+
+	for rs.Next() {
+		v, e := rs.Values()
+		fmt.Println(v[0], e)
+	}
+	// Output: one string value with some text! <nil>
+	// two string value with even more text than the first one <nil>
+	// [] <nil>
+}
+
 func ExampleRows_rawValues() {
 	// t.Parallel()
 	mock, err := NewConn()
