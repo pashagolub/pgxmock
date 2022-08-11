@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/jackc/pgconn"
+	"github.com/jackc/pgtype"
+	"github.com/jackc/pgx/v4"
 )
 
 func TestPointerToInterfaceArgument(t *testing.T) {
@@ -142,37 +144,35 @@ func ExampleRows_expectToBeClosed() {
 	//     row 0 - [1 john]
 }
 
-// func ExampleRows_customDriverValue() {
-// 	mock, err := NewConn()
-// 	if err != nil {
-// 		fmt.Println("failed to open pgxmock database:", err)
-// 	}
-// 	defer mock.Close(context.Background())
+func ExampleRows_customDriverValue() {
+	mock, err := NewConn()
+	if err != nil {
+		fmt.Println("failed to open pgxmock database:", err)
+	}
+	defer mock.Close(context.Background())
 
-// 	rows := NewRows([]string{"id", "null_int"}).
-// 		AddRow(1, 7).
-// 		AddRow(5, sql.NullInt64{Int64: 5, Valid: true}).
-// 		AddRow(2, sql.NullInt64{})
+	rows := NewRows([]string{"id", "null_int"}).
+		AddRow(5, pgtype.Int8{Int: 5, Status: pgtype.Present}).
+		AddRow(2, pgtype.Int8{Status: pgtype.Null})
 
-// 	mock.ExpectQuery("SELECT").WillReturnRows(rows)
+	mock.ExpectQuery("SELECT").WillReturnRows(rows)
 
-// 	rs, _ := mock.Query(context.Background(), "SELECT")
-// 	defer rs.Close()
+	rs, _ := mock.Query(context.Background(), "SELECT")
+	defer rs.Close()
 
-// 	for rs.Next() {
-// 		var id int
-// 		var num sql.NullInt64
-// 		rs.Scan(&id, &num)
-// 		fmt.Println("scanned id:", id, "and null int64:", num)
-// 	}
+	for rs.Next() {
+		var id int
+		var num pgtype.Int8
+		rs.Scan(&id, &num)
+		fmt.Println("scanned id:", id, "and null int64:", num.Get())
+	}
 
-// 	if rs.Err() != nil {
-// 		fmt.Println("got rows error:", rs.Err())
-// 	}
-// 	// Output: scanned id: 1 and null int64: {7 true}
-// 	// scanned id: 5 and null int64: {5 true}
-// 	// scanned id: 2 and null int64: {0 false}
-// }
+	if rs.Err() != nil {
+		fmt.Println("got rows error:", rs.Err())
+	}
+	// Output: scanned id: 5 and null int64: 5
+	// scanned id: 2 and null int64: <nil>
+}
 
 func TestAllowsToSetRowsErrors(t *testing.T) {
 	t.Parallel()
@@ -257,33 +257,33 @@ func TestRowsClosed(t *testing.T) {
 	}
 }
 
-// func TestQuerySingleRow(t *testing.T) {
-// 	t.Parallel()
-// 	mock, err := New()
-// 	if err != nil {
-// 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
-// 	}
-// 	defer mock.Close(context.Background())
+func TestQuerySingleRow(t *testing.T) {
+	t.Parallel()
+	mock, err := NewConn()
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	defer mock.Close(context.Background())
 
-// 	rows := NewRows([]string{"id"}).
-// 		AddRow(1).
-// 		AddRow(2)
-// 	mock.ExpectQuery("SELECT").WillReturnRows(rows)
+	rows := NewRows([]string{"id"}).
+		AddRow(1).
+		AddRow(2)
+	mock.ExpectQuery("SELECT").WillReturnRows(rows)
 
-// 	var id int
-// 	if err := mock.QueryRow(context.Background(), "SELECT").Scan(&id); err != nil {
-// 		t.Fatalf("unexpected error: %s", err)
-// 	}
+	var id int
+	if err := mock.QueryRow(context.Background(), "SELECT").Scan(&id); err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
 
-// 	mock.ExpectQuery("SELECT").WillReturnRows(NewRows([]string{"id"}))
-// 	if err := mock.QueryRow(context.Background(), "SELECT").Scan(&id); err != sql.ErrNoRows {
-// 		t.Fatal("expected sql no rows error")
-// 	}
+	mock.ExpectQuery("SELECT").WillReturnRows(NewRows([]string{"id"}))
+	if err := mock.QueryRow(context.Background(), "SELECT").Scan(&id); err != pgx.ErrNoRows {
+		t.Fatal("expected sql no rows error")
+	}
 
-// 	if err := mock.ExpectationsWereMet(); err != nil {
-// 		t.Fatal(err)
-// 	}
-// }
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
 
 // func TestQueryRowBytesInvalidatedByNext_bytesIntoRawBytes(t *testing.T) {
 // 	t.Parallel()

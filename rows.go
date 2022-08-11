@@ -8,6 +8,7 @@ import (
 
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgproto3/v2"
+	"github.com/jackc/pgx/v4"
 )
 
 // CSVColumnParser is a function which converts trimmed csv
@@ -68,6 +69,9 @@ func (rs *rowSets) Scan(dest ...interface{}) error {
 	r := rs.sets[rs.pos]
 	if len(dest) != len(r.defs) {
 		return fmt.Errorf("Incorrect argument number %d for columns %d", len(dest), len(r.defs))
+	}
+	if len(r.rows) == 0 {
+		return pgx.ErrNoRows
 	}
 	for i, col := range r.rows[r.pos-1] {
 		if dest[i] == nil {
