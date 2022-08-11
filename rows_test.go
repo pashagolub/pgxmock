@@ -128,9 +128,11 @@ func ExampleRows_expectToBeClosed() {
 	}
 	defer mock.Close(context.Background())
 
-	rows := NewRows([]string{"id", "title"}).AddRow(1, "john")
-	mock.ExpectQuery("SELECT").WillReturnRows(rows).RowsWillBeClosed()
+	row := NewRows([]string{"id", "title"}).AddRow(1, "john")
+	rows := NewRows([]string{"id", "title"}).AddRow(1, "john").AddRow(2, "anna")
+	mock.ExpectQuery("SELECT").WillReturnRows(row, rows).RowsWillBeClosed()
 
+	_, _ = mock.Query(context.Background(), "SELECT")
 	_, _ = mock.Query(context.Background(), "SELECT")
 
 	if err := mock.ExpectationsWereMet(); err != nil {
@@ -141,7 +143,11 @@ func ExampleRows_expectToBeClosed() {
 	//   - matches sql: 'SELECT'
 	//   - is without arguments
 	//   - should return rows:
-	//     row 0 - [1 john]
+	//     result set: 0
+	//       row 0 - [1 john]
+	//     result set: 1
+	//       row 0 - [1 john]
+	//       row 1 - [2 anna]
 }
 
 func ExampleRows_customDriverValue() {
@@ -286,7 +292,6 @@ func TestQuerySingleRow(t *testing.T) {
 }
 
 func ExampleRows_values() {
-	// t.Parallel()
 	mock, err := NewConn()
 	if err != nil {
 		fmt.Println("failed to open pgxmock database:", err)
@@ -315,7 +320,6 @@ func ExampleRows_values() {
 }
 
 func ExampleRows_rawValues() {
-	// t.Parallel()
 	mock, err := NewConn()
 	if err != nil {
 		fmt.Println("failed to open pgxmock database:", err)
