@@ -285,25 +285,33 @@ func TestQuerySingleRow(t *testing.T) {
 	}
 }
 
-// func TestQueryRowBytesInvalidatedByNext_bytesIntoRawBytes(t *testing.T) {
-// 	t.Parallel()
-// 	replace := []byte(invalid)
-// 	rows := NewRows([]string{"raw"}).
-// 		AddRow([]byte(`one binary value with some text!`)).
-// 		AddRow([]byte(`two binary value with even more text than the first one`))
-// 	scan := func(rs *sql.Rows) ([]byte, error) {
-// 		var raw sql.RawBytes
-// 		return raw, rs.Scan(&raw)
-// 	}
-// 	want := []struct {
-// 		Initial  []byte
-// 		Replaced []byte
-// 	}{
-// 		{Initial: []byte(`one binary value with some text!`), Replaced: replace[:len(replace)-7]},
-// 		{Initial: []byte(`two binary value with even more text than the first one`), Replaced: bytes.Join([][]byte{replace, replace[:len(replace)-23]}, nil)},
-// 	}
-// 	queryRowBytesInvalidatedByNext(t, rows, scan, want)
-// }
+func ExampleRows_rawValues() {
+	// t.Parallel()
+	mock, err := NewConn()
+	if err != nil {
+		fmt.Println("failed to open pgxmock database:", err)
+	}
+	defer mock.Close(context.Background())
+
+	rows := NewRows([]string{"raw"}).
+		AddRow([]byte(`one binary value with some text!`)).
+		AddRow([]byte(`two binary value with even more text than the first one`)).
+		AddRow([]byte{})
+	mock.ExpectQuery("SELECT").WillReturnRows(rows)
+
+	rs, err := mock.Query(context.Background(), "SELECT")
+	defer rs.Close()
+
+	if err != nil {
+		fmt.Print(err)
+	}
+	for rs.Next() {
+		fmt.Println(string(rs.RawValues()[0]))
+	}
+	// Output: one binary value with some text!
+	// two binary value with even more text than the first one
+	//
+}
 
 // func TestQueryRowBytesNotInvalidatedByNext_bytesIntoBytes(t *testing.T) {
 // 	t.Parallel()

@@ -162,7 +162,6 @@ func rawBytes(col interface{}) (_ []byte, ok bool) {
 		return nil, false
 	}
 	// Copy the bytes from the mocked row into a shared raw buffer, which we'll replace the content of later
-	// This allows scanning into sql.RawBytes to correctly become invalid on subsequent calls to Next(), Scan() or Close()
 	b := make([]byte, len(val))
 	copy(b, val)
 	return b, true
