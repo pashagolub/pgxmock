@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/jackc/pgconn"
+	"github.com/jackc/pgproto3/v2"
 	"github.com/jackc/pgtype"
 	"github.com/jackc/pgx/v4"
 )
@@ -129,7 +130,10 @@ func ExampleRows_expectToBeClosed() {
 	defer mock.Close(context.Background())
 
 	row := NewRows([]string{"id", "title"}).AddRow(1, "john")
-	rows := NewRows([]string{"id", "title"}).AddRow(1, "john").AddRow(2, "anna")
+	rows := NewRowsWithColumnDefinition(
+		pgproto3.FieldDescription{Name: []byte("id")},
+		pgproto3.FieldDescription{Name: []byte("title")}).
+		AddRow(1, "john").AddRow(2, "anna")
 	mock.ExpectQuery("SELECT").WillReturnRows(row, rows).RowsWillBeClosed()
 
 	_, _ = mock.Query(context.Background(), "SELECT")
