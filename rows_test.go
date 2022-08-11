@@ -7,6 +7,9 @@ import (
 	"testing"
 
 	"github.com/jackc/pgconn"
+	"github.com/jackc/pgproto3/v2"
+	"github.com/jackc/pgtype"
+	"github.com/jackc/pgx/v4"
 )
 
 func TestPointerToInterfaceArgument(t *testing.T) {
@@ -126,9 +129,14 @@ func ExampleRows_expectToBeClosed() {
 	}
 	defer mock.Close(context.Background())
 
-	rows := NewRows([]string{"id", "title"}).AddRow(1, "john")
-	mock.ExpectQuery("SELECT").WillReturnRows(rows).RowsWillBeClosed()
+	row := NewRows([]string{"id", "title"}).AddRow(1, "john")
+	rows := NewRowsWithColumnDefinition(
+		pgproto3.FieldDescription{Name: []byte("id")},
+		pgproto3.FieldDescription{Name: []byte("title")}).
+		AddRow(1, "john").AddRow(2, "anna")
+	mock.ExpectQuery("SELECT").WillReturnRows(row, rows).RowsWillBeClosed()
 
+	_, _ = mock.Query(context.Background(), "SELECT")
 	_, _ = mock.Query(context.Background(), "SELECT")
 
 	if err := mock.ExpectationsWereMet(); err != nil {
@@ -139,40 +147,42 @@ func ExampleRows_expectToBeClosed() {
 	//   - matches sql: 'SELECT'
 	//   - is without arguments
 	//   - should return rows:
-	//     row 0 - [1 john]
+	//     result set: 0
+	//       row 0 - [1 john]
+	//     result set: 1
+	//       row 0 - [1 john]
+	//       row 1 - [2 anna]
 }
 
-// func ExampleRows_customDriverValue() {
-// 	mock, err := NewConn()
-// 	if err != nil {
-// 		fmt.Println("failed to open pgxmock database:", err)
-// 	}
-// 	defer mock.Close(context.Background())
+func ExampleRows_customDriverValue() {
+	mock, err := NewConn()
+	if err != nil {
+		fmt.Println("failed to open pgxmock database:", err)
+	}
+	defer mock.Close(context.Background())
 
-// 	rows := NewRows([]string{"id", "null_int"}).
-// 		AddRow(1, 7).
-// 		AddRow(5, sql.NullInt64{Int64: 5, Valid: true}).
-// 		AddRow(2, sql.NullInt64{})
+	rows := NewRows([]string{"id", "null_int"}).
+		AddRow(5, pgtype.Int8{Int: 5, Status: pgtype.Present}).
+		AddRow(2, pgtype.Int8{Status: pgtype.Null})
 
-// 	mock.ExpectQuery("SELECT").WillReturnRows(rows)
+	mock.ExpectQuery("SELECT").WillReturnRows(rows)
 
-// 	rs, _ := mock.Query(context.Background(), "SELECT")
-// 	defer rs.Close()
+	rs, _ := mock.Query(context.Background(), "SELECT")
+	defer rs.Close()
 
-// 	for rs.Next() {
-// 		var id int
-// 		var num sql.NullInt64
-// 		rs.Scan(&id, &num)
-// 		fmt.Println("scanned id:", id, "and null int64:", num)
-// 	}
+	for rs.Next() {
+		var id int
+		var num pgtype.Int8
+		_ = rs.Scan(&id, &num)
+		fmt.Println("scanned id:", id, "and null int64:", num.Get())
+	}
 
-// 	if rs.Err() != nil {
-// 		fmt.Println("got rows error:", rs.Err())
-// 	}
-// 	// Output: scanned id: 1 and null int64: {7 true}
-// 	// scanned id: 5 and null int64: {5 true}
-// 	// scanned id: 2 and null int64: {0 false}
-// }
+	if rs.Err() != nil {
+		fmt.Println("got rows error:", rs.Err())
+	}
+	// Output: scanned id: 5 and null int64: 5
+	// scanned id: 2 and null int64: <nil>
+}
 
 func TestAllowsToSetRowsErrors(t *testing.T) {
 	t.Parallel()
@@ -257,53 +267,88 @@ func TestRowsClosed(t *testing.T) {
 	}
 }
 
-// func TestQuerySingleRow(t *testing.T) {
-// 	t.Parallel()
-// 	mock, err := New()
-// 	if err != nil {
-// 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
-// 	}
-// 	defer mock.Close(context.Background())
+func TestQuerySingleRow(t *testing.T) {
+	t.Parallel()
+	mock, err := NewConn()
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	defer mock.Close(context.Background())
 
-// 	rows := NewRows([]string{"id"}).
-// 		AddRow(1).
-// 		AddRow(2)
-// 	mock.ExpectQuery("SELECT").WillReturnRows(rows)
+	rows := NewRows([]string{"id"}).
+		AddRow(1).
+		AddRow(2)
+	mock.ExpectQuery("SELECT").WillReturnRows(rows)
 
-// 	var id int
-// 	if err := mock.QueryRow(context.Background(), "SELECT").Scan(&id); err != nil {
-// 		t.Fatalf("unexpected error: %s", err)
-// 	}
+	var id int
+	if err := mock.QueryRow(context.Background(), "SELECT").Scan(&id); err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
 
-// 	mock.ExpectQuery("SELECT").WillReturnRows(NewRows([]string{"id"}))
-// 	if err := mock.QueryRow(context.Background(), "SELECT").Scan(&id); err != sql.ErrNoRows {
-// 		t.Fatal("expected sql no rows error")
-// 	}
+	mock.ExpectQuery("SELECT").WillReturnRows(NewRows([]string{"id"}))
+	if err := mock.QueryRow(context.Background(), "SELECT").Scan(&id); err != pgx.ErrNoRows {
+		t.Fatal("expected sql no rows error")
+	}
 
-// 	if err := mock.ExpectationsWereMet(); err != nil {
-// 		t.Fatal(err)
-// 	}
-// }
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
 
-// func TestQueryRowBytesInvalidatedByNext_bytesIntoRawBytes(t *testing.T) {
-// 	t.Parallel()
-// 	replace := []byte(invalid)
-// 	rows := NewRows([]string{"raw"}).
-// 		AddRow([]byte(`one binary value with some text!`)).
-// 		AddRow([]byte(`two binary value with even more text than the first one`))
-// 	scan := func(rs *sql.Rows) ([]byte, error) {
-// 		var raw sql.RawBytes
-// 		return raw, rs.Scan(&raw)
-// 	}
-// 	want := []struct {
-// 		Initial  []byte
-// 		Replaced []byte
-// 	}{
-// 		{Initial: []byte(`one binary value with some text!`), Replaced: replace[:len(replace)-7]},
-// 		{Initial: []byte(`two binary value with even more text than the first one`), Replaced: bytes.Join([][]byte{replace, replace[:len(replace)-23]}, nil)},
-// 	}
-// 	queryRowBytesInvalidatedByNext(t, rows, scan, want)
-// }
+func ExampleRows_values() {
+	mock, err := NewConn()
+	if err != nil {
+		fmt.Println("failed to open pgxmock database:", err)
+	}
+	defer mock.Close(context.Background())
+
+	rows := NewRows([]string{"raw"}).
+		AddRow(`one string value with some text!`).
+		AddRow(`two string value with even more text than the first one`).
+		AddRow([]byte{})
+	mock.ExpectQuery("SELECT").WillReturnRows(rows)
+
+	rs, err := mock.Query(context.Background(), "SELECT")
+	if err != nil {
+		fmt.Print(err)
+	}
+	defer rs.Close()
+
+	for rs.Next() {
+		v, e := rs.Values()
+		fmt.Println(v[0], e)
+	}
+	// Output: one string value with some text! <nil>
+	// two string value with even more text than the first one <nil>
+	// [] <nil>
+}
+
+func ExampleRows_rawValues() {
+	mock, err := NewConn()
+	if err != nil {
+		fmt.Println("failed to open pgxmock database:", err)
+	}
+	defer mock.Close(context.Background())
+
+	rows := NewRows([]string{"raw"}).
+		AddRow([]byte(`one binary value with some text!`)).
+		AddRow([]byte(`two binary value with even more text than the first one`)).
+		AddRow([]byte{})
+	mock.ExpectQuery("SELECT").WillReturnRows(rows)
+
+	rs, err := mock.Query(context.Background(), "SELECT")
+	if err != nil {
+		fmt.Print(err)
+	}
+	defer rs.Close()
+
+	for rs.Next() {
+		fmt.Println(string(rs.RawValues()[0]))
+	}
+	// Output: one binary value with some text!
+	// two binary value with even more text than the first one
+	//
+}
 
 // func TestQueryRowBytesNotInvalidatedByNext_bytesIntoBytes(t *testing.T) {
 // 	t.Parallel()

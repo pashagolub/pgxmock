@@ -8,6 +8,7 @@ import (
 
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgproto3/v2"
+	"github.com/jackc/pgx/v4"
 )
 
 // CSVColumnParser is a function which converts trimmed csv
@@ -68,6 +69,9 @@ func (rs *rowSets) Scan(dest ...interface{}) error {
 	r := rs.sets[rs.pos]
 	if len(dest) != len(r.defs) {
 		return fmt.Errorf("Incorrect argument number %d for columns %d", len(dest), len(r.defs))
+	}
+	if len(r.rows) == 0 {
+		return pgx.ErrNoRows
 	}
 	for i, col := range r.rows[r.pos-1] {
 		if dest[i] == nil {
@@ -158,7 +162,6 @@ func rawBytes(col interface{}) (_ []byte, ok bool) {
 		return nil, false
 	}
 	// Copy the bytes from the mocked row into a shared raw buffer, which we'll replace the content of later
-	// This allows scanning into sql.RawBytes to correctly become invalid on subsequent calls to Next(), Scan() or Close()
 	b := make([]byte, len(val))
 	copy(b, val)
 	return b, true
