@@ -163,7 +163,7 @@ func ExampleRows_customDriverValue() {
 	for rs.Next() {
 		var id int
 		var num pgtype.Int8
-		rs.Scan(&id, &num)
+		_ = rs.Scan(&id, &num)
 		fmt.Println("scanned id:", id, "and null int64:", num.Get())
 	}
 
