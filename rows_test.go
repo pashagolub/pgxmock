@@ -300,11 +300,11 @@ func ExampleRows_rawValues() {
 	mock.ExpectQuery("SELECT").WillReturnRows(rows)
 
 	rs, err := mock.Query(context.Background(), "SELECT")
-	defer rs.Close()
-
 	if err != nil {
 		fmt.Print(err)
 	}
+	defer rs.Close()
+
 	for rs.Next() {
 		fmt.Println(string(rs.RawValues()[0]))
 	}
