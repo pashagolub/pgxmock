@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	pgx "github.com/jackc/pgx/v4"
+	pgx "github.com/jackc/pgx/v5"
 )
 
 func cancelOrder(db pgxIface, orderID int) error {
@@ -229,23 +229,23 @@ func TestTransactionExpectations(t *testing.T) {
 		t.Errorf("an error '%s' was not expected when committing a transaction", err)
 	}
 
-	// beginTxFunc and commit
-	mock.ExpectBeginTx(pgx.TxOptions{})
-	mock.ExpectCommit()
+	// // beginTxFunc and commit
+	// mock.ExpectBeginTx(pgx.TxOptions{})
+	// mock.ExpectCommit()
 
-	err = mock.BeginFunc(context.Background(), func(tx pgx.Tx) error { return nil })
-	if err != nil {
-		t.Errorf("an error '%s' was not expected when beginning a transaction", err)
-	}
+	// err = mock.BeginFunc(context.Background(), func(tx pgx.Tx) error { return nil })
+	// if err != nil {
+	// 	t.Errorf("an error '%s' was not expected when beginning a transaction", err)
+	// }
 
-	// beginTxFunc and rollback
-	mock.ExpectBeginTx(pgx.TxOptions{})
-	mock.ExpectRollback()
+	// // beginTxFunc and rollback
+	// mock.ExpectBeginTx(pgx.TxOptions{})
+	// mock.ExpectRollback()
 
-	err = mock.BeginFunc(context.Background(), func(tx pgx.Tx) error { return errors.New("smth wrong") })
-	if err == nil {
-		t.Error("an error was expected whithin a transaction, but got none")
-	}
+	// err = mock.BeginFunc(context.Background(), func(tx pgx.Tx) error { return errors.New("smth wrong") })
+	// if err == nil {
+	// 	t.Error("an error was expected whithin a transaction, but got none")
+	// }
 
 	// begin and rollback
 	mock.ExpectBegin()
@@ -1109,7 +1109,7 @@ func TestExecExpectationErrorDelay(t *testing.T) {
 	res, err := mock.Exec(context.Background(), "INSERT INTO articles (title) VALUES (?)", "hello")
 	stop := time.Now()
 
-	if res != nil {
+	if res.String() != "" {
 		t.Errorf("result was not expected, was expecting nil")
 	}
 
@@ -1238,7 +1238,7 @@ func TestConnInfo(t *testing.T) {
 	}
 	defer mock.Close(context.Background())
 
-	_ = mock.ConnInfo()
+	_ = mock.Config()
 }
 
 func TestPgConn(t *testing.T) {

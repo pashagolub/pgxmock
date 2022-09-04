@@ -18,11 +18,9 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/jackc/pgconn"
-	"github.com/jackc/pgproto3/v2"
-	"github.com/jackc/pgtype"
-	"github.com/jackc/pgx/v4"
-	"github.com/jackc/pgx/v4/pgxpool"
+	pgx "github.com/jackc/pgx/v5"
+	pgconn "github.com/jackc/pgx/v5/pgconn"
+	pgxpool "github.com/jackc/pgx/v5/pgxpool"
 )
 
 // pgxMockIface interface serves to create expectations
@@ -103,12 +101,12 @@ type pgxMockIface interface {
 
 	// NewRowsWithColumnDefinition allows Rows to be created from a
 	// sql driver.Value slice with a definition of sql metadata
-	NewRowsWithColumnDefinition(columns ...pgproto3.FieldDescription) *Rows
+	NewRowsWithColumnDefinition(columns ...pgconn.FieldDescription) *Rows
 
 	// New Column allows to create a Column
-	NewColumn(name string) *pgproto3.FieldDescription
+	NewColumn(name string) *pgconn.FieldDescription
 
-	ConnInfo() *pgtype.ConnInfo
+	Config() *pgx.ConnConfig
 
 	PgConn() *pgconn.PgConn
 }
@@ -121,11 +119,9 @@ type pgxIface interface {
 	Exec(context.Context, string, ...interface{}) (pgconn.CommandTag, error)
 	Query(context.Context, string, ...interface{}) (pgx.Rows, error)
 	QueryRow(context.Context, string, ...interface{}) pgx.Row
-	QueryFunc(ctx context.Context, sql string, args []interface{}, scans []interface{}, f func(pgx.QueryFuncRow) error) (pgconn.CommandTag, error)
 	Ping(context.Context) error
 	Prepare(context.Context, string, string) (*pgconn.StatementDescription, error)
 	Deallocate(ctx context.Context, name string) error
-	ConnInfo() *pgtype.ConnInfo
 	PgConn() *pgconn.PgConn
 }
 
@@ -147,6 +143,10 @@ type pgxmock struct {
 	monitorPings bool
 
 	expected []expectation
+}
+
+func (c *pgxmock) Config() *pgx.ConnConfig {
+	return &pgx.ConnConfig{}
 }
 
 // region Expectations
@@ -260,12 +260,6 @@ func (c *pgxmock) NewRows(columns []string) *Rows {
 	return r
 }
 
-// ConnInfo returns the connection info used for this connection
-func (c *pgxmock) ConnInfo() *pgtype.ConnInfo {
-	ci := pgtype.ConnInfo{}
-	return &ci
-}
-
 // PgConn exposes the underlying low level postgres connection
 // This is just here to support interfaces that use it. Here is just returns an empty PgConn
 func (c *pgxmock) PgConn() *pgconn.PgConn {
@@ -275,15 +269,15 @@ func (c *pgxmock) PgConn() *pgconn.PgConn {
 
 // NewRowsWithColumnDefinition allows Rows to be created from a
 // sql driver.Value slice with a definition of sql metadata
-func (c *pgxmock) NewRowsWithColumnDefinition(columns ...pgproto3.FieldDescription) *Rows {
+func (c *pgxmock) NewRowsWithColumnDefinition(columns ...pgconn.FieldDescription) *Rows {
 	r := NewRowsWithColumnDefinition(columns...)
 	return r
 }
 
 // NewColumn allows to create a Column that can be enhanced with metadata
 // using OfType/Nullable/WithLength/WithPrecisionAndScale methods.
-func (c *pgxmock) NewColumn(name string) *pgproto3.FieldDescription {
-	return &pgproto3.FieldDescription{Name: []byte(name)}
+func (c *pgxmock) NewColumn(name string) *pgconn.FieldDescription {
+	return &pgconn.FieldDescription{Name: name}
 }
 
 // open a mock database driver connection
@@ -426,35 +420,6 @@ func (c *pgxmock) SendBatch(ctx context.Context, b *pgx.Batch) pgx.BatchResults 
 
 func (c *pgxmock) LargeObjects() pgx.LargeObjects {
 	return pgx.LargeObjects{}
-}
-
-// QueryFunc executes sql with args. For each row returned by the query the values will scanned into the elements of
-// scans and f will be called. If any row fails to scan or f returns an error the query will be aborted and the error
-// will be returned.
-func (c *pgxmock) QueryFunc(ctx context.Context, sql string, args []interface{}, scans []interface{}, f func(pgx.QueryFuncRow) error) (pgconn.CommandTag, error) {
-	rows, err := c.Query(ctx, sql, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		err = rows.Scan(scans...)
-		if err != nil {
-			return nil, err
-		}
-
-		err = f(rows)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-
-	return rows.CommandTag(), nil
 }
 
 func (c *pgxmock) BeginFunc(ctx context.Context, f func(pgx.Tx) error) (err error) {
@@ -802,15 +767,14 @@ func (c *pgxmock) Exec(ctx context.Context, query string, args ...interface{}) (
 		select {
 		case <-time.After(ex.delay):
 			if err != nil {
-				return nil, err
+				return pgconn.NewCommandTag(""), err
 			}
 			return ex.result, nil
 		case <-ctx.Done():
-			return nil, ErrCancelled
+			return pgconn.NewCommandTag(""), ErrCancelled
 		}
 	}
-
-	return nil, err
+	return pgconn.NewCommandTag(""), err
 }
 
 func (c *pgxmock) exec(query string, args []interface{}) (*ExpectedExec, error) {
@@ -867,7 +831,7 @@ func (c *pgxmock) exec(query string, args []interface{}) (*ExpectedExec, error) 
 		return expected, expected.err // mocked to return error
 	}
 
-	if expected.result == nil {
+	if expected.result.String() == "" {
 		return nil, fmt.Errorf("ExecQuery '%s' with args %+v, must return a pgconn.CommandTag, but it was not set for expectation %T as %+v", query, args, expected, expected)
 	}
 

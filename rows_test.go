@@ -6,10 +6,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/jackc/pgconn"
-	"github.com/jackc/pgproto3/v2"
-	"github.com/jackc/pgtype"
-	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 func TestPointerToInterfaceArgument(t *testing.T) {
@@ -63,7 +62,7 @@ func ExampleRows() {
 	rows := NewRows([]string{"id", "title"}).
 		AddRow(1, "one").
 		AddRow(2, "two").
-		AddCommandTag(pgconn.CommandTag("SELECT 2"))
+		AddCommandTag(pgconn.NewCommandTag("SELECT 2"))
 
 	mock.ExpectQuery("SELECT").WillReturnRows(rows)
 
@@ -131,8 +130,8 @@ func ExampleRows_expectToBeClosed() {
 
 	row := NewRows([]string{"id", "title"}).AddRow(1, "john")
 	rows := NewRowsWithColumnDefinition(
-		pgproto3.FieldDescription{Name: []byte("id")},
-		pgproto3.FieldDescription{Name: []byte("title")}).
+		pgconn.FieldDescription{Name: "id"},
+		pgconn.FieldDescription{Name: "title"}).
 		AddRow(1, "john").AddRow(2, "anna")
 	mock.ExpectQuery("SELECT").WillReturnRows(row, rows).RowsWillBeClosed()
 
@@ -162,8 +161,8 @@ func ExampleRows_customDriverValue() {
 	defer mock.Close(context.Background())
 
 	rows := NewRows([]string{"id", "null_int"}).
-		AddRow(5, pgtype.Int8{Int: 5, Status: pgtype.Present}).
-		AddRow(2, pgtype.Int8{Status: pgtype.Null})
+		AddRow(5, pgtype.Int8{Int64: 5, Valid: true}).
+		AddRow(2, pgtype.Int8{Valid: false})
 
 	mock.ExpectQuery("SELECT").WillReturnRows(rows)
 
@@ -174,14 +173,14 @@ func ExampleRows_customDriverValue() {
 		var id int
 		var num pgtype.Int8
 		_ = rs.Scan(&id, &num)
-		fmt.Println("scanned id:", id, "and null int64:", num.Get())
+		fmt.Println("scanned id:", id, "and null int64:", num)
 	}
 
 	if rs.Err() != nil {
 		fmt.Println("got rows error:", rs.Err())
 	}
-	// Output: scanned id: 5 and null int64: 5
-	// scanned id: 2 and null int64: <nil>
+	// Output: scanned id: 5 and null int64: {5 true}
+	// scanned id: 2 and null int64: {0 false}
 }
 
 func TestAllowsToSetRowsErrors(t *testing.T) {

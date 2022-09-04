@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jackc/pgconn"
-	pgx "github.com/jackc/pgx/v4"
+	pgx "github.com/jackc/pgx/v5"
+	pgconn "github.com/jackc/pgx/v5/pgconn"
 )
 
 // an expectation interface
@@ -233,7 +233,7 @@ func (e *ExpectedExec) String() string {
 		msg += strings.Join(margs, "\n")
 	}
 
-	if e.result != nil {
+	if e.result.String() > "" {
 		msg += "\n  - should return Result having:"
 		msg += fmt.Sprintf("\n      RowsAffected: %d", e.result.RowsAffected())
 	}
@@ -371,19 +371,7 @@ func (e *ExpectedPing) String() string {
 // WillReturnRows specifies the set of resulting rows that will be returned
 // by the triggered query
 func (e *ExpectedQuery) WillReturnRows(rows ...*Rows) *ExpectedQuery {
-	defs := 0
-	sets := make([]*Rows, len(rows))
-	for i, r := range rows {
-		sets[i] = r
-		if r.defs != nil {
-			defs++
-		}
-	}
-	if defs > 0 && defs == len(sets) {
-		e.rows = &rowSetsWithDefinition{&rowSets{sets: sets, ex: e}}
-	} else {
-		e.rows = &rowSets{sets: sets, ex: e}
-	}
+	e.rows = &rowSets{sets: rows, ex: e}
 	return e
 }
 
