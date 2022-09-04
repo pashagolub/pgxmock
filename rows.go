@@ -260,26 +260,6 @@ func (r *Rows) FromCSVString(s string) *Rows {
 	return r
 }
 
-// // Implement the "RowsNextResultSet" interface
-// func (rs *rowSets) HasNextResultSet() bool {
-// 	return rs.pos+1 < len(rs.sets)
-// }
-
-// // Implement the "RowsNextResultSet" interface
-// func (rs *rowSets) NextResultSet() error {
-// 	if !rs.HasNextResultSet() {
-// 		return io.EOF
-// 	}
-
-// 	rs.pos++
-// 	return nil
-// }
-
-// type for rows with columns definition created with pgxmock.NewRowsWithColumnDefinition
-type rowSetsWithDefinition struct {
-	*rowSets
-}
-
 // NewRowsWithColumnDefinition return rows with columns metadata
 func NewRowsWithColumnDefinition(columns ...pgconn.FieldDescription) *Rows {
 	return &Rows{
