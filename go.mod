@@ -6,7 +6,7 @@ require (
 	github.com/jackc/pgconn v1.13.0
 	github.com/jackc/pgproto3/v2 v2.3.1
 	github.com/jackc/pgtype v1.12.0
-	github.com/jackc/pgx/v4 v4.17.1
+	github.com/jackc/pgx/v4 v4.17.2
 	github.com/pashagolub/pgxstruct v0.0.0-20210217101842-40d357eec200
 )
 
