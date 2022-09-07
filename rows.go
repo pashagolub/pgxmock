@@ -70,6 +70,11 @@ func (rs *rowSets) Values() ([]interface{}, error) {
 
 func (rs *rowSets) Scan(dest ...interface{}) error {
 	r := rs.sets[rs.pos]
+	if len(dest) == 1 {
+		if rc, ok := dest[0].(pgx.RowScanner); ok {
+			return rc.ScanRow(rs)
+		}
+	}
 	if len(dest) != len(r.defs) {
 		return fmt.Errorf("Incorrect argument number %d for columns %d", len(dest), len(r.defs))
 	}
