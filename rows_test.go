@@ -2,9 +2,11 @@ package pgxmock
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgproto3/v2"
@@ -592,6 +594,110 @@ func TestEmptyRowSets(t *testing.T) {
 	}
 	if !set3.empty() {
 		t.Fatalf("expected rowset 3, to be empty, but it was not")
+	}
+}
+
+func TestScanTime(t *testing.T) {
+	mock, err := NewPool()
+	if err != nil {
+		panic(err)
+	}
+
+	now, _ := time.Parse(time.RFC3339, "2006-01-02T15:04:05Z07:00")
+
+	mock.ExpectQuery(`SELECT now()`).
+		WillReturnRows(
+			mock.NewRows([]string{"stamp"}).
+				AddRow(now))
+
+	var value sql.NullTime
+	err = mock.QueryRow(context.Background(), `SELECT now()`).Scan(&value)
+	if err != nil {
+		t.Error(err)
+	}
+	if value.Time != now {
+		t.Errorf("want %v, got %v", now, value.Time)
+	}
+}
+
+func TestScanTimeString(t *testing.T) {
+	mock, err := NewPool()
+	if err != nil {
+		panic(err)
+	}
+
+	mock.ExpectQuery(`SELECT now()`).
+		WillReturnRows(
+			mock.NewRows([]string{"stamp"}).
+				AddRow("2006-01-02T15:04:05Z07:00"))
+
+	var value sql.NullTime
+	err = mock.QueryRow(context.Background(), `SELECT now()`).Scan(&value)
+	if err == nil {
+		t.Error("managed to parse a string to a sql.NullTime, didn't expect to")
+	}
+}
+
+func TestScanInt32(t *testing.T) {
+	mock, err := NewPool()
+	if err != nil {
+		panic(err)
+	}
+
+	mock.ExpectQuery(`SELECT fortytwo`).
+		WillReturnRows(
+			mock.NewRows([]string{"fortytwo"}).
+				AddRow(42))
+
+	var value int32
+	err = mock.QueryRow(context.Background(), `SELECT fortytwo`).Scan(&value)
+	if err != nil {
+		t.Error(err)
+	}
+	if value != 42 {
+		t.Errorf("want %v, got %v", 42, value)
+	}
+}
+
+func TestScanFloat32(t *testing.T) {
+	mock, err := NewPool()
+	if err != nil {
+		panic(err)
+	}
+
+	mock.ExpectQuery(`SELECT fortytwo`).
+		WillReturnRows(
+			mock.NewRows([]string{"fortytwo"}).
+				AddRow(42.5))
+
+	var value float32
+	err = mock.QueryRow(context.Background(), `SELECT fortytwo`).Scan(&value)
+	if err != nil {
+		t.Error(err)
+	}
+	if value != 42.5 {
+		t.Errorf("want %v, got %v", 42.5, value)
+	}
+}
+
+func TestScanBool(t *testing.T) {
+	mock, err := NewPool()
+	if err != nil {
+		panic(err)
+	}
+
+	mock.ExpectQuery(`SELECT fortytwo`).
+		WillReturnRows(
+			mock.NewRows([]string{"fortytwo"}).
+				AddRow(true))
+
+	var value bool
+	err = mock.QueryRow(context.Background(), `SELECT fortytwo`).Scan(&value)
+	if err != nil {
+		t.Error(err)
+	}
+	if !value {
+		t.Errorf("want %v, got %v", true, value)
 	}
 }
 
