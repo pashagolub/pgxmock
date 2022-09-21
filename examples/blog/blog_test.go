@@ -9,7 +9,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/pashagolub/pgxmock"
+	"github.com/pashagolub/pgxmock/v2"
 )
 
 func (a *api) assertJSON(actual []byte, data interface{}, t *testing.T) {

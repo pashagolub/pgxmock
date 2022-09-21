@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 
-	pgx "github.com/jackc/pgx/v4"
+	pgx "github.com/jackc/pgx/v5"
 )
 
 type PgxIface interface {

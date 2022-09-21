@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 
-	pgconn "github.com/jackc/pgconn"
-	pgx "github.com/jackc/pgx/v4"
+	pgx "github.com/jackc/pgx/v5"
+	pgconn "github.com/jackc/pgx/v5/pgconn"
 )
 
 type PgxIface interface {
