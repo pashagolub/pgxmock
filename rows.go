@@ -225,7 +225,7 @@ func (r *Rows) RowError(row int, err error) *Rows {
 // return the same instance to perform subsequent actions.
 // Note that the number of values must match the number
 // of columns
-func (r *Rows) AddRow(values ...interface{}) *Rows {
+func (r *Rows) AddRow(values ...any) *Rows {
 	if len(values) != len(r.defs) {
 		panic("Expected number of values to match number of columns")
 	}
@@ -233,6 +233,15 @@ func (r *Rows) AddRow(values ...interface{}) *Rows {
 	row := make([]interface{}, len(r.defs))
 	copy(row, values)
 	r.rows = append(r.rows, row)
+	return r
+}
+
+// AddRows adds multiple rows composed from any slice and
+// returns the same instance to perform subsequent actions.
+func (r *Rows) AddRows(values ...[]any) *Rows {
+	for _, value := range values {
+		r.AddRow(value...)
+	}
 	return r
 }
 
