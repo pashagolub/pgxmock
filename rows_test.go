@@ -52,12 +52,94 @@ func TestExplicitTypeCasting(t *testing.T) {
 	}
 }
 
+func TestAddRows(t *testing.T) {
+	t.Parallel()
+	mock, err := NewConn()
+	if err != nil {
+		fmt.Println("failed to open sqlmock database:", err)
+	}
+	defer mock.Close(context.Background())
+
+	values := [][]any{
+		{
+			1, "John",
+		},
+		{
+			2, "Jane",
+		},
+		{
+			3, "Peter",
+		},
+		{
+			4, "Emily",
+		},
+	}
+
+	rows := NewRows([]string{"id", "name"}).AddRows(values...)
+	mock.ExpectQuery("SELECT").WillReturnRows(rows).RowsWillBeClosed()
+
+	rs, _ := mock.Query(context.Background(), "SELECT")
+	defer rs.Close()
+
+	for rs.Next() {
+		var id int
+		var name string
+		_ = rs.Scan(&id, &name)
+		fmt.Println("scanned id:", id, "and name:", name)
+	}
+
+	if rs.Err() != nil {
+		fmt.Println("got rows error:", rs.Err())
+	}
+	// Output: scanned id: 1 and title: John
+	// scanned id: 2 and title: Jane
+	// scanned id: 3 and title: Peter
+	// scanned id: 4 and title: Emily
+}
+
+func ExampleRows_AddRows() {
+	mock, err := NewConn()
+	if err != nil {
+		fmt.Println("failed to open sqlmock database:", err)
+	}
+	defer mock.Close(context.Background())
+
+	values := [][]any{
+		{
+			1, "one",
+		},
+		{
+			2, "two",
+		},
+	}
+
+	rows := NewRows([]string{"id", "title"}).AddRows(values...)
+
+	mock.ExpectQuery("SELECT").WillReturnRows(rows)
+
+	rs, _ := mock.Query(context.Background(), "SELECT")
+	defer rs.Close()
+
+	for rs.Next() {
+		var id int
+		var title string
+		_ = rs.Scan(&id, &title)
+		fmt.Println("scanned id:", id, "and title:", title)
+	}
+
+	if rs.Err() != nil {
+		fmt.Println("got rows error:", rs.Err())
+	}
+	// Output: scanned id: 1 and title: one
+	// scanned id: 2 and title: two
+}
+
 func ExampleRows() {
 	mock, err := NewConn()
 	if err != nil {
 		fmt.Println("failed to open pgxmock database:", err)
 	}
-	// defer mock.Close(context.Background())
+	defer mock.Close(context.Background())
 
 	rows := NewRows([]string{"id", "title"}).
 		AddRow(1, "one").
