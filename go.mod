@@ -2,7 +2,7 @@ module github.com/pashagolub/pgxmock/v2
 
 go 1.19
 
-require github.com/jackc/pgx/v5 v5.0.0
+require github.com/jackc/pgx/v5 v5.0.1
 
 require (
 	github.com/jackc/pgpassfile v1.0.0 // indirect
