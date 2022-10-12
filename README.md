@@ -18,11 +18,11 @@ It's based on the well-known [sqlmock](https://github.com/DATA-DOG/go-sqlmock) l
 
 ## Install
 
-    go get github.com/pashagolub/pgxmock
+    go get github.com/pashagolub/pgxmock/v2
 
 ## Documentation and Examples
 
-Visit [godoc](http://pkg.go.dev/github.com/pashagolub/pgxmock) for general examples and public api reference.
+Visit [godoc](http://pkg.go.dev/github.com/pashagolub/pgxmock/v2) for general examples and public api reference.
 
 See implementation examples:
 
@@ -93,7 +93,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/pashagolub/pgxmock"
+	"github.com/pashagolub/pgxmock/v2"
 )
 
 // a successful case
@@ -172,7 +172,7 @@ provide a standard sql parsing matchers.
 ## Matching arguments like time.Time
 
 There may be arguments which are of `struct` type and cannot be compared easily by value like `time.Time`. In this case
-**pgxmock** provides an [Argument](https://pkg.go.dev/github.com/pashagolub/pgxmock#Argument) interface which
+**pgxmock** provides an [Argument](https://pkg.go.dev/github.com/pashagolub/pgxmock/v2#Argument) interface which
 can be used in more sophisticated matching. Here is a simple example of time argument matching:
 
 ``` go
