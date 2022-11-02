@@ -95,11 +95,11 @@ func (rs *rowSets) Scan(dest ...interface{}) error {
 			continue
 		}
 		val := reflect.ValueOf(col)
-		if _, ok := dest[i].(*interface{}); ok || destVal.Elem().Kind() == val.Kind() {
+		if _, ok := dest[i].(*interface{}); ok || val.Type().AssignableTo(destVal.Elem().Type()) {
 			if destElem := destVal.Elem(); destElem.CanSet() {
 				destElem.Set(val)
 			} else {
-				return fmt.Errorf("Cannot set destination  value for column %s", string(r.defs[i].Name))
+				return fmt.Errorf("Cannot set destination value for column %s", string(r.defs[i].Name))
 			}
 		} else {
 			// Try to use Scanner interface
