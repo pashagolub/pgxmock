@@ -959,7 +959,7 @@ func TestPrepareExec(t *testing.T) {
 	mock.ExpectBegin()
 	ep := mock.ExpectPrepare("foo", "INSERT INTO ORDERS\\(ID, STATUS\\) VALUES \\(\\?, \\?\\)")
 	for i := 0; i < 3; i++ {
-		ep.ExpectExec().WillReturnResult(NewResult("UPDATE", 1))
+		ep.ExpectExec().WithArgs(AnyArg(), AnyArg()).WillReturnResult(NewResult("UPDATE", 1))
 	}
 	mock.ExpectCommit()
 	tx, _ := mock.Begin(context.Background())
@@ -1071,7 +1071,7 @@ func TestPreparedStatementCloseExpectation(t *testing.T) {
 	defer mock.Close(context.Background())
 
 	ep := mock.ExpectPrepare("foo", "INSERT INTO ORDERS").WillBeClosed()
-	ep.ExpectExec().WillReturnResult(NewResult("UPDATE", 1))
+	ep.ExpectExec().WithArgs(AnyArg(), AnyArg()).WillReturnResult(NewResult("UPDATE", 1))
 
 	_, err = mock.Prepare(context.Background(), "foo", "INSERT INTO ORDERS(ID, STATUS) VALUES (?, ?)")
 	if err != nil {
@@ -1101,7 +1101,7 @@ func TestExecExpectationErrorDelay(t *testing.T) {
 
 	// test that return of error is delayed
 	delay := time.Millisecond * 100
-	mock.ExpectExec("^INSERT INTO articles").
+	mock.ExpectExec("^INSERT INTO articles").WithArgs(AnyArg()).
 		WillReturnError(errors.New("slow fail")).
 		WillDelayFor(delay)
 
