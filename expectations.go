@@ -376,9 +376,6 @@ func (e *ExpectedQuery) WillReturnRows(rows ...*Rows) *ExpectedQuery {
 }
 
 func (e *queryBasedExpectation) argsMatches(args []interface{}) error {
-	if nil == e.args {
-		return nil
-	}
 	if len(args) != len(e.args) {
 		return fmt.Errorf("expected %d, but got %d arguments", len(e.args), len(args))
 	}
