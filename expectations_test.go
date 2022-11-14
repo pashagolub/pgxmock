@@ -95,3 +95,17 @@ func TestQueryRowScan(t *testing.T) {
 		t.Error(err)
 	}
 }
+
+func TestMissingWithArgs(t *testing.T) {
+	mock, _ := NewConn()
+	// No arguments expected
+	mock.ExpectExec("INSERT something")
+	// Receiving argument
+	_, err := mock.Exec(context.Background(), "INSERT something", "something")
+	if err == nil {
+		t.Error("arguments do not match error was expected")
+	}
+	if err := mock.ExpectationsWereMet(); err == nil {
+		t.Error("expectation was not matched error was expected")
+	}
+}
