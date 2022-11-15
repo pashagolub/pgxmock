@@ -4,11 +4,12 @@ import (
 	"context"
 
 	pgx "github.com/jackc/pgx/v5"
+	pgxpool "github.com/jackc/pgx/v5/pgxpool"
 )
 
 type PgxIface interface {
 	Begin(context.Context) (pgx.Tx, error)
-	Close(context.Context) error
+	Close()
 }
 
 func recordStats(db PgxIface, userID, productID int) (err error) {
@@ -37,11 +38,11 @@ func recordStats(db PgxIface, userID, productID int) (err error) {
 
 func main() {
 	// @NOTE: the real connection is not required for tests
-	db, err := pgx.Connect(context.Background(), "postgres://rolname@hostname/dbname")
+	db, err := pgxpool.New(context.Background(), "postgres://rolname@hostname/dbname")
 	if err != nil {
 		panic(err)
 	}
-	defer db.Close(context.Background())
+	defer db.Close()
 
 	if err = recordStats(db, 1 /*some user id*/, 5 /*some product id*/); err != nil {
 		panic(err)
