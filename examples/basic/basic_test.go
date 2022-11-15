@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"testing"
 
@@ -10,11 +9,11 @@ import (
 
 // a successful case
 func TestShouldUpdateStats(t *testing.T) {
-	mock, err := pgxmock.NewConn()
+	mock, err := pgxmock.NewPool()
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
-	defer mock.Close(context.Background())
+	defer mock.Close()
 
 	mock.ExpectBegin()
 	mock.ExpectExec("UPDATE products").WillReturnResult(pgxmock.NewResult("UPDATE", 1))
@@ -34,11 +33,11 @@ func TestShouldUpdateStats(t *testing.T) {
 
 // a failing test case
 func TestShouldRollbackStatUpdatesOnFailure(t *testing.T) {
-	mock, err := pgxmock.NewConn()
+	mock, err := pgxmock.NewPool()
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
-	defer mock.Close(context.Background())
+	defer mock.Close()
 
 	mock.ExpectBegin()
 	mock.ExpectExec("UPDATE products").WillReturnResult(pgxmock.NewResult("UPDATE", 1))
