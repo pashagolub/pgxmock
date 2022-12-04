@@ -2,9 +2,13 @@ package pgxmock
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"testing"
+	"time"
+
+	"github.com/jackc/pgx/v5"
 )
 
 func ExampleExpectedExec() {
@@ -25,6 +29,45 @@ func TestUnmonitoredPing(t *testing.T) {
 	}
 }
 
+func TestUnexpectedPing(t *testing.T) {
+	mock, _ := NewConn(MonitorPingsOption(true))
+	err := mock.Ping(context.Background())
+	if err == nil {
+		t.Error("Ping should return error for unexpected call")
+	}
+	mock.ExpectExec("foo")
+	err = mock.Ping(context.Background())
+	if err == nil {
+		t.Error("Ping should return error for unexpected call")
+	}
+}
+
+func TestUnexpectedPrepare(t *testing.T) {
+	mock, _ := NewConn()
+	_, err := mock.Prepare(context.Background(), "foo", "bar")
+	if err == nil {
+		t.Error("Prepare should return error for unexpected call")
+	}
+	mock.ExpectExec("foo")
+	_, err = mock.Prepare(context.Background(), "foo", "bar")
+	if err == nil {
+		t.Error("Prepare should return error for unexpected call")
+	}
+}
+
+func TestUnexpectedCopyFrom(t *testing.T) {
+	mock, _ := NewConn()
+	_, err := mock.CopyFrom(context.Background(), pgx.Identifier{"schema", "table"}, []string{"foo", "bar"}, nil)
+	if err == nil {
+		t.Error("CopyFrom should return error for unexpected call")
+	}
+	mock.ExpectExec("foo")
+	_, err = mock.CopyFrom(context.Background(), pgx.Identifier{"schema", "table"}, []string{"foo", "bar"}, nil)
+	if err == nil {
+		t.Error("CopyFrom should return error for unexpected call")
+	}
+}
+
 func TestBuildQuery(t *testing.T) {
 	mock, _ := NewConn(MonitorPingsOption(true))
 	query := `
@@ -41,7 +84,7 @@ func TestBuildQuery(t *testing.T) {
 
 	`
 
-	mock.ExpectPing()
+	mock.ExpectPing().WillDelayFor(1 * time.Second).WillReturnError(errors.New("no ping please"))
 	mock.ExpectQuery(query)
 	mock.ExpectExec(query)
 	mock.ExpectPrepare("foo", query)

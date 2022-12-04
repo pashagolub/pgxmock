@@ -438,7 +438,7 @@ func (e *ExpectedCopyFrom) WillDelayFor(duration time.Duration) *ExpectedCopyFro
 func (e *ExpectedCopyFrom) String() string {
 	msg := "ExpectedCopyFrom => expecting CopyFrom which:"
 	msg += "\n  - matches table name: '" + e.expectedTableName + "'"
-	msg += fmt.Sprintf("\n  - matches column names: '%+v'", e.expectedTableName)
+	msg += fmt.Sprintf("\n  - matches column names: '%+v'", e.expectedColumns)
 
 	if e.err != nil {
 		msg += fmt.Sprintf("\n  - should return error: %s", e.err)

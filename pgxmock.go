@@ -50,23 +50,23 @@ type pgxMockIface interface {
 	// the *ExpectedExec allows to mock database response
 	ExpectExec(expectedSQL string) *ExpectedExec
 
-	// ExpectBegin expects *sql.DB.Begin to be called.
+	// ExpectBegin expects pgx.Conn.Begin to be called.
 	// the *ExpectedBegin allows to mock database response
 	ExpectBegin() *ExpectedBegin
 
-	// ExpectBeginTx expects expects BeginTxFunc() to be called with expectedSQL
+	// ExpectBeginTx expects expects BeginTx() to be called with expectedSQL
 	// query. The *ExpectedBegin allows to mock database response.
 	ExpectBeginTx(txOptions pgx.TxOptions) *ExpectedBegin
 
-	// ExpectCommit expects *sql.Tx.Commit to be called.
+	// ExpectCommit expects pgx.Tx.Commit to be called.
 	// the *ExpectedCommit allows to mock database response
 	ExpectCommit() *ExpectedCommit
 
-	// ExpectRollback expects *sql.Tx.Rollback to be called.
+	// ExpectRollback expects pgx.Tx.Rollback to be called.
 	// the *ExpectedRollback allows to mock database response
 	ExpectRollback() *ExpectedRollback
 
-	// ExpectPing expected *sql.DB.Ping to be called.
+	// ExpectPing expected pgx.Conn.Ping to be called.
 	// the *ExpectedPing allows to mock database response
 	//
 	// Ping support only exists in the SQL library in Go 1.8 and above.
@@ -419,35 +419,6 @@ func (c *pgxmock) SendBatch(ctx context.Context, b *pgx.Batch) pgx.BatchResults 
 
 func (c *pgxmock) LargeObjects() pgx.LargeObjects {
 	return pgx.LargeObjects{}
-}
-
-func (c *pgxmock) BeginFunc(ctx context.Context, f func(pgx.Tx) error) (err error) {
-	return c.BeginTxFunc(ctx, pgx.TxOptions{}, f)
-}
-
-func (c *pgxmock) BeginTxFunc(ctx context.Context, txOptions pgx.TxOptions, f func(pgx.Tx) error) (err error) {
-	var tx pgx.Tx
-	tx, err = c.BeginTx(ctx, txOptions)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if err == nil {
-			return
-		}
-		rollbackErr := tx.Rollback(ctx)
-		if !(rollbackErr == nil || errors.Is(rollbackErr, pgx.ErrTxClosed)) {
-			err = rollbackErr
-		}
-	}()
-
-	fErr := f(tx)
-	if fErr != nil {
-		_ = tx.Rollback(ctx) // ignore rollback error as there is already an error to return
-		return fErr
-	}
-
-	return tx.Commit(ctx)
 }
 
 func (c *pgxmock) BeginTx(ctx context.Context, txOptions pgx.TxOptions) (pgx.Tx, error) {
