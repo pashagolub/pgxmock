@@ -45,11 +45,9 @@ type PgxIface interface {
 }
 
 func recordStats(db PgxIface, userID, productID int) (err error) {
-	tx, err := db.Begin(context.Background())
-	if err != nil {
+	if tx, err := db.Begin(context.Background()); err != nil {
 		return
 	}
-
 	defer func() {
 		switch err {
 		case nil:
@@ -58,11 +56,12 @@ func recordStats(db PgxIface, userID, productID int) (err error) {
 			_ = tx.Rollback(context.Background())
 		}
 	}()
-
-	if _, err = tx.Exec(context.Background(), "UPDATE products SET views = views + 1"); err != nil {
+	sql := "UPDATE products SET views = views + 1"
+	if _, err = tx.Exec(context.Background(), sql); err != nil {
 		return
 	}
-	if _, err = tx.Exec(context.Background(), "INSERT INTO product_viewers (user_id, product_id) VALUES (?, ?)", userID, productID); err != nil {
+	sql = "INSERT INTO product_viewers (user_id, product_id) VALUES ($1, $2)"
+	if _, err = tx.Exec(context.Background(), sql, userID, productID); err != nil {
 		return
 	}
 	return
@@ -97,20 +96,23 @@ import (
 
 // a successful case
 func TestShouldUpdateStats(t *testing.T) {
-	mock, err := pgxmock.NewConn()
+	mock, err := pgxmock.NewPool()
 	if err != nil {
-		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+		t.Fatal(err)
 	}
-	defer mock.Close(context.Background())
+	defer mock.Close()
 
 	mock.ExpectBegin()
-	mock.ExpectExec("UPDATE products").WillReturnResult(pgxmock.NewResult("UPDATE", 1))
-	mock.ExpectExec("INSERT INTO product_viewers").WithArgs(2, 3).WillReturnResult(pgxmock.NewResult("INSERT", 1))
+	mock.ExpectExec("UPDATE products").
+		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+	mock.ExpectExec("INSERT INTO product_viewers").
+		WithArgs(2, 3).
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
 	mock.ExpectCommit()
 
 	// now we execute our method
 	if err = recordStats(mock, 2, 3); err != nil {
-		t.Errorf("error was not expected while updating stats: %s", err)
+		t.Errorf("error was not expected while updating: %s", err)
 	}
 
 	// we make sure that all expectations were met
@@ -121,14 +123,15 @@ func TestShouldUpdateStats(t *testing.T) {
 
 // a failing test case
 func TestShouldRollbackStatUpdatesOnFailure(t *testing.T) {
-	mock, err := pgxmock.NewConn()
+	mock, err := pgxmock.NewPool()
 	if err != nil {
-		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+		t.Fatal(err)
 	}
-	defer mock.Close(context.Background())
+	defer mock.Close()
 
 	mock.ExpectBegin()
-	mock.ExpectExec("UPDATE products").WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+	mock.ExpectExec("UPDATE products").
+		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
 	mock.ExpectExec("INSERT INTO product_viewers").
 		WithArgs(2, 3).
 		WillReturnError(fmt.Errorf("some error"))
