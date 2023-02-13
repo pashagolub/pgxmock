@@ -17,7 +17,6 @@ func recordStats(db PgxIface, userID, productID int) (err error) {
 	if err != nil {
 		return
 	}
-
 	defer func() {
 		switch err {
 		case nil:
@@ -26,11 +25,12 @@ func recordStats(db PgxIface, userID, productID int) (err error) {
 			_ = tx.Rollback(context.Background())
 		}
 	}()
-
-	if _, err = tx.Exec(context.Background(), "UPDATE products SET views = views + 1"); err != nil {
+	sql := "UPDATE products SET views = views + 1"
+	if _, err = tx.Exec(context.Background(), sql); err != nil {
 		return
 	}
-	if _, err = tx.Exec(context.Background(), "INSERT INTO product_viewers (user_id, product_id) VALUES (?, ?)", userID, productID); err != nil {
+	sql = "INSERT INTO product_viewers (user_id, product_id) VALUES ($1, $2)"
+	if _, err = tx.Exec(context.Background(), sql, userID, productID); err != nil {
 		return
 	}
 	return
