@@ -25,8 +25,9 @@ Visit [godoc](http://pkg.go.dev/github.com/pashagolub/pgxmock/v2) for general ex
 
 See implementation examples:
 
+- [the simplest one](https://github.com/pashagolub/pgxmock/tree/master/examples/basic)
 - [blog API server](https://github.com/pashagolub/pgxmock/tree/master/examples/blog)
-- [the same orders example](https://github.com/pashagolub/pgxmock/tree/master/examples/orders)
+
 
 ### Something you may want to test
 
