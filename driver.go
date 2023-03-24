@@ -45,6 +45,6 @@ func (p *pgxmockPool) Close() {
 	_ = p.close(context.Background())
 }
 
-func (p *pgxmockPool) Acquire(ctx context.Context) (*pgxpool.Conn, error) {
+func (p *pgxmockPool) Acquire(context.Context) (*pgxpool.Conn, error) {
 	return nil, errors.New("pgpool.Acquire() method is not implemented")
 }

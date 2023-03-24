@@ -33,7 +33,7 @@ type pgxMockIface interface {
 	ExpectClose() *ExpectedClose
 
 	// ExpectationsWereMet checks whether all queued expectations
-	// were met in order (unless MatchExpectationsInOrder set to false). 
+	// were met in order (unless MatchExpectationsInOrder set to false).
 	// If any of them was not met - an error is returned.
 	ExpectationsWereMet() error
 
@@ -348,7 +348,7 @@ func (c *pgxmock) Conn() *pgx.Conn {
 	panic("Conn() is not available in pgxmock")
 }
 
-func (c *pgxmock) CopyFrom(ctx context.Context, tableName pgx.Identifier, columnNames []string, rowSrc pgx.CopyFromSource) (int64, error) {
+func (c *pgxmock) CopyFrom(ctx context.Context, tableName pgx.Identifier, columnNames []string, _ pgx.CopyFromSource) (int64, error) {
 	ex, err := c.copyFrom(tableName.Sanitize(), columnNames)
 	if ex != nil {
 		select {
@@ -414,7 +414,7 @@ func (c *pgxmock) copyFrom(tableName string, columnNames []string) (*ExpectedCop
 	return expected, expected.err
 }
 
-func (c *pgxmock) SendBatch(ctx context.Context, b *pgx.Batch) pgx.BatchResults {
+func (c *pgxmock) SendBatch(context.Context, *pgx.Batch) pgx.BatchResults {
 	return nil
 }
 
@@ -431,7 +431,7 @@ func (c *pgxmock) BeginTx(ctx context.Context, txOptions pgx.TxOptions) (pgx.Tx,
 		return nil, err
 	}
 
-	return c, nil
+	return c, ctx.Err()
 }
 
 func (c *pgxmock) Begin(ctx context.Context) (pgx.Tx, error) {
@@ -484,7 +484,7 @@ func (c *pgxmock) Prepare(ctx context.Context, name, query string) (*pgconn.Stat
 		return nil, err
 	}
 
-	return &pgconn.StatementDescription{Name: name, SQL: query}, nil
+	return &pgconn.StatementDescription{Name: name, SQL: query}, ctx.Err()
 }
 
 func (c *pgxmock) prepare(name string, query string) (*ExpectedPrepare, error) {
@@ -552,7 +552,7 @@ func (c *pgxmock) Deallocate(ctx context.Context, name string) error {
 		return fmt.Errorf("Deallocate: prepared statement name '%s' doesn't exist", name)
 	}
 	expected.wasClosed = true
-	return nil
+	return ctx.Err()
 }
 
 func (c *pgxmock) Commit(ctx context.Context) error {
@@ -586,7 +586,10 @@ func (c *pgxmock) Commit(ctx context.Context) error {
 
 	expected.triggered = true
 	expected.Unlock()
-	return expected.err
+	if expected.err != nil {
+		return expected.err
+	}
+	return ctx.Err()
 }
 
 func (c *pgxmock) Rollback(ctx context.Context) error {
@@ -620,7 +623,10 @@ func (c *pgxmock) Rollback(ctx context.Context) error {
 
 	expected.triggered = true
 	expected.Unlock()
-	return expected.err
+	if expected.err != nil {
+		return expected.err
+	}
+	return ctx.Err()
 }
 
 // ErrCancelled defines an error value, which can be expected in case of
@@ -710,7 +716,7 @@ type errRow struct {
 	err error
 }
 
-func (er errRow) Scan(dest ...interface{}) error {
+func (er errRow) Scan(...interface{}) error {
 	return er.err
 }
 
