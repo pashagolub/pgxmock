@@ -33,7 +33,8 @@ type pgxMockIface interface {
 	ExpectClose() *ExpectedClose
 
 	// ExpectationsWereMet checks whether all queued expectations
-	// were met in order. If any of them was not met - an error is returned.
+	// were met in order (unless MatchExpectationsInOrder set to false). 
+	// If any of them was not met - an error is returned.
 	ExpectationsWereMet() error
 
 	// ExpectPrepare expects Prepare() to be called with expectedSQL query.
