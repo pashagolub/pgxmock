@@ -415,7 +415,7 @@ func (e *queryBasedExpectation) attemptArgMatch(args []interface{}) (err error) 
 // Returned by *Pgxmock.ExpectCopyFrom.
 type ExpectedCopyFrom struct {
 	commonExpectation
-	expectedTableName string
+	expectedTableName pgx.Identifier
 	expectedColumns   []string
 	rowsAffected      int64
 	delay             time.Duration
@@ -437,7 +437,7 @@ func (e *ExpectedCopyFrom) WillDelayFor(duration time.Duration) *ExpectedCopyFro
 // String returns string representation
 func (e *ExpectedCopyFrom) String() string {
 	msg := "ExpectedCopyFrom => expecting CopyFrom which:"
-	msg += "\n  - matches table name: '" + e.expectedTableName + "'"
+	msg += "\n  - matches table name: '" + e.expectedTableName.Sanitize() + "'"
 	msg += fmt.Sprintf("\n  - matches column names: '%+v'", e.expectedColumns)
 
 	if e.err != nil {

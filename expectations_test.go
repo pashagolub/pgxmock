@@ -11,6 +11,26 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+func TestCopyFromBug(t *testing.T) {
+	mock, _ := NewConn()
+	defer func() {
+		err := mock.ExpectationsWereMet()
+		if err != nil {
+			t.Errorf("expectation were not met: %s", err)
+		}
+	}()
+
+	mock.ExpectCopyFrom(pgx.Identifier{"foo"}, []string{"bar"}).WillReturnResult(1)
+
+	var rows [][]any
+	rows = append(rows, []any{"baz"})
+
+	_, err := mock.CopyFrom(context.Background(), pgx.Identifier{"foo"}, []string{"bar"}, pgx.CopyFromRows(rows))
+	if err != nil {
+		t.Errorf("unexpected error: %s", err)
+	}
+}
+
 func ExampleExpectedExec() {
 	mock, _ := NewConn()
 	result := NewErrorResult(fmt.Errorf("some error"))

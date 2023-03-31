@@ -115,7 +115,7 @@ func TestMockCopyFrom(t *testing.T) {
 	}
 	defer mock.Close(context.Background())
 
-	mock.ExpectCopyFrom(`"fooschema"."baztable"`, []string{"col1"}).
+	mock.ExpectCopyFrom(pgx.Identifier{"fooschema", "baztable"}, []string{"col1"}).
 		WillReturnResult(2).WillDelayFor(1 * time.Second)
 
 	_, err = mock.CopyFrom(context.Background(), pgx.Identifier{"error", "error"}, []string{"error"}, nil)
@@ -135,7 +135,7 @@ func TestMockCopyFrom(t *testing.T) {
 		t.Errorf("expected RowsAffected to be 2, but got %d instead", rows)
 	}
 
-	mock.ExpectCopyFrom(`"fooschema"."baztable"`, []string{"col1"}).
+	mock.ExpectCopyFrom(pgx.Identifier{"fooschema", "baztable"}, []string{"col1"}).
 		WillReturnError(errors.New("error is here"))
 
 	_, err = mock.CopyFrom(context.Background(), pgx.Identifier{"fooschema", "baztable"}, []string{"col1"}, nil)
