@@ -47,3 +47,14 @@ func TestAcquire(t *testing.T) {
 		t.Error("expected error, but got nil")
 	}
 }
+
+func TestPoolStat(t *testing.T) {
+	mock, err := NewPool()
+	if err != nil {
+		t.Errorf("expected no error, but got: %s", err)
+	}
+	s := mock.Stat()
+	if s == nil {
+		t.Error("expected stat object, but got nil")
+	}
+}
