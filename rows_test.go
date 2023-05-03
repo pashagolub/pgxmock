@@ -848,3 +848,56 @@ func TestEmptyRowSets(t *testing.T) {
 // 		t.Fatal(err)
 // 	}
 // }
+
+func TestMockQueryWithCollect(t *testing.T) {
+	t.Parallel()
+	mock, err := NewConn()
+	if err != nil {
+		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	defer mock.Close(context.Background())
+	type rowStructType struct {
+		ID    int
+		Title string
+	}
+	rs := NewRows([]string{"id", "title"}).AddRow(5, "hello world")
+
+	mock.ExpectQuery("SELECT (.+) FROM articles WHERE id = ?").
+		WithArgs(5).
+		WillReturnRows(rs)
+
+	rows, err := mock.Query(context.Background(), "SELECT (.+) FROM articles WHERE id = ?", 5)
+	if err != nil {
+		t.Errorf("error '%s' was not expected while retrieving mock rows", err)
+	}
+
+	defer rows.Close()
+
+	//if !rows.Next() {
+	//	t.Error("it must have had one row as result, but got empty result set instead")
+	//}
+
+	rawMap, err := pgx.CollectRows(rows, pgx.RowToStructByPos[rowStructType])
+	if err != nil {
+		t.Errorf("error '%s' was not expected while trying to collect rows", err)
+	}
+
+	var id = rawMap[0].ID
+	var title = rawMap[0].Title
+
+	if err != nil {
+		t.Errorf("error '%s' was not expected while trying to scan row", err)
+	}
+
+	if id != 5 {
+		t.Errorf("expected mocked id to be 5, but got %d instead", id)
+	}
+
+	if title != "hello world" {
+		t.Errorf("expected mocked title to be 'hello world', but got '%s' instead", title)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
+}

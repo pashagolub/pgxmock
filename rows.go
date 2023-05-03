@@ -127,7 +127,12 @@ func (rs *rowSets) RawValues() [][]byte {
 			dest[i] = b
 			continue
 		}
-		dest[i] = col.([]byte)
+		d, ok := col.([]byte)
+		if ok {
+			dest[i] = d
+		} else {
+			dest[i] = []byte(fmt.Sprintf("%v", col))
+		}
 	}
 
 	return dest
