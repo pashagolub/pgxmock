@@ -53,8 +53,8 @@ func TestPoolStat(t *testing.T) {
 	if err != nil {
 		t.Errorf("expected no error, but got: %s", err)
 	}
-	_ = mock.Stat()
-	if err == nil {
-		t.Error("expected error, but got nil")
+	s := mock.Stat()
+	if s == nil {
+		t.Error("expected stat object, but got nil")
 	}
 }
