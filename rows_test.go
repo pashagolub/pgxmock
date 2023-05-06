@@ -877,7 +877,7 @@ func TestMockQueryWithCollect(t *testing.T) {
 	//	t.Error("it must have had one row as result, but got empty result set instead")
 	//}
 
-	rawMap, err := pgx.CollectRows(rows, pgx.RowToStructByPos[rowStructType])
+	rawMap, err := pgx.CollectRows(rows, pgx.RowToAddrOfStructByPos[rowStructType])
 	if err != nil {
 		t.Errorf("error '%s' was not expected while trying to collect rows", err)
 	}

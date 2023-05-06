@@ -2,6 +2,7 @@ package pgxmock
 
 import (
 	"encoding/csv"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
@@ -99,7 +100,7 @@ func (rs *rowSets) Scan(dest ...interface{}) error {
 			if destElem := destVal.Elem(); destElem.CanSet() {
 				destElem.Set(val)
 			} else {
-				return fmt.Errorf("Cannot set destination value for column %s", string(r.defs[i].Name))
+				return fmt.Errorf("Cannot set destination value for column %s", r.defs[i].Name)
 			}
 		} else {
 			// Try to use Scanner interface
@@ -127,12 +128,7 @@ func (rs *rowSets) RawValues() [][]byte {
 			dest[i] = b
 			continue
 		}
-		d, ok := col.([]byte)
-		if ok {
-			dest[i] = d
-		} else {
-			dest[i] = []byte(fmt.Sprintf("%v", col))
-		}
+		dest[i] = []byte(fmt.Sprintf("%v", col))
 	}
 
 	return dest
@@ -170,8 +166,8 @@ func (rs *rowSets) empty() bool {
 }
 
 func rawBytes(col interface{}) (_ []byte, ok bool) {
-	val, ok := col.([]byte)
-	if !ok || len(val) == 0 {
+	val, err := json.Marshal(col)
+	if err != nil || len(val) == 0 {
 		return nil, false
 	}
 	// Copy the bytes from the mocked row into a shared raw buffer, which we'll replace the content of later
