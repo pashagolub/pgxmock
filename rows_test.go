@@ -2,6 +2,7 @@ package pgxmock
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"testing"
@@ -424,7 +425,11 @@ func ExampleRows_rawValues() {
 	defer rs.Close()
 
 	for rs.Next() {
-		fmt.Println(string(rs.RawValues()[0]))
+		var rawValue []byte
+		if err := json.Unmarshal(rs.RawValues()[0], &rawValue); err != nil {
+			fmt.Print(err)
+		}
+		fmt.Println(string(rawValue))
 	}
 	// Output: one binary value with some text!
 	// two binary value with even more text than the first one
@@ -877,7 +882,7 @@ func TestMockQueryWithCollect(t *testing.T) {
 	//	t.Error("it must have had one row as result, but got empty result set instead")
 	//}
 
-	rawMap, err := pgx.CollectRows(rows, pgx.RowToStructByPos[rowStructType])
+	rawMap, err := pgx.CollectRows(rows, pgx.RowToAddrOfStructByPos[rowStructType])
 	if err != nil {
 		t.Errorf("error '%s' was not expected while trying to collect rows", err)
 	}
