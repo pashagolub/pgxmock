@@ -161,7 +161,9 @@ func (c *pgxmock) AcquireFunc(ctx context.Context, f func(*pgxpool.Conn) error) 
 	return nil
 }
 
-func (c *pgxmock) Reset()
+func (c *pgxmock) Reset() {
+
+}
 
 // region Expectations
 func (c *pgxmock) ExpectClose() *ExpectedClose {
