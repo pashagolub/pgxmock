@@ -107,7 +107,7 @@ type pgxMockIface interface {
 	// New Column allows to create a Column
 	NewColumn(name string) *pgconn.FieldDescription
 
-	Config() *pgx.ConnConfig
+	Config() *pgxpool.Config
 
 	PgConn() *pgconn.PgConn
 }
@@ -119,6 +119,7 @@ type pgxIface interface {
 	Exec(context.Context, string, ...interface{}) (pgconn.CommandTag, error)
 	Query(context.Context, string, ...interface{}) (pgx.Rows, error)
 	QueryRow(context.Context, string, ...interface{}) pgx.Row
+	Reset()
 	Ping(context.Context) error
 	Prepare(context.Context, string, string) (*pgconn.StatementDescription, error)
 	Deallocate(ctx context.Context, name string) error
@@ -134,6 +135,8 @@ type PgxPoolIface interface {
 	pgxIface
 	pgx.Tx
 	Acquire(ctx context.Context) (*pgxpool.Conn, error)
+	AcquireAllIdle(ctx context.Context) []*pgxpool.Conn
+	AcquireFunc(ctx context.Context, f func(*pgxpool.Conn) error) error
 	Close()
 	Stat() *pgxpool.Stat
 }
@@ -146,8 +149,20 @@ type pgxmock struct {
 	expected []expectation
 }
 
-func (c *pgxmock) Config() *pgx.ConnConfig {
-	return &pgx.ConnConfig{}
+func (c *pgxmock) Config() *pgxpool.Config {
+	return &pgxpool.Config{}
+}
+
+func (c *pgxmock) AcquireAllIdle(_ context.Context) []*pgxpool.Conn {
+	return []*pgxpool.Conn{}
+}
+
+func (c *pgxmock) AcquireFunc(_ context.Context, _ func(*pgxpool.Conn) error) error {
+	return nil
+}
+
+func (c *pgxmock) Reset() {
+
 }
 
 // region Expectations
