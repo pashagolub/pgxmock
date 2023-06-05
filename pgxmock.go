@@ -157,7 +157,7 @@ func (c *pgxmock) AcquireAllIdle(_ context.Context) []*pgxpool.Conn {
 	return []*pgxpool.Conn{}
 }
 
-func (c *pgxmock) AcquireFunc(_ context.Context, f func(*pgxpool.Conn) error) error {
+func (c *pgxmock) AcquireFunc(_ context.Context, _ func(*pgxpool.Conn) error) error {
 	return nil
 }
 
