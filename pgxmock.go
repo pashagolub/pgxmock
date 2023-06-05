@@ -153,7 +153,7 @@ func (c *pgxmock) Config() *pgxpool.Config {
 	return &pgxpool.Config{}
 }
 
-func (c *pgxmock) AcquireAllIdle(ctx context.Context) []*pgxpool.Conn {
+func (c *pgxmock) AcquireAllIdle(_ context.Context) []*pgxpool.Conn {
 	return []*pgxpool.Conn{}
 }
 
