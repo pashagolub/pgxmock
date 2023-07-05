@@ -139,6 +139,7 @@ type PgxPoolIface interface {
 	AcquireFunc(ctx context.Context, f func(*pgxpool.Conn) error) error
 	Close()
 	Stat() *pgxpool.Stat
+	AsConn() PgxConnIface
 }
 
 type pgxmock struct {

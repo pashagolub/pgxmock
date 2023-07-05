@@ -49,6 +49,11 @@ func (p *pgxmockPool) Acquire(context.Context) (*pgxpool.Conn, error) {
 	return nil, errors.New("pgpool.Acquire() method is not implemented")
 }
 
+// AsConn is similar to Acquire but returns proper mocking interface
+func (p *pgxmockPool) AsConn() PgxConnIface {
+	return &pgxmockConn{pgxmock: p.pgxmock}
+}
+
 func (p *pgxmockPool) Stat() *pgxpool.Stat {
 	return &pgxpool.Stat{}
 }
