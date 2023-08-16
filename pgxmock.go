@@ -251,6 +251,13 @@ func (c *pgxmock) ExpectCopyFrom(expectedTableName pgx.Identifier, expectedColum
 	return e
 }
 
+// ExpectReset expects Reset to be called.
+func (c *pgxmock) ExpectReset() *ExpectedReset {
+	e := &ExpectedReset{}
+	c.expected = append(c.expected, e)
+	return e
+}
+
 func (c *pgxmock) ExpectPing() *ExpectedPing {
 	if !c.monitorPings {
 		log.Println("ExpectPing will have no effect as monitoring pings is disabled. Use MonitorPingsOption to enable.")
