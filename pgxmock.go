@@ -150,6 +150,34 @@ type pgxmock struct {
 	expected []expectation
 }
 
+type mockBatchResults struct {
+	queries []pgx.BatchItem
+	results []pgconn.CommandTag
+}
+
+func (mbr *mockBatchResults) Exec() (pgconn.CommandTag, error) {
+	if len(mbr.queries) == 0 {
+		return nil, errors.New("no queries in batch")
+	}
+	query := mbr.queries[0]
+	mbr.queries = mbr.queries[1:]
+	return query.Exec()
+}
+
+func (mbr *mockBatchResults) Query() (pgx.Rows, error) {
+	if len(mbr.queries) == 0 {
+		return nil, errors.New("no queries in batch")
+	}
+	query := mbr.queries[0]
+	mbr.queries = mbr.queries[1:]
+	return query.Query()
+}
+
+func (mbr *mockBatchResults) Close() {
+	mbr.queries = nil
+	mbr.results = nil
+}
+
 func (c *pgxmock) Config() *pgxpool.Config {
 	return &pgxpool.Config{}
 }
@@ -431,8 +459,23 @@ func (c *pgxmock) copyFrom(tableName pgx.Identifier, columnNames []string) (*Exp
 	return expected, expected.err
 }
 
-func (c *pgxmock) SendBatch(context.Context, *pgx.Batch) pgx.BatchResults {
-	return nil
+func (c *pgxmock) SendBatch(ctx context.Context, batch *pgx.Batch) pgx.BatchResults {
+	mbr := &mockBatchResults{
+		queries: batch.Items(),
+	}
+
+	// Execute all the queries in the batch and store the results
+	for _, query := range mbr.queries {
+		if query.Query != "" {
+			result, err := c.Exec(ctx, query.Query, query.Arguments...)
+			if err != nil {
+				return nil
+			}
+			mbr.results = append(mbr.results, result)
+		}
+	}
+
+	return mbr
 }
 
 func (c *pgxmock) LargeObjects() pgx.LargeObjects {
