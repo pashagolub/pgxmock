@@ -142,12 +142,43 @@ type PgxPoolIface interface {
 	AsConn() PgxConnIface
 }
 
+type ExpectedBatch struct {
+	expectSQL string
+	args      []driver.Value
+	err       error
+	result    pgx.BatchResults
+	delay     time.Duration
+	triggered bool
+}
+
+func (b *ExpectedBatch) WithArgs(args ...driver.Value) *ExpectedBatch {
+	b.args = args
+	return b
+}
+
+func (b *ExpectedBatch) WillReturnError(err error) *ExpectedBatch {
+	b.err = err
+	return b
+}
+
+func (b *ExpectedBatch) WillReturnResult(result pgx.BatchResults) *ExpectedBatch {
+	b.result = result
+	return b
+}
+
 type pgxmock struct {
 	ordered      bool
 	queryMatcher QueryMatcher
 	monitorPings bool
 
 	expected []expectation
+	batches  []*ExpectedBatch
+}
+
+func (c *pgxmock) ExpectBatch(sql string) *ExpectedBatch {
+	b := &ExpectedBatch{expectSQL: sql}
+	c.batches = append(c.batches, b)
+	return b
 }
 
 func (c *pgxmock) Config() *pgxpool.Config {
@@ -431,7 +462,13 @@ func (c *pgxmock) copyFrom(tableName pgx.Identifier, columnNames []string) (*Exp
 	return expected, expected.err
 }
 
-func (c *pgxmock) SendBatch(context.Context, *pgx.Batch) pgx.BatchResults {
+func (c *pgxmock) SendBatch(ctx context.Context, batch *pgx.Batch) pgx.BatchResults {
+	for _, b := range c.batches {
+		if b.expectSQL == batch.SQL() && reflect.DeepEqual(b.args, batch.Arguments()) {
+			b.triggered = true
+			return b.result
+		}
+	}
 	return nil
 }
 
