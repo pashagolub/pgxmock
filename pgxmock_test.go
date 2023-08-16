@@ -1254,3 +1254,26 @@ func TestNewRowsWithColumnDefinition(t *testing.T) {
 		t.Error("NewRows failed")
 	}
 }
+
+func TestExpectReset(t *testing.T) {
+	mock, err := NewConn()
+	if err != nil {
+		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	defer mock.Close(context.Background())
+
+	// Successful scenario
+	mock.ExpectReset()
+	mock.Reset()
+	err = mock.ExpectationsWereMet()
+	if err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
+
+	// Unsuccessful scenario
+	mock.ExpectReset()
+	err = mock.ExpectationsWereMet()
+	if err == nil {
+		t.Error("was expecting an error, but there was none")
+	}
+}
