@@ -913,5 +913,4 @@ func (c *pgxmock) Reset() {
 	}
 	expected.triggered = true
 	expected.Unlock()
-	return
 }
