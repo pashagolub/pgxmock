@@ -1256,14 +1256,14 @@ func TestNewRowsWithColumnDefinition(t *testing.T) {
 }
 
 func TestExpectReset(t *testing.T) {
-	mock, err := NewConn()
+	mock, err := NewPool()
 	if err != nil {
 		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
 	}
-	defer mock.Close(context.Background())
+	defer mock.Close()
 
 	// Successful scenario
-	mock.ExpectReset()
+	_ = mock.ExpectReset()
 	mock.Reset()
 	err = mock.ExpectationsWereMet()
 	if err != nil {
