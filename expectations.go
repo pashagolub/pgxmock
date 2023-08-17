@@ -421,27 +421,6 @@ type ExpectedCopyFrom struct {
 	delay             time.Duration
 }
 
-// ExpectedReset is used to manage pgx.Reset expectation
-type ExpectedReset struct {
-	commonExpectation
-}
-
-func (e *ExpectedReset) fulfilled() bool {
-	return e.triggered
-}
-
-func (e *ExpectedReset) Lock() {
-	e.Mutex.Lock()
-}
-
-func (e *ExpectedReset) Unlock() {
-	e.Mutex.Unlock()
-}
-
-func (e *ExpectedReset) String() string {
-	return "ExpectedReset => expecting database Reset"
-}
-
 // WillReturnError allows to set an error for expected database exec action
 func (e *ExpectedCopyFrom) WillReturnError(err error) *ExpectedCopyFrom {
 	e.err = err
@@ -475,4 +454,13 @@ func (e *ExpectedCopyFrom) String() string {
 func (e *ExpectedCopyFrom) WillReturnResult(result int64) *ExpectedCopyFrom {
 	e.rowsAffected = result
 	return e
+}
+
+// ExpectedReset is used to manage pgx.Reset expectation
+type ExpectedReset struct {
+	commonExpectation
+}
+
+func (e *ExpectedReset) String() string {
+	return "ExpectedReset => expecting database Reset"
 }
