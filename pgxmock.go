@@ -63,6 +63,10 @@ type pgxMockIface interface {
 	// the *ExpectedCommit allows to mock database response
 	ExpectCommit() *ExpectedCommit
 
+	// ExpectReset expects pgxpool.Reset() to be called.
+	// The *ExpectedReset allows to mock database response
+	ExpectReset() *ExpectedReset
+
 	// ExpectRollback expects pgx.Tx.Rollback to be called.
 	// the *ExpectedRollback allows to mock database response
 	ExpectRollback() *ExpectedRollback
@@ -119,7 +123,6 @@ type pgxIface interface {
 	Exec(context.Context, string, ...interface{}) (pgconn.CommandTag, error)
 	Query(context.Context, string, ...interface{}) (pgx.Rows, error)
 	QueryRow(context.Context, string, ...interface{}) pgx.Row
-	Reset()
 	Ping(context.Context) error
 	Prepare(context.Context, string, string) (*pgconn.StatementDescription, error)
 	Deallocate(ctx context.Context, name string) error
@@ -131,15 +134,17 @@ type PgxConnIface interface {
 	pgx.Tx
 	Close(ctx context.Context) error
 }
+
 type PgxPoolIface interface {
 	pgxIface
 	pgx.Tx
 	Acquire(ctx context.Context) (*pgxpool.Conn, error)
 	AcquireAllIdle(ctx context.Context) []*pgxpool.Conn
 	AcquireFunc(ctx context.Context, f func(*pgxpool.Conn) error) error
+	AsConn() PgxConnIface
 	Close()
 	Stat() *pgxpool.Stat
-	AsConn() PgxConnIface
+	Reset()
 }
 
 type pgxmock struct {
@@ -160,10 +165,6 @@ func (c *pgxmock) AcquireAllIdle(_ context.Context) []*pgxpool.Conn {
 
 func (c *pgxmock) AcquireFunc(_ context.Context, _ func(*pgxpool.Conn) error) error {
 	return nil
-}
-
-func (c *pgxmock) Reset() {
-
 }
 
 // region Expectations
@@ -247,6 +248,13 @@ func (c *pgxmock) ExpectCopyFrom(expectedTableName pgx.Identifier, expectedColum
 	e := &ExpectedCopyFrom{}
 	e.expectedTableName = expectedTableName
 	e.expectedColumns = expectedColumns
+	c.expected = append(c.expected, e)
+	return e
+}
+
+// ExpectReset expects Reset to be called.
+func (c *pgxmock) ExpectReset() *ExpectedReset {
+	e := &ExpectedReset{}
 	c.expected = append(c.expected, e)
 	return e
 }
@@ -883,4 +891,26 @@ func (c *pgxmock) ping() (*ExpectedPing, error) {
 	expected.triggered = true
 	expected.Unlock()
 	return expected, expected.err
+}
+
+func (c *pgxmock) Reset() {
+	var expected *ExpectedReset
+	var ok bool
+	for _, next := range c.expected {
+		next.Lock()
+		if next.fulfilled() {
+			next.Unlock()
+			continue
+		}
+
+		if expected, ok = next.(*ExpectedReset); ok {
+			break
+		}
+		next.Unlock()
+	}
+	if expected == nil {
+		return
+	}
+	expected.triggered = true
+	expected.Unlock()
 }

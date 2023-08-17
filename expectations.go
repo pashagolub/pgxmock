@@ -455,3 +455,12 @@ func (e *ExpectedCopyFrom) WillReturnResult(result int64) *ExpectedCopyFrom {
 	e.rowsAffected = result
 	return e
 }
+
+// ExpectedReset is used to manage pgx.Reset expectation
+type ExpectedReset struct {
+	commonExpectation
+}
+
+func (e *ExpectedReset) String() string {
+	return "ExpectedReset => expecting database Reset"
+}
