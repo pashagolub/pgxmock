@@ -125,7 +125,6 @@ type pgxIface interface {
 	QueryRow(context.Context, string, ...interface{}) pgx.Row
 	Ping(context.Context) error
 	Prepare(context.Context, string, string) (*pgconn.StatementDescription, error)
-	Deallocate(ctx context.Context, name string) error
 	PgConn() *pgconn.PgConn
 }
 
@@ -133,6 +132,7 @@ type PgxConnIface interface {
 	pgxIface
 	pgx.Tx
 	Close(ctx context.Context) error
+	Deallocate(ctx context.Context, name string) error
 }
 
 type PgxPoolIface interface {
