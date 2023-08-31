@@ -13,10 +13,17 @@ import (
 
 // an expectation interface
 type expectation interface {
+	error() error
+	required() bool
 	fulfilled() bool
-	Lock()
-	Unlock()
-	String() string
+	fulfill()
+	sync.Locker
+	fmt.Stringer
+}
+
+type CallModifyer interface {
+	Maybe() CallModifyer
+	Times(n int) CallModifyer
 }
 
 // common expectation struct
@@ -25,10 +32,36 @@ type commonExpectation struct {
 	sync.Mutex
 	triggered bool
 	err       error
+	optional  bool
+	seqCalls  int //how many sequentional calls should be made
+
+}
+
+func (e *commonExpectation) error() error {
+	return e.err
+}
+
+func (e *commonExpectation) fulfill() {
+	e.triggered = true
+	return
 }
 
 func (e *commonExpectation) fulfilled() bool {
 	return e.triggered
+}
+
+func (e *commonExpectation) required() bool {
+	return !e.optional
+}
+
+func (e *commonExpectation) Maybe() CallModifyer {
+	e.optional = true
+	return e
+}
+
+func (e *commonExpectation) Times(n int) CallModifyer {
+	e.seqCalls = n
+	return e
 }
 
 // ExpectedClose is used to manage pgx.Close expectation

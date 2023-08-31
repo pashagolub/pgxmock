@@ -11,6 +11,24 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+func TestCallModifier(t *testing.T) {
+	mock, _ := NewConn()
+	f := func() {
+		err := mock.ExpectationsWereMet()
+		if err != nil {
+			t.Errorf("expectation were not met: %s", err)
+		}
+	}
+
+	mock.ExpectPing().WillDelayFor(time.Second).Maybe()
+	f() //should produce no error since Ping() call is optional
+
+	if err := mock.Ping(context.Background()); err != nil {
+		t.Errorf("unexpected error: %s", err)
+	}
+	f() //should produce no error since Ping() was called actually
+}
+
 func TestCopyFromBug(t *testing.T) {
 	mock, _ := NewConn()
 	defer func() {
@@ -50,7 +68,7 @@ func TestUnmonitoredPing(t *testing.T) {
 }
 
 func TestUnexpectedPing(t *testing.T) {
-	mock, _ := NewConn(MonitorPingsOption(true))
+	mock, _ := NewConn()
 	err := mock.Ping(context.Background())
 	if err == nil {
 		t.Error("Ping should return error for unexpected call")
@@ -89,7 +107,7 @@ func TestUnexpectedCopyFrom(t *testing.T) {
 }
 
 func TestBuildQuery(t *testing.T) {
-	mock, _ := NewConn(MonitorPingsOption(true))
+	mock, _ := NewConn()
 	query := `
 		SELECT
 			name,

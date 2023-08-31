@@ -14,7 +14,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"reflect"
 	"time"
 
@@ -150,9 +149,7 @@ type PgxPoolIface interface {
 type pgxmock struct {
 	ordered      bool
 	queryMatcher QueryMatcher
-	monitorPings bool
-
-	expected []expectation
+	expected     []expectation
 }
 
 func (c *pgxmock) Config() *pgxpool.Config {
@@ -181,7 +178,7 @@ func (c *pgxmock) MatchExpectationsInOrder(b bool) {
 func (c *pgxmock) ExpectationsWereMet() error {
 	for _, e := range c.expected {
 		e.Lock()
-		fulfilled := e.fulfilled()
+		fulfilled := e.fulfilled() || !e.required()
 		e.Unlock()
 
 		if !fulfilled {
@@ -260,10 +257,6 @@ func (c *pgxmock) ExpectReset() *ExpectedReset {
 }
 
 func (c *pgxmock) ExpectPing() *ExpectedPing {
-	if !c.monitorPings {
-		log.Println("ExpectPing will have no effect as monitoring pings is disabled. Use MonitorPingsOption to enable.")
-		return nil
-	}
 	e := &ExpectedPing{}
 	c.expected = append(c.expected, e)
 	return e
@@ -313,60 +306,22 @@ func (c *pgxmock) open(options []func(*pgxmock) error) error {
 			return err
 		}
 	}
-	// if c.converter == nil {
-	// 	c.converter = driver.DefaultParameterConverter
-	// }
+
 	if c.queryMatcher == nil {
 		c.queryMatcher = QueryMatcherRegexp
 	}
 
-	if c.monitorPings {
-		// We call Ping on the driver shortly to verify startup assertions by
-		// driving internal behaviour of the sql standard library. We don't
-		// want this call to ping to be monitored for expectation purposes so
-		// temporarily disable.
-		c.monitorPings = false
-		defer func() { c.monitorPings = true }()
-	}
-	return c.Ping(context.TODO())
+	return nil
 }
 
 // Close a mock database driver connection. It may or may not
 // be called depending on the circumstances, but if it is called
 // there must be an *ExpectedClose expectation satisfied.
-func (c *pgxmock) close(context.Context) error {
-	var expected *ExpectedClose
-	var fulfilled int
-	var ok bool
-	for _, next := range c.expected {
-		next.Lock()
-		if next.fulfilled() {
-			next.Unlock()
-			fulfilled++
-			continue
-		}
-
-		if expected, ok = next.(*ExpectedClose); ok {
-			break
-		}
-
-		next.Unlock()
-		if c.ordered {
-			return fmt.Errorf("call to database Close, was not expected, next expectation is: %s", next)
-		}
+func (c *pgxmock) close(ctx context.Context) error {
+	if _, err := findExpectation[*ExpectedClose](c, "Close()"); err != nil {
+		return err
 	}
-
-	if expected == nil {
-		msg := "call to database Close was not expected"
-		if fulfilled == len(c.expected) {
-			msg = "all expectations were already fulfilled, " + msg
-		}
-		return fmt.Errorf(msg)
-	}
-
-	expected.triggered = true
-	expected.Unlock()
-	return expected.err
+	return ctx.Err()
 }
 
 func (c *pgxmock) Conn() *pgx.Conn {
@@ -581,75 +536,15 @@ func (c *pgxmock) Deallocate(ctx context.Context, name string) error {
 }
 
 func (c *pgxmock) Commit(ctx context.Context) error {
-	var expected *ExpectedCommit
-	var fulfilled int
-	var ok bool
-	for _, next := range c.expected {
-		next.Lock()
-		if next.fulfilled() {
-			next.Unlock()
-			fulfilled++
-			continue
-		}
-
-		if expected, ok = next.(*ExpectedCommit); ok {
-			break
-		}
-
-		next.Unlock()
-		if c.ordered {
-			return fmt.Errorf("call to Commit transaction, was not expected, next expectation is: %s", next)
-		}
-	}
-	if expected == nil {
-		msg := "call to Commit transaction was not expected"
-		if fulfilled == len(c.expected) {
-			msg = "all expectations were already fulfilled, " + msg
-		}
-		return fmt.Errorf(msg)
-	}
-
-	expected.triggered = true
-	expected.Unlock()
-	if expected.err != nil {
-		return expected.err
+	if _, err := findExpectation[*ExpectedCommit](c, "Commit()"); err != nil {
+		return err
 	}
 	return ctx.Err()
 }
 
 func (c *pgxmock) Rollback(ctx context.Context) error {
-	var expected *ExpectedRollback
-	var fulfilled int
-	var ok bool
-	for _, next := range c.expected {
-		next.Lock()
-		if next.fulfilled() {
-			next.Unlock()
-			fulfilled++
-			continue
-		}
-
-		if expected, ok = next.(*ExpectedRollback); ok {
-			break
-		}
-
-		next.Unlock()
-		if c.ordered {
-			return fmt.Errorf("call to Rollback transaction, was not expected, next expectation is: %s", next)
-		}
-	}
-	if expected == nil {
-		msg := "call to Rollback transaction was not expected"
-		if fulfilled == len(c.expected) {
-			msg = "all expectations were already fulfilled, " + msg
-		}
-		return fmt.Errorf(msg)
-	}
-
-	expected.triggered = true
-	expected.Unlock()
-	if expected.err != nil {
-		return expected.err
+	if _, err := findExpectation[*ExpectedRollback](c, "Rollback()"); err != nil {
+		return err
 	}
 	return ctx.Err()
 }
@@ -842,11 +737,7 @@ func (c *pgxmock) exec(query string, args []interface{}) (*ExpectedExec, error) 
 
 // Implement the "Pinger" interface - the explicit DB driver ping was only added to database/sql in Go 1.8
 func (c *pgxmock) Ping(ctx context.Context) error {
-	if !c.monitorPings {
-		return nil
-	}
-
-	ex, err := c.ping()
+	ex, err := findExpectation[*ExpectedPing](c, "Ping()")
 	if ex != nil {
 		select {
 		case <-ctx.Done():
@@ -854,12 +745,16 @@ func (c *pgxmock) Ping(ctx context.Context) error {
 		case <-time.After(ex.delay):
 		}
 	}
-
 	return err
 }
 
-func (c *pgxmock) ping() (*ExpectedPing, error) {
-	var expected *ExpectedPing
+type ExpectationType[t any] interface {
+	*t
+	expectation
+}
+
+func findExpectation[ET ExpectationType[t], t any](c *pgxmock, method string) (ET, error) {
+	var expected ET
 	var fulfilled int
 	var ok bool
 	for _, next := range c.expected {
@@ -870,47 +765,29 @@ func (c *pgxmock) ping() (*ExpectedPing, error) {
 			continue
 		}
 
-		if expected, ok = next.(*ExpectedPing); ok {
+		if expected, ok = next.(ET); ok {
 			break
 		}
 
 		next.Unlock()
 		if c.ordered {
-			return nil, fmt.Errorf("call to database Ping, was not expected, next expectation is: %s", next)
+			return nil, fmt.Errorf("call to method %s, was not expected, next expectation is: %s", method, next)
 		}
 	}
 
 	if expected == nil {
-		msg := "call to database Ping was not expected"
+		msg := fmt.Sprintf("call to method %s was not expected", method)
 		if fulfilled == len(c.expected) {
 			msg = "all expectations were already fulfilled, " + msg
 		}
 		return nil, fmt.Errorf(msg)
 	}
 
-	expected.triggered = true
+	expected.fulfill()
 	expected.Unlock()
-	return expected, expected.err
+	return expected, expected.error()
 }
 
 func (c *pgxmock) Reset() {
-	var expected *ExpectedReset
-	var ok bool
-	for _, next := range c.expected {
-		next.Lock()
-		if next.fulfilled() {
-			next.Unlock()
-			continue
-		}
-
-		if expected, ok = next.(*ExpectedReset); ok {
-			break
-		}
-		next.Unlock()
-	}
-	if expected == nil {
-		return
-	}
-	expected.triggered = true
-	expected.Unlock()
+	_, _ = findExpectation[*ExpectedReset](c, "Reset()")
 }
