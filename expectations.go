@@ -171,7 +171,6 @@ func (e *ExpectedCommit) String() string {
 type ExpectedExec struct {
 	queryBasedExpectation
 	result pgconn.CommandTag
-	delay  time.Duration
 }
 
 // WithArgs will match given expected args to actual database exec operation arguments.
