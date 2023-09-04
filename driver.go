@@ -12,10 +12,7 @@ type pgxmockConn struct {
 }
 
 // NewConn creates PgxConnIface database connection and a mock to manage expectations.
-// Accepts options, like ValueConverterOption, to use a ValueConverter from
-// a specific driver.
-// Pings db so that all expectations could be
-// asserted.
+// Accepts options, like QueryMatcherOption, to match SQL query strings in more sophisticated ways.
 func NewConn(options ...func(*pgxmock) error) (PgxConnIface, error) {
 	smock := &pgxmockConn{}
 	smock.ordered = true
@@ -31,10 +28,7 @@ type pgxmockPool struct {
 }
 
 // NewPool creates PgxPoolIface pool of database connections and a mock to manage expectations.
-// Accepts options, like ValueConverterOption, to use a ValueConverter from
-// a specific driver.
-// Pings db so that all expectations could be
-// asserted.
+// Accepts options, like QueryMatcherOption, to match SQL query strings in more sophisticated ways.
 func NewPool(options ...func(*pgxmock) error) (PgxPoolIface, error) {
 	smock := &pgxmockPool{}
 	smock.ordered = true
