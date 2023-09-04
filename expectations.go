@@ -201,9 +201,8 @@ func (e *ExpectedExec) String() string {
 }
 
 // WillReturnResult arranges for an expected Exec() to return a particular
-// result, there is pgxmock.NewResult(lastInsertID int64, affectedRows int64) method
-// to build a corresponding result. Or if actions needs to be tested against errors
-// pgxmock.NewErrorResult(err error) to return a given error.
+// result, there is pgxmock.NewResult(op string, rowsAffected int64) method
+// to build a corresponding result.
 func (e *ExpectedExec) WillReturnResult(result pgconn.CommandTag) *ExpectedExec {
 	e.result = result
 	return e
