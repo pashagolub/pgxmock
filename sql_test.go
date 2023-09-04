@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	pgxmock "github.com/pashagolub/pgxmock/v2"
+	pgxmock "github.com/pashagolub/pgxmock/v3"
 )
 
 func TestScanTime(t *testing.T) {
