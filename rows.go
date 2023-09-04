@@ -23,9 +23,9 @@ var CSVColumnParser = func(s string) interface{} {
 }
 
 type rowSets struct {
-	sets []*Rows
-	pos  int
-	ex   *ExpectedQuery
+	sets     []*Rows
+	RowSetNo int
+	ex       *ExpectedQuery
 }
 
 func (rs *rowSets) Conn() *pgx.Conn {
@@ -33,16 +33,16 @@ func (rs *rowSets) Conn() *pgx.Conn {
 }
 
 func (rs *rowSets) Err() error {
-	r := rs.sets[rs.pos]
-	return r.nextErr[r.pos-1]
+	r := rs.sets[rs.RowSetNo]
+	return r.nextErr[r.recNo-1]
 }
 
 func (rs *rowSets) CommandTag() pgconn.CommandTag {
-	return rs.sets[rs.pos].commandTag
+	return rs.sets[rs.RowSetNo].commandTag
 }
 
 func (rs *rowSets) FieldDescriptions() []pgconn.FieldDescription {
-	return rs.sets[rs.pos].defs
+	return rs.sets[rs.RowSetNo].defs
 }
 
 // func (rs *rowSets) Columns() []string {
@@ -56,21 +56,21 @@ func (rs *rowSets) Close() {
 
 // advances to next row
 func (rs *rowSets) Next() bool {
-	r := rs.sets[rs.pos]
-	r.pos++
-	return r.pos <= len(r.rows)
+	r := rs.sets[rs.RowSetNo]
+	r.recNo++
+	return r.recNo <= len(r.rows)
 }
 
 // Values returns the decoded row values. As with Scan(), it is an error to
 // call Values without first calling Next() and checking that it returned
 // true.
 func (rs *rowSets) Values() ([]interface{}, error) {
-	r := rs.sets[rs.pos]
-	return r.rows[r.pos-1], r.nextErr[r.pos-1]
+	r := rs.sets[rs.RowSetNo]
+	return r.rows[r.recNo-1], r.nextErr[r.recNo-1]
 }
 
 func (rs *rowSets) Scan(dest ...interface{}) error {
-	r := rs.sets[rs.pos]
+	r := rs.sets[rs.RowSetNo]
 	if len(dest) == 1 {
 		if rc, ok := dest[0].(pgx.RowScanner); ok {
 			return rc.ScanRow(rs)
@@ -82,7 +82,7 @@ func (rs *rowSets) Scan(dest ...interface{}) error {
 	if len(r.rows) == 0 {
 		return pgx.ErrNoRows
 	}
-	for i, col := range r.rows[r.pos-1] {
+	for i, col := range r.rows[r.recNo-1] {
 		if dest[i] == nil {
 			//behave compatible with pgx
 			continue
@@ -116,14 +116,14 @@ func (rs *rowSets) Scan(dest ...interface{}) error {
 
 		}
 	}
-	return r.nextErr[r.pos-1]
+	return r.nextErr[r.recNo-1]
 }
 
 func (rs *rowSets) RawValues() [][]byte {
-	r := rs.sets[rs.pos]
+	r := rs.sets[rs.RowSetNo]
 	dest := make([][]byte, len(r.defs))
 
-	for i, col := range r.rows[r.pos-1] {
+	for i, col := range r.rows[r.recNo-1] {
 		if b, ok := rawBytes(col); ok {
 			dest[i] = b
 			continue
@@ -137,23 +137,23 @@ func (rs *rowSets) RawValues() [][]byte {
 // transforms to debuggable printable string
 func (rs *rowSets) String() string {
 	if rs.empty() {
-		return "with empty rows"
+		return "\t- returns no data"
 	}
 
-	msg := "should return rows:\n"
+	msg := "\t- returns data:\n"
 	if len(rs.sets) == 1 {
 		for n, row := range rs.sets[0].rows {
-			msg += fmt.Sprintf("    row %d - %+v\n", n, row)
+			msg += fmt.Sprintf("\t\trow %d - %+v\n", n, row)
 		}
-		return strings.TrimSpace(msg)
+		return msg
 	}
 	for i, set := range rs.sets {
-		msg += fmt.Sprintf("    result set: %d\n", i)
+		msg += fmt.Sprintf("\t\tresult set: %d\n", i)
 		for n, row := range set.rows {
-			msg += fmt.Sprintf("      row %d - %+v\n", n, row)
+			msg += fmt.Sprintf("\t\t\trow %d: %+v\n", n, row)
 		}
 	}
-	return strings.TrimSpace(msg)
+	return msg
 }
 
 func (rs *rowSets) empty() bool {
@@ -182,7 +182,7 @@ type Rows struct {
 	commandTag pgconn.CommandTag
 	defs       []pgconn.FieldDescription
 	rows       [][]interface{}
-	pos        int
+	recNo      int
 	nextErr    map[int]error
 	closeErr   error
 }

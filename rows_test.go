@@ -225,15 +225,16 @@ func ExampleRows_expectToBeClosed() {
 		fmt.Println("got error:", err)
 	}
 
-	// Output: got error: expected query rows to be closed, but it was not: ExpectedQuery => expecting Query, QueryContext or QueryRow which:
-	//   - matches sql: 'SELECT'
-	//   - is without arguments
-	//   - should return rows:
-	//     result set: 0
-	//       row 0 - [1 john]
-	//     result set: 1
-	//       row 0 - [1 john]
-	//       row 1 - [2 anna]
+	/*Output: got error: expected query rows to be closed, but it was not: ExpectedQuery => expecting call to Query() or to QueryRow():
+	- matches sql: 'SELECT'
+	- is without arguments
+	- returns data:
+		result set: 0
+			row 0: [1 john]
+		result set: 1
+			row 0: [1 john]
+			row 1: [2 anna]
+	*/
 }
 
 func ExampleRows_customDriverValue() {
