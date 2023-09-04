@@ -748,5 +748,4 @@ func (c *pgxmock) Reset() {
 		return
 	}
 	_ = ex.waitForDelay(context.Background())
-	return
 }

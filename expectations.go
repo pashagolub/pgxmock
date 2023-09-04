@@ -49,7 +49,6 @@ func (e *commonExpectation) error() error {
 
 func (e *commonExpectation) fulfill() {
 	e.triggered = true
-	return
 }
 
 func (e *commonExpectation) fulfilled() bool {
