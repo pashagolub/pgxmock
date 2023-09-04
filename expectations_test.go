@@ -51,19 +51,24 @@ func TestCopyFromBug(t *testing.T) {
 
 func ExampleExpectedExec() {
 	mock, _ := NewConn()
-	result := NewErrorResult(fmt.Errorf("some error"))
-	mock.ExpectExec("^INSERT (.+)").WillReturnResult(result)
+	ex := mock.ExpectExec("^INSERT (.+)").WillReturnResult(NewResult("INSERT", 15))
+	ex.WillDelayFor(time.Second)
+	fmt.Print(ex)
 	res, _ := mock.Exec(context.Background(), "INSERT something")
-	s := res.String()
-	fmt.Println(s)
-	// Output: some error
+	fmt.Println(res)
+	// Output: ExpectedExec => expecting call to Exec():
+	// 	- matches sql: '^INSERT (.+)'
+	// 	- is without arguments
+	// 	- returns result: INSERT 15
+	// 	- delayed execution for: 1s
+	// INSERT 15
 }
 
 func TestUnmonitoredPing(t *testing.T) {
 	mock, _ := NewConn()
 	p := mock.ExpectPing()
-	if p != nil {
-		t.Error("ExpectPing should return nil since MonitorPingsOption = false ")
+	if p == nil {
+		t.Error("ExpectPing should return *ExpectedPing")
 	}
 }
 

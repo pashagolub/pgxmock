@@ -273,8 +273,8 @@ func TestPrepareExpectations(t *testing.T) {
 	defer mock.Close(context.Background())
 
 	mock.ExpectPrepare("foo", "SELECT (.+) FROM articles WHERE id = ?").
-		WillDelayFor(1 * time.Second).
-		WillReturnCloseError(errors.New("invaders must die"))
+		WillReturnCloseError(errors.New("invaders must die")).
+		WillDelayFor(1 * time.Second)
 
 	stmt, err := mock.Prepare(context.Background(), "foo", "SELECT (.+) FROM articles WHERE id = $1")
 	if err != nil {
@@ -1034,6 +1034,7 @@ func TestExpectedCloseOrder(t *testing.T) {
 	}
 	defer mock.Close(context.Background())
 	mock.ExpectClose().WillReturnError(fmt.Errorf("Close failed"))
+	t.Log()
 	_, _ = mock.Begin(context.Background())
 	if err := mock.ExpectationsWereMet(); err == nil {
 		t.Error("expected error on ExpectationsWereMet")
@@ -1062,7 +1063,7 @@ func TestPreparedStatementCloseExpectation(t *testing.T) {
 	}
 	defer mock.Close(context.Background())
 
-	ep := mock.ExpectPrepare("foo", "INSERT INTO ORDERS").WillBeClosed()
+	ep := mock.ExpectPrepare("foo", "INSERT INTO ORDERS").WillBeDeallocated()
 	ep.ExpectExec().WithArgs(AnyArg(), AnyArg()).WillReturnResult(NewResult("UPDATE", 1))
 
 	_, err = mock.Prepare(context.Background(), "foo", "INSERT INTO ORDERS(ID, STATUS) VALUES (?, ?)")
@@ -1094,8 +1095,8 @@ func TestExecExpectationErrorDelay(t *testing.T) {
 	// test that return of error is delayed
 	delay := time.Millisecond * 100
 	mock.ExpectExec("^INSERT INTO articles").WithArgs(AnyArg()).
-		WillReturnError(errors.New("slow fail")).
-		WillDelayFor(delay)
+		WillDelayFor(delay).
+		WillReturnError(errors.New("slow fail"))
 
 	start := time.Now()
 	res, err := mock.Exec(context.Background(), "INSERT INTO articles (title) VALUES (?)", "hello")
@@ -1172,9 +1173,9 @@ func TestQueryWithTimeout(t *testing.T) {
 	rs := NewRows([]string{"id", "title"}).FromCSVString("5,hello world")
 
 	mock.ExpectQuery("SELECT (.+) FROM articles WHERE id = ?").
-		WillDelayFor(50 * time.Millisecond). // Query will take longer than timeout
 		WithArgs(5).
-		WillReturnRows(rs)
+		WillReturnRows(rs).
+		WillDelayFor(50 * time.Millisecond) // Query will take longer than timeout
 
 	_, err = queryWithTimeout(10*time.Millisecond, mock, "SELECT (.+) FROM articles WHERE id = ?", 5)
 	if err == nil {

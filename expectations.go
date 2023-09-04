@@ -1,6 +1,8 @@
 package pgxmock
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -11,8 +13,8 @@ import (
 	pgconn "github.com/jackc/pgx/v5/pgconn"
 )
 
-// an expectation interface
-type expectation interface {
+// an Expectation interface
+type Expectation interface {
 	error() error
 	required() bool
 	fulfilled() bool
@@ -24,17 +26,21 @@ type expectation interface {
 type CallModifyer interface {
 	Maybe() CallModifyer
 	Times(n int) CallModifyer
+	WillDelayFor(duration time.Duration) CallModifyer
+	WillReturnError(err error)
+	WillPanic(v any)
 }
 
 // common expectation struct
 // satisfies the expectation interface
 type commonExpectation struct {
 	sync.Mutex
-	triggered bool
-	err       error
-	optional  bool
-	seqCalls  int //how many sequentional calls should be made
-
+	triggered bool          // if mettod called
+	err       error         // should method return error
+	panic     any           // panic value to return for recovery
+	delay     time.Duration // should method delay before return
+	optional  bool          // can method be skipped
+	calls     int           // how many sequentional calls should be made
 }
 
 func (e *commonExpectation) error() error {
@@ -54,14 +60,72 @@ func (e *commonExpectation) required() bool {
 	return !e.optional
 }
 
+func (e *commonExpectation) waitForDelay(ctx context.Context) (err error) {
+	select {
+	case <-time.After(e.delay):
+		err = e.error()
+	case <-ctx.Done():
+		err = ctx.Err()
+	}
+	if e.panic != nil {
+		panic(e.panic)
+	}
+	return err
+}
+
+// Maybe allows the expected method call to be optional.
+// Not calling an optional method will not cause an error while asserting expectations
 func (e *commonExpectation) Maybe() CallModifyer {
 	e.optional = true
 	return e
 }
 
+// Times indicates that that the expected method should only fire the indicated number of times
 func (e *commonExpectation) Times(n int) CallModifyer {
-	e.seqCalls = n
+	e.calls = n
 	return e
+}
+
+// WillDelayFor allows to specify duration for which it will delay
+// result. May be used together with Context
+func (e *commonExpectation) WillDelayFor(duration time.Duration) CallModifyer {
+	e.delay = duration
+	return e
+}
+
+// WillReturnError allows to set an error for the expected method
+func (e *commonExpectation) WillReturnError(err error) {
+	e.err = err
+}
+
+var errPanic = errors.New("pgxmock panic")
+
+// WillPanic allows to force the expected method to panic
+func (e *commonExpectation) WillPanic(v any) {
+	e.err = errPanic
+	e.panic = v
+}
+
+// String returns string representation
+func (e *commonExpectation) String() string {
+	w := new(strings.Builder)
+	if e.err != nil {
+		if e.err != errPanic {
+			fmt.Fprintf(w, "\t- returns error: %v\n", e.err)
+		} else {
+			fmt.Fprintf(w, "\t- panics with: %v\n", e.panic)
+		}
+	}
+	if e.delay > 0 {
+		fmt.Fprintf(w, "\t- delayed execution for: %v\n", e.delay)
+	}
+	if e.optional {
+		fmt.Fprint(w, "\t- execution is optional\n")
+	}
+	if e.calls > 0 {
+		fmt.Fprintf(w, "\t- execution calls awaited: %d\n", e.calls)
+	}
+	return w.String()
 }
 
 // ExpectedClose is used to manage pgx.Close expectation
@@ -70,49 +134,25 @@ type ExpectedClose struct {
 	commonExpectation
 }
 
-// WillReturnError allows to set an error for pgx.Close action
-func (e *ExpectedClose) WillReturnError(err error) *ExpectedClose {
-	e.err = err
-	return e
-}
-
 // String returns string representation
 func (e *ExpectedClose) String() string {
-	msg := "ExpectedClose => expecting database Close"
-	if e.err != nil {
-		msg += fmt.Sprintf(", which should return error: %s", e.err)
-	}
-	return msg
+	return "ExpectedClose => expecting call to Close()\n" + e.commonExpectation.String()
 }
 
 // ExpectedBegin is used to manage *pgx.Begin expectation
 // returned by pgxmock.ExpectBegin.
 type ExpectedBegin struct {
 	commonExpectation
-	delay time.Duration
-	opts  pgx.TxOptions
-}
-
-// WillReturnError allows to set an error for pgx.Begin action
-func (e *ExpectedBegin) WillReturnError(err error) *ExpectedBegin {
-	e.err = err
-	return e
+	opts pgx.TxOptions
 }
 
 // String returns string representation
 func (e *ExpectedBegin) String() string {
-	msg := "ExpectedBegin => expecting database transaction Begin"
-	if e.err != nil {
-		msg += fmt.Sprintf(", which should return error: %s", e.err)
+	msg := "ExpectedBegin => expecting call to Begin() or to BeginTx()\n"
+	if e.opts != (pgx.TxOptions{}) {
+		msg += fmt.Sprintf("\t- transaction options awaited: %+v\n", e.opts)
 	}
-	return msg
-}
-
-// WillDelayFor allows to specify duration for which it will delay
-// result. May be used together with Context
-func (e *ExpectedBegin) WillDelayFor(duration time.Duration) *ExpectedBegin {
-	e.delay = duration
-	return e
+	return msg + e.commonExpectation.String()
 }
 
 // ExpectedCommit is used to manage pgx.Tx.Commit expectation
@@ -121,104 +161,9 @@ type ExpectedCommit struct {
 	commonExpectation
 }
 
-// WillReturnError allows to set an error for pgx.Tx.Close action
-func (e *ExpectedCommit) WillReturnError(err error) *ExpectedCommit {
-	e.err = err
-	return e
-}
-
 // String returns string representation
 func (e *ExpectedCommit) String() string {
-	msg := "ExpectedCommit => expecting transaction Commit"
-	if e.err != nil {
-		msg += fmt.Sprintf(", which should return error: %s", e.err)
-	}
-	return msg
-}
-
-// ExpectedRollback is used to manage pgx.Tx.Rollback expectation
-// returned by pgxmock.ExpectRollback.
-type ExpectedRollback struct {
-	commonExpectation
-}
-
-// WillReturnError allows to set an error for pgx.Tx.Rollback action
-func (e *ExpectedRollback) WillReturnError(err error) *ExpectedRollback {
-	e.err = err
-	return e
-}
-
-// String returns string representation
-func (e *ExpectedRollback) String() string {
-	msg := "ExpectedRollback => expecting transaction Rollback"
-	if e.err != nil {
-		msg += fmt.Sprintf(", which should return error: %s", e.err)
-	}
-	return msg
-}
-
-// ExpectedQuery is used to manage *pgx.Conn.Query, *pgx.Conn.QueryRow, *pgx.Tx.Query,
-// *pgx.Tx.QueryRow, *pgx.Stmt.Query or *pgx.Stmt.QueryRow expectations.
-// Returned by pgxmock.ExpectQuery.
-type ExpectedQuery struct {
-	queryBasedExpectation
-	rows             pgx.Rows
-	delay            time.Duration
-	rowsMustBeClosed bool
-	rowsWereClosed   bool
-}
-
-// WithArgs will match given expected args to actual database query arguments.
-// if at least one argument does not match, it will return an error. For specific
-// arguments an pgxmock.Argument interface can be used to match an argument.
-func (e *ExpectedQuery) WithArgs(args ...interface{}) *ExpectedQuery {
-	e.args = args
-	return e
-}
-
-// RowsWillBeClosed expects this query rows to be closed.
-func (e *ExpectedQuery) RowsWillBeClosed() *ExpectedQuery {
-	e.rowsMustBeClosed = true
-	return e
-}
-
-// WillReturnError allows to set an error for expected database query
-func (e *ExpectedQuery) WillReturnError(err error) *ExpectedQuery {
-	e.err = err
-	return e
-}
-
-// WillDelayFor allows to specify duration for which it will delay
-// result. May be used together with Context
-func (e *ExpectedQuery) WillDelayFor(duration time.Duration) *ExpectedQuery {
-	e.delay = duration
-	return e
-}
-
-// String returns string representation
-func (e *ExpectedQuery) String() string {
-	msg := "ExpectedQuery => expecting Query, QueryContext or QueryRow which:"
-	msg += "\n  - matches sql: '" + e.expectSQL + "'"
-
-	if len(e.args) == 0 {
-		msg += "\n  - is without arguments"
-	} else {
-		msg += "\n  - is with arguments:\n"
-		for i, arg := range e.args {
-			msg += fmt.Sprintf("    %d - %+v\n", i, arg)
-		}
-		msg = strings.TrimSpace(msg)
-	}
-
-	if e.rows != nil {
-		msg += fmt.Sprintf("\n  - %s", e.rows)
-	}
-
-	if e.err != nil {
-		msg += fmt.Sprintf("\n  - should return error: %s", e.err)
-	}
-
-	return msg
+	return "ExpectedCommit => expecting call to Tx.Commit()\n" + e.commonExpectation.String()
 }
 
 // ExpectedExec is used to manage pgx.Exec, pgx.Tx.Exec or pgx.Stmt.Exec expectations.
@@ -237,45 +182,24 @@ func (e *ExpectedExec) WithArgs(args ...interface{}) *ExpectedExec {
 	return e
 }
 
-// WillReturnError allows to set an error for expected database exec action
-func (e *ExpectedExec) WillReturnError(err error) *ExpectedExec {
-	e.err = err
-	return e
-}
-
-// WillDelayFor allows to specify duration for which it will delay
-// result. May be used together with Context
-func (e *ExpectedExec) WillDelayFor(duration time.Duration) *ExpectedExec {
-	e.delay = duration
-	return e
-}
-
 // String returns string representation
 func (e *ExpectedExec) String() string {
-	msg := "ExpectedExec => expecting Exec or ExecContext which:"
-	msg += "\n  - matches sql: '" + e.expectSQL + "'"
+	msg := "ExpectedExec => expecting call to Exec():\n"
+	msg += fmt.Sprintf("\t- matches sql: '%s'\n", e.expectSQL)
 
 	if len(e.args) == 0 {
-		msg += "\n  - is without arguments"
+		msg += "\t- is without arguments\n"
 	} else {
-		msg += "\n  - is with arguments:\n"
-		var margs []string
+		msg += "\t- is with arguments:\n"
 		for i, arg := range e.args {
-			margs = append(margs, fmt.Sprintf("    %d - %+v", i, arg))
+			msg += fmt.Sprintf("\t\t%d - %+v\n", i, arg)
 		}
-		msg += strings.Join(margs, "\n")
 	}
-
 	if e.result.String() > "" {
-		msg += "\n  - should return Result having:"
-		msg += fmt.Sprintf("\n      RowsAffected: %d", e.result.RowsAffected())
+		msg += fmt.Sprintf("\t- returns result: %s\n", e.result)
 	}
 
-	if e.err != nil {
-		msg += fmt.Sprintf("\n  - should return error: %s", e.err)
-	}
-
-	return msg
+	return msg + e.commonExpectation.String()
 }
 
 // WillReturnResult arranges for an expected Exec() to return a particular
@@ -294,34 +218,25 @@ type ExpectedPrepare struct {
 	mock           *pgxmock
 	expectStmtName string
 	expectSQL      string
-	closeErr       error
+	deallocateErr  error
 	mustBeClosed   bool
-	wasClosed      bool
-	delay          time.Duration
-}
-
-// WillReturnError allows to set an error for the expected pgx.Prepare or pgx.Tx.Prepare action.
-func (e *ExpectedPrepare) WillReturnError(err error) *ExpectedPrepare {
-	e.err = err
-	return e
+	deallocated    bool
 }
 
 // WillReturnCloseError allows to set an error for this prepared statement Close action
 func (e *ExpectedPrepare) WillReturnCloseError(err error) *ExpectedPrepare {
-	e.closeErr = err
+	e.deallocateErr = err
 	return e
 }
 
-// WillDelayFor allows to specify duration for which it will delay
-// result. May be used together with Context
-func (e *ExpectedPrepare) WillDelayFor(duration time.Duration) *ExpectedPrepare {
-	e.delay = duration
-	return e
-}
-
-// WillBeClosed expects this prepared statement to
-// be closed.
+// WillBeClosed is for backward compatibility only and will be removed soon.
+// One should use WillBeDeallocated() instead
 func (e *ExpectedPrepare) WillBeClosed() *ExpectedPrepare {
+	return e.WillBeDeallocated()
+}
+
+// WillBeDeallocated expects this prepared statement to be deallocated
+func (e *ExpectedPrepare) WillBeDeallocated() *ExpectedPrepare {
 	e.mustBeClosed = true
 	return e
 }
@@ -331,7 +246,6 @@ func (e *ExpectedPrepare) WillBeClosed() *ExpectedPrepare {
 func (e *ExpectedPrepare) ExpectQuery() *ExpectedQuery {
 	eq := &ExpectedQuery{}
 	eq.expectSQL = e.expectStmtName
-	// eq.converter = e.mock.converter
 	e.mock.expected = append(e.mock.expected, eq)
 	return eq
 }
@@ -341,26 +255,30 @@ func (e *ExpectedPrepare) ExpectQuery() *ExpectedQuery {
 func (e *ExpectedPrepare) ExpectExec() *ExpectedExec {
 	eq := &ExpectedExec{}
 	eq.expectSQL = e.expectStmtName
-	// eq.converter = e.mock.converter
 	e.mock.expected = append(e.mock.expected, eq)
 	return eq
 }
 
 // String returns string representation
 func (e *ExpectedPrepare) String() string {
-	msg := "ExpectedPrepare => expecting Prepare statement which:"
-	msg += "\n  - matches statement name: '" + e.expectStmtName + "'"
-	msg += "\n  - matches sql: '" + e.expectSQL + "'"
-
-	if e.err != nil {
-		msg += fmt.Sprintf("\n  - should return error: %s", e.err)
+	msg := "ExpectedPrepare => expecting call to Prepare():"
+	msg += fmt.Sprintf("\t- matches statement name: '%s'", e.expectStmtName)
+	msg += fmt.Sprintf("\t- matches sql: '%s'\n", e.expectSQL)
+	if e.deallocateErr != nil {
+		msg += fmt.Sprintf("\t- returns error on Close: %s", e.deallocateErr)
 	}
+	return msg + e.commonExpectation.String()
+}
 
-	if e.closeErr != nil {
-		msg += fmt.Sprintf("\n  - should return error on Close: %s", e.closeErr)
-	}
+// ExpectedPing is used to manage Ping() expectations
+type ExpectedPing struct {
+	commonExpectation
+}
 
-	return msg
+// String returns string representation
+func (e *ExpectedPing) String() string {
+	msg := "ExpectedPing => expecting call to Ping()\n"
+	return msg + e.commonExpectation.String()
 }
 
 // query based expectation
@@ -368,44 +286,7 @@ func (e *ExpectedPrepare) String() string {
 type queryBasedExpectation struct {
 	commonExpectation
 	expectSQL string
-	// converter driver.ValueConverter
-	args []interface{}
-}
-
-// ExpectedPing is used to manage pgx.Ping expectations.
-// Returned by pgxmock.ExpectPing.
-type ExpectedPing struct {
-	commonExpectation
-	delay time.Duration
-}
-
-// WillDelayFor allows to specify duration for which it will delay result. May
-// be used together with Context.
-func (e *ExpectedPing) WillDelayFor(duration time.Duration) *ExpectedPing {
-	e.delay = duration
-	return e
-}
-
-// WillReturnError allows to set an error for expected database ping
-func (e *ExpectedPing) WillReturnError(err error) *ExpectedPing {
-	e.err = err
-	return e
-}
-
-// String returns string representation
-func (e *ExpectedPing) String() string {
-	msg := "ExpectedPing => expecting database Ping"
-	if e.err != nil {
-		msg += fmt.Sprintf(", which should return error: %s", e.err)
-	}
-	return msg
-}
-
-// WillReturnRows specifies the set of resulting rows that will be returned
-// by the triggered query
-func (e *ExpectedQuery) WillReturnRows(rows ...*Rows) *ExpectedQuery {
-	e.rows = &rowSets{sets: rows, ex: e}
-	return e
+	args      []interface{}
 }
 
 func (e *queryBasedExpectation) argsMatches(args []interface{}) error {
@@ -444,6 +325,55 @@ func (e *queryBasedExpectation) attemptArgMatch(args []interface{}) (err error) 
 	return
 }
 
+// ExpectedQuery is used to manage *pgx.Conn.Query, *pgx.Conn.QueryRow, *pgx.Tx.Query,
+// *pgx.Tx.QueryRow, *pgx.Stmt.Query or *pgx.Stmt.QueryRow expectations
+type ExpectedQuery struct {
+	queryBasedExpectation
+	rows             pgx.Rows
+	rowsMustBeClosed bool
+	rowsWereClosed   bool
+}
+
+// WithArgs will match given expected args to actual database query arguments.
+// if at least one argument does not match, it will return an error. For specific
+// arguments an pgxmock.Argument interface can be used to match an argument.
+func (e *ExpectedQuery) WithArgs(args ...interface{}) *ExpectedQuery {
+	e.args = args
+	return e
+}
+
+// RowsWillBeClosed expects this query rows to be closed.
+func (e *ExpectedQuery) RowsWillBeClosed() *ExpectedQuery {
+	e.rowsMustBeClosed = true
+	return e
+}
+
+// String returns string representation
+func (e *ExpectedQuery) String() string {
+	msg := "ExpectedQuery => expecting call to Query() or to QueryRow():\n"
+	msg += fmt.Sprintf("\t- matches sql: '%s'\n", e.expectSQL)
+
+	if len(e.args) == 0 {
+		msg += "\t- is without arguments\n"
+	} else {
+		msg += "\t- is with arguments:\n"
+		for i, arg := range e.args {
+			msg += fmt.Sprintf("\t\t%d - %+v\n", i, arg)
+		}
+	}
+	if e.rows != nil {
+		msg += fmt.Sprintf("%s\n", e.rows)
+	}
+	return msg + e.commonExpectation.String()
+}
+
+// WillReturnRows specifies the set of resulting rows that will be returned
+// by the triggered query
+func (e *ExpectedQuery) WillReturnRows(rows ...*Rows) *ExpectedQuery {
+	e.rows = &rowSets{sets: rows, ex: e}
+	return e
+}
+
 // ExpectedCopyFrom is used to manage *pgx.Conn.CopyFrom expectations.
 // Returned by *Pgxmock.ExpectCopyFrom.
 type ExpectedCopyFrom struct {
@@ -451,20 +381,6 @@ type ExpectedCopyFrom struct {
 	expectedTableName pgx.Identifier
 	expectedColumns   []string
 	rowsAffected      int64
-	delay             time.Duration
-}
-
-// WillReturnError allows to set an error for expected database exec action
-func (e *ExpectedCopyFrom) WillReturnError(err error) *ExpectedCopyFrom {
-	e.err = err
-	return e
-}
-
-// WillDelayFor allows to specify duration for which it will delay
-// result. May be used together with Context
-func (e *ExpectedCopyFrom) WillDelayFor(duration time.Duration) *ExpectedCopyFrom {
-	e.delay = duration
-	return e
 }
 
 // String returns string representation
@@ -474,16 +390,13 @@ func (e *ExpectedCopyFrom) String() string {
 	msg += fmt.Sprintf("\n  - matches column names: '%+v'", e.expectedColumns)
 
 	if e.err != nil {
-		msg += fmt.Sprintf("\n  - should return error: %s", e.err)
+		msg += fmt.Sprintf("\n  - should returns error: %s", e.err)
 	}
 
 	return msg
 }
 
-// WillReturnResult arranges for an expected Exec() to return a particular
-// result, there is pgxmock.NewResult(lastInsertID int64, affectedRows int64) method
-// to build a corresponding result. Or if actions needs to be tested against errors
-// pgxmock.NewErrorResult(err error) to return a given error.
+// WillReturnResult arranges for an expected CopyFrom() to return a number of rows affected
 func (e *ExpectedCopyFrom) WillReturnResult(result int64) *ExpectedCopyFrom {
 	e.rowsAffected = result
 	return e
@@ -496,4 +409,19 @@ type ExpectedReset struct {
 
 func (e *ExpectedReset) String() string {
 	return "ExpectedReset => expecting database Reset"
+}
+
+// ExpectedRollback is used to manage pgx.Tx.Rollback expectation
+// returned by pgxmock.ExpectRollback.
+type ExpectedRollback struct {
+	commonExpectation
+}
+
+// String returns string representation
+func (e *ExpectedRollback) String() string {
+	msg := "ExpectedRollback => expecting transaction Rollback"
+	if e.err != nil {
+		msg += fmt.Sprintf(", which should return error: %s", e.err)
+	}
+	return msg
 }
