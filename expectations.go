@@ -35,12 +35,12 @@ type CallModifyer interface {
 // satisfies the expectation interface
 type commonExpectation struct {
 	sync.Mutex
-	triggered int           // how many times method was called
-	err       error         // should method return error
-	panic     any           // panic value to return for recovery
-	delay     time.Duration // should method delay before return
-	optional  bool          // can method be skipped
-	calls     int           // how many sequentional calls should be made
+	triggered     int           // how many times method was called
+	err           error         // should method return error
+	optional      bool          // can method be skipped
+	panicArgument any           // panic value to return for recovery
+	plannedDelay  time.Duration // should method delay before return
+	plannedCalls  int           // how many sequentional calls should be made
 }
 
 func (e *commonExpectation) error() error {
@@ -52,7 +52,7 @@ func (e *commonExpectation) fulfill() {
 }
 
 func (e *commonExpectation) fulfilled() bool {
-	return e.triggered >= e.calls
+	return e.triggered > e.plannedCalls
 }
 
 func (e *commonExpectation) required() bool {
@@ -61,13 +61,13 @@ func (e *commonExpectation) required() bool {
 
 func (e *commonExpectation) waitForDelay(ctx context.Context) (err error) {
 	select {
-	case <-time.After(e.delay):
+	case <-time.After(e.plannedDelay):
 		err = e.error()
 	case <-ctx.Done():
 		err = ctx.Err()
 	}
-	if e.panic != nil {
-		panic(e.panic)
+	if e.panicArgument != nil {
+		panic(e.panicArgument)
 	}
 	return err
 }
@@ -81,14 +81,14 @@ func (e *commonExpectation) Maybe() CallModifyer {
 
 // Times indicates that that the expected method should only fire the indicated number of times
 func (e *commonExpectation) Times(n int) CallModifyer {
-	e.calls = n
+	e.plannedCalls = n
 	return e
 }
 
 // WillDelayFor allows to specify duration for which it will delay
 // result. May be used together with Context
 func (e *commonExpectation) WillDelayFor(duration time.Duration) CallModifyer {
-	e.delay = duration
+	e.plannedDelay = duration
 	return e
 }
 
@@ -102,7 +102,7 @@ var errPanic = errors.New("pgxmock panic")
 // WillPanic allows to force the expected method to panic
 func (e *commonExpectation) WillPanic(v any) {
 	e.err = errPanic
-	e.panic = v
+	e.panicArgument = v
 }
 
 // String returns string representation
@@ -112,17 +112,17 @@ func (e *commonExpectation) String() string {
 		if e.err != errPanic {
 			fmt.Fprintf(w, "\t- returns error: %v\n", e.err)
 		} else {
-			fmt.Fprintf(w, "\t- panics with: %v\n", e.panic)
+			fmt.Fprintf(w, "\t- panics with: %v\n", e.panicArgument)
 		}
 	}
-	if e.delay > 0 {
-		fmt.Fprintf(w, "\t- delayed execution for: %v\n", e.delay)
+	if e.plannedDelay > 0 {
+		fmt.Fprintf(w, "\t- delayed execution for: %v\n", e.plannedDelay)
 	}
 	if e.optional {
 		fmt.Fprint(w, "\t- execution is optional\n")
 	}
-	if e.calls > 0 {
-		fmt.Fprintf(w, "\t- execution calls awaited: %d\n", e.calls)
+	if e.plannedCalls > 0 {
+		fmt.Fprintf(w, "\t- execution calls awaited: %d\n", e.plannedCalls)
 	}
 	return w.String()
 }
