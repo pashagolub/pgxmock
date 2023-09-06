@@ -352,8 +352,10 @@ func (c *pgxmock) copyFrom(tableName pgx.Identifier, columnNames []string) (*Exp
 			if expected, ok = next.(*ExpectedCopyFrom); ok {
 				break
 			}
-
 			next.Unlock()
+			if !ok && !next.required() {
+				continue
+			}
 			return nil, fmt.Errorf("call to CopyFrom statement with table name '%s', was not expected, next expectation is: %s", tableName, next)
 		}
 
@@ -471,8 +473,10 @@ func (c *pgxmock) prepare(name string, query string) (*ExpectedPrepare, error) {
 			if expected, ok = next.(*ExpectedPrepare); ok {
 				break
 			}
-
 			next.Unlock()
+			if !ok && !next.required() {
+				continue
+			}
 			return nil, fmt.Errorf("call to Prepare statement with query '%s', was not expected, next expectation is: %s", query, next)
 		}
 
@@ -564,6 +568,9 @@ func (c *pgxmock) query(query string, args []interface{}) (*ExpectedQuery, error
 				break
 			}
 			next.Unlock()
+			if !ok && !next.required() {
+				continue
+			}
 			return nil, fmt.Errorf("call to Query '%s' with args %+v, was not expected, next expectation is: %s", query, args, next)
 		}
 		if qr, ok := next.(*ExpectedQuery); ok {
@@ -652,6 +659,9 @@ func (c *pgxmock) exec(query string, args []interface{}) (*ExpectedExec, error) 
 				break
 			}
 			next.Unlock()
+			if !ok && !next.required() {
+				continue
+			}
 			return nil, fmt.Errorf("call to Exec '%s' with args %+v, was not expected, next expectation is: %s", query, args, next)
 		}
 		if exec, ok := next.(*ExpectedExec); ok {
@@ -725,6 +735,9 @@ func findExpectation[ET ExpectationType[t], t any](c *pgxmock, method string) (E
 
 		next.Unlock()
 		if c.ordered {
+			if !ok && !next.required() {
+				continue
+			}
 			return nil, fmt.Errorf("call to method %s, was not expected, next expectation is: %s", method, next)
 		}
 	}
