@@ -35,7 +35,7 @@ type CallModifyer interface {
 // satisfies the expectation interface
 type commonExpectation struct {
 	sync.Mutex
-	triggered bool          // if mettod called
+	triggered int           // how many times method was called
 	err       error         // should method return error
 	panic     any           // panic value to return for recovery
 	delay     time.Duration // should method delay before return
@@ -48,11 +48,11 @@ func (e *commonExpectation) error() error {
 }
 
 func (e *commonExpectation) fulfill() {
-	e.triggered = true
+	e.triggered++
 }
 
 func (e *commonExpectation) fulfilled() bool {
-	return e.triggered
+	return e.triggered >= e.calls
 }
 
 func (e *commonExpectation) required() bool {

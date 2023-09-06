@@ -74,15 +74,21 @@ func TestCopyFromBug(t *testing.T) {
 func ExampleExpectedExec() {
 	mock, _ := NewConn()
 	ex := mock.ExpectExec("^INSERT (.+)").WillReturnResult(NewResult("INSERT", 15))
-	ex.WillDelayFor(time.Second)
+	ex.WillDelayFor(time.Second).Maybe().Times(2)
+
 	fmt.Print(ex)
 	res, _ := mock.Exec(ctx, "INSERT something")
+	fmt.Println(res)
+	res, _ = mock.Exec(ctx, "INSERT something")
 	fmt.Println(res)
 	// Output: ExpectedExec => expecting call to Exec():
 	// 	- matches sql: '^INSERT (.+)'
 	// 	- is without arguments
 	// 	- returns result: INSERT 15
 	// 	- delayed execution for: 1s
+	// 	- execution is optional
+	// 	- execution calls awaited: 2
+	// INSERT 15
 	// INSERT 15
 }
 

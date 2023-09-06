@@ -383,7 +383,7 @@ func (c *pgxmock) copyFrom(tableName pgx.Identifier, columnNames []string) (*Exp
 		return nil, fmt.Errorf("CopyFrom: column names '%v' were not expected, expected column names are '%v'", columnNames, expected.expectedColumns)
 	}
 
-	expected.triggered = true
+	expected.fulfill()
 	return expected, nil
 }
 
@@ -439,7 +439,7 @@ func (c *pgxmock) begin(txOptions pgx.TxOptions) (*ExpectedBegin, error) {
 	if expected.opts != txOptions {
 		return nil, fmt.Errorf("Begin: call with transaction options '%v' was not expected, expected name is '%v'", txOptions, expected.opts)
 	}
-	expected.triggered = true
+	expected.fulfill()
 
 	return expected, nil
 }
@@ -504,7 +504,7 @@ func (c *pgxmock) prepare(name string, query string) (*ExpectedPrepare, error) {
 		return nil, fmt.Errorf("Prepare: %v", err)
 	}
 
-	expected.triggered = true
+	expected.fulfill()
 	return expected, nil
 }
 
@@ -604,7 +604,7 @@ func (c *pgxmock) query(query string, args []interface{}) (*ExpectedQuery, error
 		return nil, fmt.Errorf("Query '%s', arguments do not match: %s", query, err)
 	}
 
-	expected.triggered = true
+	expected.fulfill()
 	if expected.err == nil && expected.rows == nil {
 		return nil, fmt.Errorf("Query '%s' with args %+v, must return a pgx.Rows, but it was not set for expectation %T as %+v", query, args, expected, expected)
 	}
@@ -694,7 +694,7 @@ func (c *pgxmock) exec(query string, args []interface{}) (*ExpectedExec, error) 
 		return nil, fmt.Errorf("ExecQuery '%s', arguments do not match: %s", query, err)
 	}
 
-	expected.triggered = true
+	expected.fulfill()
 
 	if expected.result.String() == "" && expected.err == nil {
 		return nil, fmt.Errorf("Exec '%s' with args %+v, must return a pgconn.CommandTag, but it was not set for expectation %T as %+v", query, args, expected, expected)
