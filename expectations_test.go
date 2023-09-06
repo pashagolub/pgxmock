@@ -21,7 +21,10 @@ func TestPanic(t *testing.T) {
 			t.Errorf("expectation were not met: %s", err)
 		}
 	}()
-	mock.ExpectPing().WillPanic("i'm tired")
+
+	ex := mock.ExpectPing()
+	ex.WillPanic("i'm tired")
+	fmt.Println(ex)
 	if err := mock.Ping(context.Background()); err != nil {
 		t.Errorf("unexpected error: %s", err)
 	}

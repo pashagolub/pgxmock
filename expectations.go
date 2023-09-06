@@ -286,7 +286,7 @@ func (e *ExpectedPrepare) WillBeDeallocated() *ExpectedPrepare {
 func (e *ExpectedPrepare) ExpectQuery() *ExpectedQuery {
 	eq := &ExpectedQuery{}
 	eq.expectSQL = e.expectStmtName
-	e.mock.expected = append(e.mock.expected, eq)
+	e.mock.expectations = append(e.mock.expectations, eq)
 	return eq
 }
 
@@ -295,7 +295,7 @@ func (e *ExpectedPrepare) ExpectQuery() *ExpectedQuery {
 func (e *ExpectedPrepare) ExpectExec() *ExpectedExec {
 	eq := &ExpectedExec{}
 	eq.expectSQL = e.expectStmtName
-	e.mock.expected = append(e.mock.expected, eq)
+	e.mock.expectations = append(e.mock.expectations, eq)
 	return eq
 }
 

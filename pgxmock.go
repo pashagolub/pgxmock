@@ -147,7 +147,7 @@ type PgxPoolIface interface {
 type pgxmock struct {
 	ordered      bool
 	queryMatcher QueryMatcher
-	expected     []Expectation
+	expectations []Expectation
 }
 
 func (c *pgxmock) Config() *pgxpool.Config {
@@ -165,7 +165,7 @@ func (c *pgxmock) AcquireFunc(_ context.Context, _ func(*pgxpool.Conn) error) er
 // region Expectations
 func (c *pgxmock) ExpectClose() *ExpectedClose {
 	e := &ExpectedClose{}
-	c.expected = append(c.expected, e)
+	c.expectations = append(c.expectations, e)
 	return e
 }
 
@@ -174,7 +174,7 @@ func (c *pgxmock) MatchExpectationsInOrder(b bool) {
 }
 
 func (c *pgxmock) ExpectationsWereMet() error {
-	for _, e := range c.expected {
+	for _, e := range c.expectations {
 		e.Lock()
 		fulfilled := e.fulfilled() || !e.required()
 		e.Unlock()
@@ -203,31 +203,31 @@ func (c *pgxmock) ExpectationsWereMet() error {
 func (c *pgxmock) ExpectQuery(expectedSQL string) *ExpectedQuery {
 	e := &ExpectedQuery{}
 	e.expectSQL = expectedSQL
-	c.expected = append(c.expected, e)
+	c.expectations = append(c.expectations, e)
 	return e
 }
 
 func (c *pgxmock) ExpectCommit() *ExpectedCommit {
 	e := &ExpectedCommit{}
-	c.expected = append(c.expected, e)
+	c.expectations = append(c.expectations, e)
 	return e
 }
 
 func (c *pgxmock) ExpectRollback() *ExpectedRollback {
 	e := &ExpectedRollback{}
-	c.expected = append(c.expected, e)
+	c.expectations = append(c.expectations, e)
 	return e
 }
 
 func (c *pgxmock) ExpectBegin() *ExpectedBegin {
 	e := &ExpectedBegin{}
-	c.expected = append(c.expected, e)
+	c.expectations = append(c.expectations, e)
 	return e
 }
 
 func (c *pgxmock) ExpectBeginTx(txOptions pgx.TxOptions) *ExpectedBegin {
 	e := &ExpectedBegin{opts: txOptions}
-	c.expected = append(c.expected, e)
+	c.expectations = append(c.expectations, e)
 	return e
 }
 
@@ -235,7 +235,7 @@ func (c *pgxmock) ExpectExec(expectedSQL string) *ExpectedExec {
 	e := &ExpectedExec{}
 	e.expectSQL = expectedSQL
 	// e.converter = c.converter
-	c.expected = append(c.expected, e)
+	c.expectations = append(c.expectations, e)
 	return e
 }
 
@@ -243,26 +243,26 @@ func (c *pgxmock) ExpectCopyFrom(expectedTableName pgx.Identifier, expectedColum
 	e := &ExpectedCopyFrom{}
 	e.expectedTableName = expectedTableName
 	e.expectedColumns = expectedColumns
-	c.expected = append(c.expected, e)
+	c.expectations = append(c.expectations, e)
 	return e
 }
 
 // ExpectReset expects Reset to be called.
 func (c *pgxmock) ExpectReset() *ExpectedReset {
 	e := &ExpectedReset{}
-	c.expected = append(c.expected, e)
+	c.expectations = append(c.expectations, e)
 	return e
 }
 
 func (c *pgxmock) ExpectPing() *ExpectedPing {
 	e := &ExpectedPing{}
-	c.expected = append(c.expected, e)
+	c.expectations = append(c.expectations, e)
 	return e
 }
 
 func (c *pgxmock) ExpectPrepare(expectedStmtName, expectedSQL string) *ExpectedPrepare {
 	e := &ExpectedPrepare{expectSQL: expectedSQL, expectStmtName: expectedStmtName, mock: c}
-	c.expected = append(c.expected, e)
+	c.expectations = append(c.expectations, e)
 	return e
 }
 
@@ -340,7 +340,7 @@ func (c *pgxmock) copyFrom(tableName pgx.Identifier, columnNames []string) (*Exp
 	var fulfilled int
 	var ok bool
 
-	for _, next := range c.expected {
+	for _, next := range c.expectations {
 		next.Lock()
 		if next.fulfilled() {
 			next.Unlock()
@@ -368,7 +368,7 @@ func (c *pgxmock) copyFrom(tableName pgx.Identifier, columnNames []string) (*Exp
 
 	if expected == nil {
 		msg := "call to CopyFrom table name '%s' was not expected"
-		if fulfilled == len(c.expected) {
+		if fulfilled == len(c.expectations) {
 			msg = "all expectations were already fulfilled, " + msg
 		}
 		return nil, fmt.Errorf(msg, tableName)
@@ -409,7 +409,7 @@ func (c *pgxmock) begin(txOptions pgx.TxOptions) (*ExpectedBegin, error) {
 	var expected *ExpectedBegin
 	var ok bool
 	var fulfilled int
-	for _, next := range c.expected {
+	for _, next := range c.expectations {
 		next.Lock()
 		if next.fulfilled() {
 			next.Unlock()
@@ -428,7 +428,7 @@ func (c *pgxmock) begin(txOptions pgx.TxOptions) (*ExpectedBegin, error) {
 	}
 	if expected == nil {
 		msg := "call to database transaction Begin was not expected"
-		if fulfilled == len(c.expected) {
+		if fulfilled == len(c.expectations) {
 			msg = "all expectations were already fulfilled, " + msg
 		}
 		return nil, fmt.Errorf(msg)
@@ -459,7 +459,7 @@ func (c *pgxmock) prepare(name string, query string) (*ExpectedPrepare, error) {
 	var fulfilled int
 	var ok bool
 
-	for _, next := range c.expected {
+	for _, next := range c.expectations {
 		next.Lock()
 		if next.fulfilled() {
 			next.Unlock()
@@ -487,7 +487,7 @@ func (c *pgxmock) prepare(name string, query string) (*ExpectedPrepare, error) {
 
 	if expected == nil {
 		msg := "call to Prepare '%s' query was not expected"
-		if fulfilled == len(c.expected) {
+		if fulfilled == len(c.expectations) {
 			msg = "all expectations were already fulfilled, " + msg
 		}
 		return nil, fmt.Errorf(msg, query)
@@ -506,7 +506,7 @@ func (c *pgxmock) prepare(name string, query string) (*ExpectedPrepare, error) {
 
 func (c *pgxmock) Deallocate(ctx context.Context, name string) error {
 	var expected *ExpectedPrepare
-	for _, next := range c.expected {
+	for _, next := range c.expectations {
 		next.Lock()
 		if pr, ok := next.(*ExpectedPrepare); ok && pr.expectStmtName == name {
 			expected = pr
@@ -551,7 +551,7 @@ func (c *pgxmock) query(query string, args []interface{}) (*ExpectedQuery, error
 	var expected *ExpectedQuery
 	var fulfilled int
 	var ok bool
-	for _, next := range c.expected {
+	for _, next := range c.expectations {
 		next.Lock()
 		if next.fulfilled() {
 			next.Unlock()
@@ -581,7 +581,7 @@ func (c *pgxmock) query(query string, args []interface{}) (*ExpectedQuery, error
 
 	if expected == nil {
 		msg := "call to Query '%s' with args %+v was not expected"
-		if fulfilled == len(c.expected) {
+		if fulfilled == len(c.expectations) {
 			msg = "all expectations were already fulfilled, " + msg
 		}
 		return nil, fmt.Errorf(msg, query, args)
@@ -639,7 +639,7 @@ func (c *pgxmock) exec(query string, args []interface{}) (*ExpectedExec, error) 
 	var expected *ExpectedExec
 	var fulfilled int
 	var ok bool
-	for _, next := range c.expected {
+	for _, next := range c.expectations {
 		next.Lock()
 		if next.fulfilled() {
 			next.Unlock()
@@ -669,7 +669,7 @@ func (c *pgxmock) exec(query string, args []interface{}) (*ExpectedExec, error) 
 	}
 	if expected == nil {
 		msg := "call to ExecQuery '%s' with args %+v was not expected"
-		if fulfilled == len(c.expected) {
+		if fulfilled == len(c.expectations) {
 			msg = "all expectations were already fulfilled, " + msg
 		}
 		return nil, fmt.Errorf(msg, query, args)
@@ -711,7 +711,7 @@ func findExpectation[ET ExpectationType[t], t any](c *pgxmock, method string) (E
 	var expected ET
 	var fulfilled int
 	var ok bool
-	for _, next := range c.expected {
+	for _, next := range c.expectations {
 		next.Lock()
 		if next.fulfilled() {
 			next.Unlock()
@@ -731,7 +731,7 @@ func findExpectation[ET ExpectationType[t], t any](c *pgxmock, method string) (E
 
 	if expected == nil {
 		msg := fmt.Sprintf("call to method %s was not expected", method)
-		if fulfilled == len(c.expected) {
+		if fulfilled == len(c.expectations) {
 			msg = "all expectations were already fulfilled, " + msg
 		}
 		return nil, fmt.Errorf(msg)
