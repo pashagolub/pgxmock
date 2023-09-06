@@ -20,7 +20,7 @@ func TestCallModifier(t *testing.T) {
 		}
 	}
 
-	mock.ExpectPing().WillDelayFor(time.Second).Maybe()
+	mock.ExpectPing().WillDelayFor(time.Second).Maybe().Times(4)
 	f() //should produce no error since Ping() call is optional
 
 	if err := mock.Ping(context.Background()); err != nil {
