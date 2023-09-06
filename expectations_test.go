@@ -11,6 +11,22 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+func TestPanic(t *testing.T) {
+	mock, _ := NewConn()
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("The code did not panic")
+		}
+		if err := mock.ExpectationsWereMet(); err != nil {
+			t.Errorf("expectation were not met: %s", err)
+		}
+	}()
+	mock.ExpectPing().WillPanic("i'm tired")
+	if err := mock.Ping(context.Background()); err != nil {
+		t.Errorf("unexpected error: %s", err)
+	}
+}
+
 func TestCallModifier(t *testing.T) {
 	mock, _ := NewConn()
 	f := func() {
@@ -20,7 +36,7 @@ func TestCallModifier(t *testing.T) {
 		}
 	}
 
-	mock.ExpectPing().WillDelayFor(time.Second).Maybe().Times(4)
+	mock.ExpectPing().WillDelayFor(time.Second).Maybe().Times(4).WillPanic("i'm")
 	f() //should produce no error since Ping() call is optional
 
 	if err := mock.Ping(context.Background()); err != nil {

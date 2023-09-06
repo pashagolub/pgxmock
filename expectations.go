@@ -127,8 +127,50 @@ func (e *commonExpectation) String() string {
 	return w.String()
 }
 
+// queryBasedExpectation is a base class that adds a query matching logic
+type queryBasedExpectation struct {
+	expectSQL string
+	args      []interface{}
+}
+
+func (e *queryBasedExpectation) argsMatches(args []interface{}) error {
+	if len(args) != len(e.args) {
+		return fmt.Errorf("expected %d, but got %d arguments", len(e.args), len(args))
+	}
+	for k, v := range args {
+		// custom argument matcher
+		matcher, ok := e.args[k].(Argument)
+		if ok {
+			if !matcher.Match(v) {
+				return fmt.Errorf("matcher %T could not match %d argument %T - %+v", matcher, k, args[k], args[k])
+			}
+			continue
+		}
+		darg := e.args[k]
+		if !reflect.DeepEqual(darg, v) {
+			return fmt.Errorf("argument %d expected [%T - %+v] does not match actual [%T - %+v]", k, darg, darg, v, v)
+		}
+	}
+	return nil
+}
+
+func (e *queryBasedExpectation) attemptArgMatch(args []interface{}) (err error) {
+	// catch panic
+	defer func() {
+		if e := recover(); e != nil {
+			_, ok := e.(error)
+			if !ok {
+				err = fmt.Errorf(e.(string))
+			}
+		}
+	}()
+
+	err = e.argsMatches(args)
+	return
+}
+
 // ExpectedClose is used to manage pgx.Close expectation
-// returned by pgxmock.ExpectClose.
+// returned by pgxmock.ExpectClose
 type ExpectedClose struct {
 	commonExpectation
 }
@@ -168,6 +210,7 @@ func (e *ExpectedCommit) String() string {
 // ExpectedExec is used to manage pgx.Exec, pgx.Tx.Exec or pgx.Stmt.Exec expectations.
 // Returned by pgxmock.ExpectExec.
 type ExpectedExec struct {
+	commonExpectation
 	queryBasedExpectation
 	result pgconn.CommandTag
 }
@@ -278,53 +321,10 @@ func (e *ExpectedPing) String() string {
 	return msg + e.commonExpectation.String()
 }
 
-// query based expectation
-// adds a query matching logic
-type queryBasedExpectation struct {
-	commonExpectation
-	expectSQL string
-	args      []interface{}
-}
-
-func (e *queryBasedExpectation) argsMatches(args []interface{}) error {
-	if len(args) != len(e.args) {
-		return fmt.Errorf("expected %d, but got %d arguments", len(e.args), len(args))
-	}
-	for k, v := range args {
-		// custom argument matcher
-		matcher, ok := e.args[k].(Argument)
-		if ok {
-			if !matcher.Match(v) {
-				return fmt.Errorf("matcher %T could not match %d argument %T - %+v", matcher, k, args[k], args[k])
-			}
-			continue
-		}
-		darg := e.args[k]
-		if !reflect.DeepEqual(darg, v) {
-			return fmt.Errorf("argument %d expected [%T - %+v] does not match actual [%T - %+v]", k, darg, darg, v, v)
-		}
-	}
-	return nil
-}
-
-func (e *queryBasedExpectation) attemptArgMatch(args []interface{}) (err error) {
-	// catch panic
-	defer func() {
-		if e := recover(); e != nil {
-			_, ok := e.(error)
-			if !ok {
-				err = fmt.Errorf(e.(string))
-			}
-		}
-	}()
-
-	err = e.argsMatches(args)
-	return
-}
-
 // ExpectedQuery is used to manage *pgx.Conn.Query, *pgx.Conn.QueryRow, *pgx.Tx.Query,
 // *pgx.Tx.QueryRow, *pgx.Stmt.Query or *pgx.Stmt.QueryRow expectations
 type ExpectedQuery struct {
+	commonExpectation
 	queryBasedExpectation
 	rows             pgx.Rows
 	rowsMustBeClosed bool
