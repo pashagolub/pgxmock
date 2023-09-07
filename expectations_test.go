@@ -145,6 +145,7 @@ func TestUnexpectedCopyFrom(t *testing.T) {
 
 func TestBuildQuery(t *testing.T) {
 	mock, _ := NewConn()
+	a := assert.New(t)
 	query := `
 		SELECT
 			name,
@@ -160,18 +161,19 @@ func TestBuildQuery(t *testing.T) {
 	`
 
 	mock.ExpectPing().WillDelayFor(1 * time.Second).WillReturnError(errors.New("no ping please"))
-	mock.ExpectQuery(query)
-	mock.ExpectExec(query)
+	mock.ExpectQuery(query).WillReturnError(errors.New("oops"))
+	mock.ExpectExec(query).WillReturnResult(NewResult("SELECT", 1))
 	mock.ExpectPrepare("foo", query)
 
-	_ = mock.Ping(ctx)
+	err := mock.Ping(ctx)
+	a.Error(err)
 	mock.QueryRow(ctx, query)
-	_, _ = mock.Exec(ctx, query)
-	_, _ = mock.Prepare(ctx, "foo", query)
+	_, err = mock.Exec(ctx, query)
+	a.NoError(err)
+	_, err = mock.Prepare(ctx, "foo", query)
+	a.NoError(err)
 
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Error(err)
-	}
+	a.NoError(mock.ExpectationsWereMet())
 }
 
 func TestQueryRowScan(t *testing.T) {

@@ -234,15 +234,12 @@ func (c *pgxmock) ExpectBeginTx(txOptions pgx.TxOptions) *ExpectedBegin {
 func (c *pgxmock) ExpectExec(expectedSQL string) *ExpectedExec {
 	e := &ExpectedExec{}
 	e.expectSQL = expectedSQL
-	// e.converter = c.converter
 	c.expectations = append(c.expectations, e)
 	return e
 }
 
 func (c *pgxmock) ExpectCopyFrom(expectedTableName pgx.Identifier, expectedColumns []string) *ExpectedCopyFrom {
-	e := &ExpectedCopyFrom{}
-	e.expectedTableName = expectedTableName
-	e.expectedColumns = expectedColumns
+	e := &ExpectedCopyFrom{expectedTableName: expectedTableName, expectedColumns: expectedColumns}
 	c.expectations = append(c.expectations, e)
 	return e
 }
@@ -315,7 +312,7 @@ func (c *pgxmock) open(options []func(*pgxmock) error) error {
 // Close a mock database driver connection. It may or may not
 // be called depending on the circumstances, but if it is called
 // there must be an *ExpectedClose expectation satisfied.
-func (c *pgxmock) close(ctx context.Context) error {
+func (c *pgxmock) Close(ctx context.Context) error {
 	ex, err := findExpectation[*ExpectedClose](c, "Close()")
 	if err != nil {
 		return err
@@ -328,63 +325,19 @@ func (c *pgxmock) Conn() *pgx.Conn {
 }
 
 func (c *pgxmock) CopyFrom(ctx context.Context, tableName pgx.Identifier, columnNames []string, _ pgx.CopyFromSource) (int64, error) {
-	ex, err := c.copyFrom(tableName, columnNames)
+	ex, err := findExpectationFunc[*ExpectedCopyFrom](c, "BeginTx()", func(copyExp *ExpectedCopyFrom) error {
+		if !reflect.DeepEqual(copyExp.expectedTableName, tableName) {
+			return fmt.Errorf("CopyFrom: table name '%s' was not expected, expected table name is '%s'", tableName, copyExp.expectedTableName)
+		}
+		if !reflect.DeepEqual(copyExp.expectedColumns, columnNames) {
+			return fmt.Errorf("CopyFrom: column names '%v' were not expected, expected column names are '%v'", columnNames, copyExp.expectedColumns)
+		}
+		return nil
+	})
 	if err != nil {
 		return -1, err
 	}
 	return ex.rowsAffected, ex.waitForDelay(ctx)
-}
-
-func (c *pgxmock) copyFrom(tableName pgx.Identifier, columnNames []string) (*ExpectedCopyFrom, error) {
-	var expected *ExpectedCopyFrom
-	var fulfilled int
-	var ok bool
-
-	for _, next := range c.expectations {
-		next.Lock()
-		if next.fulfilled() {
-			next.Unlock()
-			fulfilled++
-			continue
-		}
-
-		if c.ordered {
-			if expected, ok = next.(*ExpectedCopyFrom); ok {
-				break
-			}
-			next.Unlock()
-			if !ok && !next.required() {
-				continue
-			}
-			return nil, fmt.Errorf("call to CopyFrom statement with table name '%s', was not expected, next expectation is: %s", tableName, next)
-		}
-
-		if pr, ok := next.(*ExpectedCopyFrom); ok {
-			if reflect.DeepEqual(pr.expectedTableName, tableName) && reflect.DeepEqual(pr.expectedColumns, columnNames) {
-				expected = pr
-				break
-			}
-		}
-		next.Unlock()
-	}
-
-	if expected == nil {
-		msg := "call to CopyFrom table name '%s' was not expected"
-		if fulfilled == len(c.expectations) {
-			msg = "all expectations were already fulfilled, " + msg
-		}
-		return nil, fmt.Errorf(msg, tableName)
-	}
-	defer expected.Unlock()
-	if !reflect.DeepEqual(expected.expectedTableName, tableName) {
-		return nil, fmt.Errorf("CopyFrom: table name '%s' was not expected, expected table name is '%s'", tableName, expected.expectedTableName)
-	}
-	if !reflect.DeepEqual(expected.expectedColumns, columnNames) {
-		return nil, fmt.Errorf("CopyFrom: column names '%v' were not expected, expected column names are '%v'", columnNames, expected.expectedColumns)
-	}
-
-	expected.fulfill()
-	return expected, nil
 }
 
 func (c *pgxmock) SendBatch(context.Context, *pgx.Batch) pgx.BatchResults {
@@ -395,129 +348,55 @@ func (c *pgxmock) LargeObjects() pgx.LargeObjects {
 	return pgx.LargeObjects{}
 }
 
+func (c *pgxmock) Begin(ctx context.Context) (pgx.Tx, error) {
+	return c.BeginTx(ctx, pgx.TxOptions{})
+}
+
 func (c *pgxmock) BeginTx(ctx context.Context, txOptions pgx.TxOptions) (pgx.Tx, error) {
-	ex, err := c.begin(txOptions)
+	ex, err := findExpectationFunc[*ExpectedBegin](c, "BeginTx()", func(beginExp *ExpectedBegin) error {
+		if beginExp.opts != txOptions {
+			return fmt.Errorf("BeginTx: call with transaction options '%v' was not expected: %s", txOptions, beginExp)
+		}
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
 	return c, ex.waitForDelay(ctx)
 }
 
-func (c *pgxmock) Begin(ctx context.Context) (pgx.Tx, error) {
-	return c.BeginTx(ctx, pgx.TxOptions{})
-}
-
-func (c *pgxmock) begin(txOptions pgx.TxOptions) (*ExpectedBegin, error) {
-	var expected *ExpectedBegin
-	var ok bool
-	var fulfilled int
-	for _, next := range c.expectations {
-		next.Lock()
-		if next.fulfilled() {
-			next.Unlock()
-			fulfilled++
-			continue
-		}
-
-		if expected, ok = next.(*ExpectedBegin); ok {
-			break
-		}
-
-		next.Unlock()
-		if c.ordered {
-			return nil, fmt.Errorf("call to database transaction Begin, was not expected, next expectation is: %s", next)
-		}
-	}
-	if expected == nil {
-		msg := "call to database transaction Begin was not expected"
-		if fulfilled == len(c.expectations) {
-			msg = "all expectations were already fulfilled, " + msg
-		}
-		return nil, fmt.Errorf(msg)
-	}
-	defer expected.Unlock()
-	if expected.opts != txOptions {
-		return nil, fmt.Errorf("Begin: call with transaction options '%v' was not expected, expected name is '%v'", txOptions, expected.opts)
-	}
-	expected.fulfill()
-
-	return expected, nil
-}
-
 func (c *pgxmock) Prepare(ctx context.Context, name, query string) (*pgconn.StatementDescription, error) {
-	ex, err := c.prepare(name, query)
+	ex, err := findExpectationFunc[*ExpectedPrepare](c, "Exec()", func(prepareExp *ExpectedPrepare) error {
+		if err := c.queryMatcher.Match(prepareExp.expectSQL, query); err != nil {
+			return err
+		}
+		if prepareExp.expectStmtName != name {
+			return fmt.Errorf("Prepare: prepared statement name '%s' was not expected, expected name is '%s'", name, prepareExp.expectStmtName)
+		}
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
-	err = ex.waitForDelay(ctx)
-	if err != nil {
+	if err = ex.waitForDelay(ctx); err != nil {
 		return nil, err
 	}
 	return &pgconn.StatementDescription{Name: name, SQL: query}, nil
 }
 
-func (c *pgxmock) prepare(name string, query string) (*ExpectedPrepare, error) {
-	var expected *ExpectedPrepare
-	var fulfilled int
-	var ok bool
-
-	for _, next := range c.expectations {
-		next.Lock()
-		if next.fulfilled() {
-			next.Unlock()
-			fulfilled++
-			continue
-		}
-
-		if c.ordered {
-			if expected, ok = next.(*ExpectedPrepare); ok {
-				break
-			}
-			next.Unlock()
-			if !ok && !next.required() {
-				continue
-			}
-			return nil, fmt.Errorf("call to Prepare statement with query '%s', was not expected, next expectation is: %s", query, next)
-		}
-
-		if pr, ok := next.(*ExpectedPrepare); ok {
-			if err := c.queryMatcher.Match(pr.expectSQL, query); err == nil {
-				expected = pr
-				break
-			}
-		}
-		next.Unlock()
-	}
-
-	if expected == nil {
-		msg := "call to Prepare '%s' query was not expected"
-		if fulfilled == len(c.expectations) {
-			msg = "all expectations were already fulfilled, " + msg
-		}
-		return nil, fmt.Errorf(msg, query)
-	}
-	defer expected.Unlock()
-	if expected.expectStmtName != name {
-		return nil, fmt.Errorf("Prepare: prepared statement name '%s' was not expected, expected name is '%s'", name, expected.expectStmtName)
-	}
-	if err := c.queryMatcher.Match(expected.expectSQL, query); err != nil {
-		return nil, fmt.Errorf("Prepare: %v", err)
-	}
-
-	expected.fulfill()
-	return expected, nil
-}
-
 func (c *pgxmock) Deallocate(ctx context.Context, name string) error {
-	var expected *ExpectedPrepare
+	var (
+		expected *ExpectedPrepare
+		ok       bool
+	)
 	for _, next := range c.expectations {
 		next.Lock()
-		if pr, ok := next.(*ExpectedPrepare); ok && pr.expectStmtName == name {
-			expected = pr
-			next.Unlock()
+		expected, ok = next.(*ExpectedPrepare)
+		ok = ok && expected.expectStmtName == name
+		next.Unlock()
+		if ok {
 			break
 		}
-		next.Unlock()
 	}
 	if expected == nil {
 		return fmt.Errorf("Deallocate: prepared statement name '%s' doesn't exist", name)
@@ -544,72 +423,22 @@ func (c *pgxmock) Rollback(ctx context.Context) error {
 
 // Implement the "QueryerContext" interface
 func (c *pgxmock) Query(ctx context.Context, sql string, args ...interface{}) (pgx.Rows, error) {
-	ex, err := c.query(sql, args)
+	ex, err := findExpectationFunc[*ExpectedQuery](c, "Query()", func(queryExp *ExpectedQuery) error {
+		if err := c.queryMatcher.Match(queryExp.expectSQL, sql); err != nil {
+			return err
+		}
+		if err := queryExp.attemptArgMatch(args); err != nil {
+			return err
+		}
+		if queryExp.err == nil && queryExp.rows == nil {
+			return fmt.Errorf("Query must return a result rows or raise an error: %v", queryExp)
+		}
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
 	return ex.rows, ex.waitForDelay(ctx)
-}
-
-func (c *pgxmock) query(query string, args []interface{}) (*ExpectedQuery, error) {
-	var expected *ExpectedQuery
-	var fulfilled int
-	var ok bool
-	for _, next := range c.expectations {
-		next.Lock()
-		if next.fulfilled() {
-			next.Unlock()
-			fulfilled++
-			continue
-		}
-
-		if c.ordered {
-			if expected, ok = next.(*ExpectedQuery); ok {
-				break
-			}
-			next.Unlock()
-			if !ok && !next.required() {
-				continue
-			}
-			return nil, fmt.Errorf("call to Query '%s' with args %+v, was not expected, next expectation is: %s", query, args, next)
-		}
-		if qr, ok := next.(*ExpectedQuery); ok {
-			if err := c.queryMatcher.Match(qr.expectSQL, query); err != nil {
-				next.Unlock()
-				continue
-			}
-			if err := qr.attemptArgMatch(args); err == nil {
-				expected = qr
-				break
-			}
-		}
-		next.Unlock()
-	}
-
-	if expected == nil {
-		msg := "call to Query '%s' with args %+v was not expected"
-		if fulfilled == len(c.expectations) {
-			msg = "all expectations were already fulfilled, " + msg
-		}
-		return nil, fmt.Errorf(msg, query, args)
-	}
-
-	defer expected.Unlock()
-
-	if err := c.queryMatcher.Match(expected.expectSQL, query); err != nil {
-		return nil, fmt.Errorf("Query: %v", err)
-	}
-
-	if err := expected.argsMatches(args); err != nil {
-		return nil, fmt.Errorf("Query '%s', arguments do not match: %s", query, err)
-	}
-
-	expected.fulfill()
-	if expected.err == nil && expected.rows == nil {
-		return nil, fmt.Errorf("Query '%s' with args %+v, must return a pgx.Rows, but it was not set for expectation %T as %+v", query, args, expected, expected)
-	}
-
-	return expected, nil
 }
 
 type errRow struct {
@@ -621,89 +450,33 @@ func (er errRow) Scan(...interface{}) error {
 }
 
 func (c *pgxmock) QueryRow(ctx context.Context, sql string, args ...interface{}) pgx.Row {
-	ex, err := c.query(sql, args)
+	rows, err := c.Query(ctx, sql, args...)
 	if err != nil {
 		return errRow{err}
 	}
-	err = ex.waitForDelay(ctx)
-	if err != nil {
-		return errRow{err}
-	}
-	_ = ex.rows.Next()
-	return ex.rows
+	_ = rows.Next()
+	return rows
 }
 
-// Implement the "ExecerContext" interface
 func (c *pgxmock) Exec(ctx context.Context, query string, args ...interface{}) (pgconn.CommandTag, error) {
-	ex, err := c.exec(query, args)
+	ex, err := findExpectationFunc[*ExpectedExec](c, "Exec()", func(execExp *ExpectedExec) error {
+		if err := c.queryMatcher.Match(execExp.expectSQL, query); err != nil {
+			return err
+		}
+		if err := execExp.attemptArgMatch(args); err != nil {
+			return err
+		}
+		if execExp.result.String() == "" && execExp.err == nil {
+			return fmt.Errorf("Exec must return a result or raise an error: %s", execExp)
+		}
+		return nil
+	})
 	if err != nil {
 		return pgconn.NewCommandTag(""), err
 	}
 	return ex.result, ex.waitForDelay(ctx)
 }
 
-func (c *pgxmock) exec(query string, args []interface{}) (*ExpectedExec, error) {
-	var expected *ExpectedExec
-	var fulfilled int
-	var ok bool
-	for _, next := range c.expectations {
-		next.Lock()
-		if next.fulfilled() {
-			next.Unlock()
-			fulfilled++
-			continue
-		}
-
-		if c.ordered {
-			if expected, ok = next.(*ExpectedExec); ok {
-				break
-			}
-			next.Unlock()
-			if !ok && !next.required() {
-				continue
-			}
-			return nil, fmt.Errorf("call to Exec '%s' with args %+v, was not expected, next expectation is: %s", query, args, next)
-		}
-		if exec, ok := next.(*ExpectedExec); ok {
-			if err := c.queryMatcher.Match(exec.expectSQL, query); err != nil {
-				next.Unlock()
-				continue
-			}
-
-			if err := exec.attemptArgMatch(args); err == nil {
-				expected = exec
-				break
-			}
-		}
-		next.Unlock()
-	}
-	if expected == nil {
-		msg := "call to ExecQuery '%s' with args %+v was not expected"
-		if fulfilled == len(c.expectations) {
-			msg = "all expectations were already fulfilled, " + msg
-		}
-		return nil, fmt.Errorf(msg, query, args)
-	}
-	defer expected.Unlock()
-
-	if err := c.queryMatcher.Match(expected.expectSQL, query); err != nil {
-		return nil, fmt.Errorf("ExecQuery: %v", err)
-	}
-
-	if err := expected.argsMatches(args); err != nil {
-		return nil, fmt.Errorf("ExecQuery '%s', arguments do not match: %s", query, err)
-	}
-
-	expected.fulfill()
-
-	if expected.result.String() == "" && expected.err == nil {
-		return nil, fmt.Errorf("Exec '%s' with args %+v, must return a pgconn.CommandTag, but it was not set for expectation %T as %+v", query, args, expected, expected)
-	}
-
-	return expected, nil
-}
-
-// Implement the "Pinger" interface - the explicit DB driver ping was only added to database/sql in Go 1.8
 func (c *pgxmock) Ping(ctx context.Context) (err error) {
 	ex, err := findExpectation[*ExpectedPing](c, "Ping()")
 	if err != nil {
@@ -712,15 +485,24 @@ func (c *pgxmock) Ping(ctx context.Context) (err error) {
 	return ex.waitForDelay(ctx)
 }
 
+func (c *pgxmock) Reset() {
+	ex, err := findExpectation[*ExpectedReset](c, "Reset()")
+	if err != nil {
+		return
+	}
+	_ = ex.waitForDelay(context.Background())
+}
+
 type ExpectationType[t any] interface {
 	*t
 	Expectation
 }
 
-func findExpectation[ET ExpectationType[t], t any](c *pgxmock, method string) (ET, error) {
+func findExpectationFunc[ET ExpectationType[t], t any](c *pgxmock, method string, cmp func(ET) error) (ET, error) {
 	var expected ET
 	var fulfilled int
 	var ok bool
+	var err error
 	for _, next := range c.expectations {
 		next.Lock()
 		if next.fulfilled() {
@@ -730,16 +512,23 @@ func findExpectation[ET ExpectationType[t], t any](c *pgxmock, method string) (E
 		}
 
 		if expected, ok = next.(ET); ok {
-			break
+			err = cmp(expected)
+			if err == nil {
+				break
+			}
 		}
-
-		next.Unlock()
 		if c.ordered {
-			if !ok && !next.required() {
+			if (!ok || err != nil) && !next.required() {
+				next.Unlock()
 				continue
+			}
+			next.Unlock()
+			if err != nil {
+				return nil, err
 			}
 			return nil, fmt.Errorf("call to method %s, was not expected, next expectation is: %s", method, next)
 		}
+		next.Unlock()
 	}
 
 	if expected == nil {
@@ -749,16 +538,12 @@ func findExpectation[ET ExpectationType[t], t any](c *pgxmock, method string) (E
 		}
 		return nil, fmt.Errorf(msg)
 	}
+	defer expected.Unlock()
 
 	expected.fulfill()
-	expected.Unlock()
 	return expected, nil
 }
 
-func (c *pgxmock) Reset() {
-	ex, err := findExpectation[*ExpectedReset](c, "Reset()")
-	if err != nil {
-		return
-	}
-	_ = ex.waitForDelay(context.Background())
+func findExpectation[ET ExpectationType[t], t any](c *pgxmock, method string) (ET, error) {
+	return findExpectationFunc[ET, t](c, method, func(_ ET) error { return nil })
 }

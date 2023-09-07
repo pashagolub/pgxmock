@@ -19,10 +19,6 @@ func NewConn(options ...func(*pgxmock) error) (PgxConnIface, error) {
 	return smock, smock.open(options)
 }
 
-func (c *pgxmockConn) Close(ctx context.Context) error {
-	return c.close(ctx)
-}
-
 type pgxmockPool struct {
 	pgxmock
 }
@@ -36,7 +32,7 @@ func NewPool(options ...func(*pgxmock) error) (PgxPoolIface, error) {
 }
 
 func (p *pgxmockPool) Close() {
-	_ = p.close(context.Background())
+	p.pgxmock.Close(context.Background())
 }
 
 func (p *pgxmockPool) Acquire(context.Context) (*pgxpool.Conn, error) {
