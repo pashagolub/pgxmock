@@ -1226,7 +1226,8 @@ func TestUnmockedMethods(t *testing.T) {
 
 func TestNewRowsWithColumnDefinition(t *testing.T) {
 	mock, _ := NewConn()
-	assert.Equal(t, 1, mock.NewRowsWithColumnDefinition(*mock.NewColumn("foo")))
+	r := mock.NewRowsWithColumnDefinition(*mock.NewColumn("foo"))
+	assert.Equal(t, 1, len(r.defs))
 }
 
 func TestExpectReset(t *testing.T) {
