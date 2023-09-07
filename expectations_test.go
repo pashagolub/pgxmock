@@ -15,6 +15,18 @@ import (
 
 var ctx = context.Background()
 
+func TestTimes(t *testing.T) {
+	mock, _ := NewConn()
+	a := assert.New(t)
+	mock.ExpectPing().Times(2)
+	err := mock.Ping(ctx)
+	a.NoError(err)
+	a.Error(mock.ExpectationsWereMet()) // must be two Ping() calls
+	err = mock.Ping(ctx)
+	a.NoError(err)
+	a.NoError(mock.ExpectationsWereMet())
+}
+
 func TestMaybe(t *testing.T) {
 	mock, _ := NewConn()
 	a := assert.New(t)

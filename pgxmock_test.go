@@ -10,6 +10,8 @@ import (
 	"time"
 
 	pgx "github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/stretchr/testify/assert"
 )
 
 func cancelOrder(db pgxIface, orderID int) error {
@@ -1210,71 +1212,32 @@ func queryWithTimeout(t time.Duration, db pgxIface, query string, args ...interf
 	}
 }
 
-func TestCon(t *testing.T) {
-	mock, err := NewConn()
-	if err != nil {
-		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
-	}
-	defer mock.Close(context.Background())
-	defer func() {
-		if r := recover(); r == nil {
-			t.Errorf("The Conn() did not panic")
-		}
-	}()
-	_ = mock.Conn()
-}
-
-func TestConnInfo(t *testing.T) {
-	mock, err := NewConn()
-	if err != nil {
-		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
-	}
-	defer mock.Close(context.Background())
-
-	_ = mock.Config()
-}
-
-func TestPgConn(t *testing.T) {
-	mock, err := NewConn()
-	if err != nil {
-		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
-	}
-	defer mock.Close(context.Background())
-
-	_ = mock.PgConn()
+func TestUnmockedMethods(t *testing.T) {
+	mock, _ := NewPool()
+	a := assert.New(t)
+	a.NotNil(mock.Config())
+	a.NotNil(mock.PgConn())
+	a.NotNil(mock.AcquireAllIdle(ctx))
+	a.Nil(mock.AcquireFunc(ctx, func(*pgxpool.Conn) error { return nil }))
+	a.Nil(mock.SendBatch(ctx, nil))
+	a.Zero(mock.LargeObjects())
+	a.Panics(func() { _ = mock.Conn() })
 }
 
 func TestNewRowsWithColumnDefinition(t *testing.T) {
-	mock, err := NewConn()
-	if err != nil {
-		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
-	}
-	defer mock.Close(context.Background())
-	r := mock.NewRowsWithColumnDefinition(*mock.NewColumn("foo"))
-	if len(r.defs) != 1 {
-		t.Error("NewRows failed")
-	}
+	mock, _ := NewConn()
+	assert.Equal(t, 1, mock.NewRowsWithColumnDefinition(*mock.NewColumn("foo")))
 }
 
 func TestExpectReset(t *testing.T) {
-	mock, err := NewPool()
-	if err != nil {
-		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
-	}
-	defer mock.Close()
-
+	mock, _ := NewPool()
+	a := assert.New(t)
 	// Successful scenario
-	_ = mock.ExpectReset()
+	mock.ExpectReset()
 	mock.Reset()
-	err = mock.ExpectationsWereMet()
-	if err != nil {
-		t.Errorf("there were unfulfilled expectations: %s", err)
-	}
+	a.NoError(mock.ExpectationsWereMet())
 
 	// Unsuccessful scenario
 	mock.ExpectReset()
-	err = mock.ExpectationsWereMet()
-	if err == nil {
-		t.Error("was expecting an error, but there was none")
-	}
+	a.Error(mock.ExpectationsWereMet())
 }

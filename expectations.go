@@ -25,7 +25,7 @@ type Expectation interface {
 
 type CallModifyer interface {
 	Maybe() CallModifyer
-	Times(n int) CallModifyer
+	Times(n uint) CallModifyer
 	WillDelayFor(duration time.Duration) CallModifyer
 	WillReturnError(err error)
 	WillPanic(v any)
@@ -35,12 +35,12 @@ type CallModifyer interface {
 // satisfies the expectation interface
 type commonExpectation struct {
 	sync.Mutex
-	triggered     int           // how many times method was called
+	triggered     uint          // how many times method was called
 	err           error         // should method return error
 	optional      bool          // can method be skipped
 	panicArgument any           // panic value to return for recovery
 	plannedDelay  time.Duration // should method delay before return
-	plannedCalls  int           // how many sequentional calls should be made
+	plannedCalls  uint          // how many sequentional calls should be made
 }
 
 func (e *commonExpectation) error() error {
@@ -52,7 +52,7 @@ func (e *commonExpectation) fulfill() {
 }
 
 func (e *commonExpectation) fulfilled() bool {
-	return e.triggered > e.plannedCalls
+	return e.triggered >= max(e.plannedCalls, 1)
 }
 
 func (e *commonExpectation) required() bool {
@@ -79,8 +79,9 @@ func (e *commonExpectation) Maybe() CallModifyer {
 	return e
 }
 
-// Times indicates that that the expected method should only fire the indicated number of times
-func (e *commonExpectation) Times(n int) CallModifyer {
+// Times indicates that that the expected method should only fire the indicated number of times.
+// Zero value is ignored and means the same as one.
+func (e *commonExpectation) Times(n uint) CallModifyer {
 	e.plannedCalls = n
 	return e
 }
