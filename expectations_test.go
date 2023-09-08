@@ -100,9 +100,12 @@ func ExampleExpectedExec() {
 	fmt.Print(ex)
 	res, _ := mock.Exec(ctx, "INSERT something")
 	fmt.Println(res)
-	res, _ = mock.Exec(ctx, "INSERT something")
-	fmt.Println(res)
-	// Output: ExpectedExec => expecting call to Exec():
+	ex.WithArgs(42)
+	fmt.Print(ex)
+	res, _ = mock.Exec(ctx, "INSERT something", 42)
+	fmt.Print(res)
+	// Output:
+	// ExpectedExec => expecting call to Exec():
 	// 	- matches sql: '^INSERT (.+)'
 	// 	- is without arguments
 	// 	- returns result: INSERT 15
@@ -110,6 +113,14 @@ func ExampleExpectedExec() {
 	// 	- execution is optional
 	// 	- execution calls awaited: 2
 	// INSERT 15
+	// ExpectedExec => expecting call to Exec():
+	// 	- matches sql: '^INSERT (.+)'
+	// 	- is with arguments:
+	// 		0 - 42
+	// 	- returns result: INSERT 15
+	// 	- delayed execution for: 1s
+	// 	- execution is optional
+	// 	- execution calls awaited: 2
 	// INSERT 15
 }
 
