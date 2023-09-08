@@ -210,7 +210,7 @@ func TestTransactionExpectations(t *testing.T) {
 	mock.ExpectBeginTx(pgx.TxOptions{AccessMode: pgx.ReadOnly})
 	mock.ExpectCommit()
 
-	tx, err = mock.BeginTx(ctx, pgx.TxOptions{})
+	_, err = mock.BeginTx(ctx, pgx.TxOptions{})
 	a.Error(err, "wrong tx access mode should raise error")
 
 	tx, err = mock.BeginTx(ctx, pgx.TxOptions{AccessMode: pgx.ReadOnly})
