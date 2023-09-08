@@ -111,43 +111,32 @@ func TestMockQuery(t *testing.T) {
 
 func TestMockCopyFrom(t *testing.T) {
 	t.Parallel()
-	mock, err := NewConn()
-	if err != nil {
-		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
-	}
-	defer mock.Close(context.Background())
-
+	mock, _ := NewConn()
+	a := assert.New(t)
 	mock.ExpectCopyFrom(pgx.Identifier{"fooschema", "baztable"}, []string{"col1"}).
 		WillReturnResult(2).WillDelayFor(1 * time.Second)
 
-	_, err = mock.CopyFrom(context.Background(), pgx.Identifier{"error", "error"}, []string{"error"}, nil)
-	if err == nil {
-		t.Error("error is expected while executing CopyFrom")
-	}
-	if mock.ExpectationsWereMet() == nil {
-		t.Error("there must be unfulfilled expectations")
-	}
+	res, err := mock.CopyFrom(context.Background(), pgx.Identifier{"error", "error"}, []string{"error"}, nil)
+	a.Error(err, "incorrect table should raise an error")
+	a.Less(res, 0)
+	a.Error(mock.ExpectationsWereMet(), "there must be unfulfilled expectations")
 
-	rows, err := mock.CopyFrom(context.Background(), pgx.Identifier{"fooschema", "baztable"}, []string{"col1"}, nil)
-	if err != nil {
-		t.Errorf("error '%s' was not expected while executing CopyFrom", err)
-	}
+	res, err = mock.CopyFrom(context.Background(), pgx.Identifier{"fooschema", "baztable"}, []string{"error"}, nil)
+	a.Error(err, "incorrect columns should raise an error")
+	a.Less(res, 0)
+	a.Error(mock.ExpectationsWereMet(), "there must be unfulfilled expectations")
 
-	if rows != 2 {
-		t.Errorf("expected RowsAffected to be 2, but got %d instead", rows)
-	}
+	res, err = mock.CopyFrom(context.Background(), pgx.Identifier{"fooschema", "baztable"}, []string{"col1"}, nil)
+	a.NoError(err)
+	a.Equal(res, 2)
 
 	mock.ExpectCopyFrom(pgx.Identifier{"fooschema", "baztable"}, []string{"col1"}).
 		WillReturnError(errors.New("error is here"))
 
 	_, err = mock.CopyFrom(context.Background(), pgx.Identifier{"fooschema", "baztable"}, []string{"col1"}, nil)
-	if err == nil {
-		t.Error("error is expected while executing CopyFrom")
-	}
+	a.Error(err)
 
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("there were unfulfilled expectations: %s", err)
-	}
+	a.NoError(mock.ExpectationsWereMet())
 }
 
 func TestMockQueryTypes(t *testing.T) {
