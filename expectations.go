@@ -140,34 +140,18 @@ func (e *queryBasedExpectation) argsMatches(args []interface{}) error {
 	}
 	for k, v := range args {
 		// custom argument matcher
-		matcher, ok := e.args[k].(Argument)
-		if ok {
+		if matcher, ok := e.args[k].(Argument); ok {
 			if !matcher.Match(v) {
 				return fmt.Errorf("matcher %T could not match %d argument %T - %+v", matcher, k, args[k], args[k])
 			}
 			continue
 		}
-		darg := e.args[k]
-		if !reflect.DeepEqual(darg, v) {
+
+		if darg := e.args[k]; !reflect.DeepEqual(darg, v) {
 			return fmt.Errorf("argument %d expected [%T - %+v] does not match actual [%T - %+v]", k, darg, darg, v, v)
 		}
 	}
 	return nil
-}
-
-func (e *queryBasedExpectation) attemptArgMatch(args []interface{}) (err error) {
-	// catch panic
-	defer func() {
-		if e := recover(); e != nil {
-			_, ok := e.(error)
-			if !ok {
-				err = fmt.Errorf(e.(string))
-			}
-		}
-	}()
-
-	err = e.argsMatches(args)
-	return
 }
 
 // ExpectedClose is used to manage pgx.Close expectation

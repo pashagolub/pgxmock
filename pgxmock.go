@@ -427,7 +427,7 @@ func (c *pgxmock) Query(ctx context.Context, sql string, args ...interface{}) (p
 		if err := c.queryMatcher.Match(queryExp.expectSQL, sql); err != nil {
 			return err
 		}
-		if err := queryExp.attemptArgMatch(args); err != nil {
+		if err := queryExp.argsMatches(args); err != nil {
 			return err
 		}
 		if queryExp.err == nil && queryExp.rows == nil {
@@ -463,7 +463,7 @@ func (c *pgxmock) Exec(ctx context.Context, query string, args ...interface{}) (
 		if err := c.queryMatcher.Match(execExp.expectSQL, query); err != nil {
 			return err
 		}
-		if err := execExp.attemptArgMatch(args); err != nil {
+		if err := execExp.argsMatches(args); err != nil {
 			return err
 		}
 		if execExp.result.String() == "" && execExp.err == nil {
