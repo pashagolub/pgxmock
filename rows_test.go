@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestPointerToInterfaceArgument(t *testing.T) {
@@ -437,70 +438,6 @@ func ExampleRows_rawValues() {
 	//
 }
 
-// func TestQueryRowBytesNotInvalidatedByNext_bytesIntoBytes(t *testing.T) {
-// 	t.Parallel()
-// 	rows := NewRows([]string{"raw"}).
-// 		AddRow([]byte(`one binary value with some text!`)).
-// 		AddRow([]byte(`two binary value with even more text than the first one`))
-// 	scan := func(rs *sql.Rows) ([]byte, error) {
-// 		var b []byte
-// 		return b, rs.Scan(&b)
-// 	}
-// 	want := [][]byte{[]byte(`one binary value with some text!`), []byte(`two binary value with even more text than the first one`)}
-// 	queryRowBytesNotInvalidatedByNext(t, rows, scan, want)
-// }
-
-// func TestQueryRowBytesNotInvalidatedByNext_stringIntoBytes(t *testing.T) {
-// 	t.Parallel()
-// 	rows := NewRows([]string{"raw"}).
-// 		AddRow(`one binary value with some text!`).
-// 		AddRow(`two binary value with even more text than the first one`)
-// 	scan := func(rs *sql.Rows) ([]byte, error) {
-// 		var b []byte
-// 		return b, rs.Scan(&b)
-// 	}
-// 	want := [][]byte{[]byte(`one binary value with some text!`), []byte(`two binary value with even more text than the first one`)}
-// 	queryRowBytesNotInvalidatedByNext(t, rows, scan, want)
-// }
-
-// func TestQueryRowBytesInvalidatedByClose_bytesIntoRawBytes(t *testing.T) {
-// 	t.Parallel()
-// 	replace := []byte(invalid)
-// 	rows := NewRows([]string{"raw"}).AddRow([]byte(`one binary value with some text!`))
-// 	scan := func(rs *sql.Rows) ([]byte, error) {
-// 		var raw sql.RawBytes
-// 		return raw, rs.Scan(&raw)
-// 	}
-// 	want := struct {
-// 		Initial  []byte
-// 		Replaced []byte
-// 	}{
-// 		Initial:  []byte(`one binary value with some text!`),
-// 		Replaced: replace[:len(replace)-7],
-// 	}
-// 	queryRowBytesInvalidatedByClose(t, rows, scan, want)
-// }
-
-// func TestQueryRowBytesNotInvalidatedByClose_bytesIntoBytes(t *testing.T) {
-// 	t.Parallel()
-// 	rows := NewRows([]string{"raw"}).AddRow([]byte(`one binary value with some text!`))
-// 	scan := func(rs *sql.Rows) ([]byte, error) {
-// 		var b []byte
-// 		return b, rs.Scan(&b)
-// 	}
-// 	queryRowBytesNotInvalidatedByClose(t, rows, scan, []byte(`one binary value with some text!`))
-// }
-
-// func TestQueryRowBytesNotInvalidatedByClose_stringIntoBytes(t *testing.T) {
-// 	t.Parallel()
-// 	rows := NewRows([]string{"raw"}).AddRow(`one binary value with some text!`)
-// 	scan := func(rs *sql.Rows) ([]byte, error) {
-// 		var b []byte
-// 		return b, rs.Scan(&b)
-// 	}
-// 	queryRowBytesNotInvalidatedByClose(t, rows, scan, []byte(`one binary value with some text!`))
-// }
-
 func TestRowsScanError(t *testing.T) {
 	t.Parallel()
 	mock, err := NewConn()
@@ -682,179 +619,6 @@ func TestEmptyRowSets(t *testing.T) {
 	}
 }
 
-// func queryRowBytesInvalidatedByNext(t *testing.T, rows *Rows, scan func(*sql.Rows) ([]byte, error), want []struct {
-// 	Initial  []byte
-// 	Replaced []byte
-// }) {
-// 	mock, err := New()
-// 	if err != nil {
-// 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
-// 	}
-// 	defer mock.Close(context.Background())
-// 	mock.ExpectQuery("SELECT").WillReturnRows(rows)
-
-// 	rs, err := mock.Query(context.Background(), "SELECT")
-// 	if err != nil {
-// 		t.Fatalf("failed to query rows: %s", err)
-// 	}
-
-// 	if !rs.Next() || rs.Err() != nil {
-// 		t.Fatal("unexpected error on first row retrieval")
-// 	}
-// 	var count int
-// 	for i := 0; ; i++ {
-// 		count++
-// 		b, err := scan(rs)
-// 		if err != nil {
-// 			t.Fatalf("unexpected error scanning row: %s", err)
-// 		}
-// 		if exp := want[i].Initial; !bytes.Equal(b, exp) {
-// 			t.Fatalf("expected raw value to be '%s' (len:%d), but got [%T]:%s (len:%d)", exp, len(exp), b, b, len(b))
-// 		}
-// 		next := rs.Next()
-// 		if exp := want[i].Replaced; !bytes.Equal(b, exp) {
-// 			t.Fatalf("expected raw value to be replaced with '%s' (len:%d) after calling Next(), but got [%T]:%s (len:%d)", exp, len(exp), b, b, len(b))
-// 		}
-// 		if !next {
-// 			break
-// 		}
-// 	}
-// 	if err := rs.Err(); err != nil {
-// 		t.Fatalf("row iteration failed: %s", err)
-// 	}
-// 	if exp := len(want); count != exp {
-// 		t.Fatalf("incorrect number of rows exp: %d, but got %d", exp, count)
-// 	}
-
-// 	if err := mock.ExpectationsWereMet(); err != nil {
-// 		t.Fatal(err)
-// 	}
-// }
-
-// func queryRowBytesNotInvalidatedByNext(t *testing.T, rows *Rows, scan func(*sql.Rows) ([]byte, error), want [][]byte) {
-// 	mock, err := New()
-// 	if err != nil {
-// 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
-// 	}
-// 	defer mock.Close(context.Background())
-// 	mock.ExpectQuery("SELECT").WillReturnRows(rows)
-
-// 	rs, err := mock.Query(context.Background(), "SELECT")
-// 	if err != nil {
-// 		t.Fatalf("failed to query rows: %s", err)
-// 	}
-
-// 	if !rs.Next() || rs.Err() != nil {
-// 		t.Fatal("unexpected error on first row retrieval")
-// 	}
-// 	var count int
-// 	for i := 0; ; i++ {
-// 		count++
-// 		b, err := scan(rs)
-// 		if err != nil {
-// 			t.Fatalf("unexpected error scanning row: %s", err)
-// 		}
-// 		if exp := want[i]; !bytes.Equal(b, exp) {
-// 			t.Fatalf("expected raw value to be '%s' (len:%d), but got [%T]:%s (len:%d)", exp, len(exp), b, b, len(b))
-// 		}
-// 		next := rs.Next()
-// 		if exp := want[i]; !bytes.Equal(b, exp) {
-// 			t.Fatalf("expected raw value to be replaced with '%s' (len:%d) after calling Next(), but got [%T]:%s (len:%d)", exp, len(exp), b, b, len(b))
-// 		}
-// 		if !next {
-// 			break
-// 		}
-// 	}
-// 	if err := rs.Err(); err != nil {
-// 		t.Fatalf("row iteration failed: %s", err)
-// 	}
-// 	if exp := len(want); count != exp {
-// 		t.Fatalf("incorrect number of rows exp: %d, but got %d", exp, count)
-// 	}
-
-// 	if err := mock.ExpectationsWereMet(); err != nil {
-// 		t.Fatal(err)
-// 	}
-// }
-
-// func queryRowBytesInvalidatedByClose(t *testing.T, rows *Rows, scan func(*sql.Rows) ([]byte, error), want struct {
-// 	Initial  []byte
-// 	Replaced []byte
-// }) {
-// 	mock, err := New()
-// 	if err != nil {
-// 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
-// 	}
-// 	defer mock.Close(context.Background())
-// 	mock.ExpectQuery("SELECT").WillReturnRows(rows)
-
-// 	rs, err := mock.Query(context.Background(), "SELECT")
-// 	if err != nil {
-// 		t.Fatalf("failed to query rows: %s", err)
-// 	}
-
-// 	if !rs.Next() || rs.Err() != nil {
-// 		t.Fatal("unexpected error on first row retrieval")
-// 	}
-// 	b, err := scan(rs)
-// 	if err != nil {
-// 		t.Fatalf("unexpected error scanning row: %s", err)
-// 	}
-// 	if !bytes.Equal(b, want.Initial) {
-// 		t.Fatalf("expected raw value to be '%s' (len:%d), but got [%T]:%s (len:%d)", want.Initial, len(want.Initial), b, b, len(b))
-// 	}
-// 	rs.Close()
-
-// 	if !bytes.Equal(b, want.Replaced) {
-// 		t.Fatalf("expected raw value to be replaced with '%s' (len:%d) after calling Next(), but got [%T]:%s (len:%d)", want.Replaced, len(want.Replaced), b, b, len(b))
-// 	}
-// 	if err := rs.Err(); err != nil {
-// 		t.Fatalf("row iteration failed: %s", err)
-// 	}
-
-// 	if err := mock.ExpectationsWereMet(); err != nil {
-// 		t.Fatal(err)
-// 	}
-// }
-
-// func queryRowBytesNotInvalidatedByClose(t *testing.T, rows *Rows, scan func(*sql.Rows) ([]byte, error), want []byte) {
-// 	mock, err := New()
-// 	if err != nil {
-// 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
-// 	}
-// 	defer mock.Close(context.Background())
-// 	mock.ExpectQuery("SELECT").WillReturnRows(rows)
-
-// 	rs, err := mock.Query(context.Background(), "SELECT")
-// 	if err != nil {
-// 		t.Fatalf("failed to query rows: %s", err)
-// 	}
-
-// 	if !rs.Next() || rs.Err() != nil {
-// 		t.Fatal("unexpected error on first row retrieval")
-// 	}
-// 	b, err := scan(rs)
-// 	if err != nil {
-// 		t.Fatalf("unexpected error scanning row: %s", err)
-// 	}
-// 	if !bytes.Equal(b, want) {
-// 		t.Fatalf("expected raw value to be '%s' (len:%d), but got [%T]:%s (len:%d)", want, len(want), b, b, len(b))
-// 	}
-// 	if err := rs.Close(); err != nil {
-// 		t.Fatalf("unexpected error closing rows: %s", err)
-// 	}
-// 	if !bytes.Equal(b, want) {
-// 		t.Fatalf("expected raw value to be replaced with '%s' (len:%d) after calling Next(), but got [%T]:%s (len:%d)", want, len(want), b, b, len(b))
-// 	}
-// 	if err := rs.Err(); err != nil {
-// 		t.Fatalf("row iteration failed: %s", err)
-// 	}
-
-// 	if err := mock.ExpectationsWereMet(); err != nil {
-// 		t.Fatal(err)
-// 	}
-// }
-
 func TestMockQueryWithCollect(t *testing.T) {
 	t.Parallel()
 	mock, err := NewConn()
@@ -879,10 +643,6 @@ func TestMockQueryWithCollect(t *testing.T) {
 
 	defer rows.Close()
 
-	//if !rows.Next() {
-	//	t.Error("it must have had one row as result, but got empty result set instead")
-	//}
-
 	rawMap, err := pgx.CollectRows(rows, pgx.RowToAddrOfStructByPos[rowStructType])
 	if err != nil {
 		t.Errorf("error '%s' was not expected while trying to collect rows", err)
@@ -906,4 +666,8 @@ func TestMockQueryWithCollect(t *testing.T) {
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("there were unfulfilled expectations: %s", err)
 	}
+}
+
+func TestRowsConn(t *testing.T) {
+	assert.Nil(t, (&rowSets{}).Conn())
 }
