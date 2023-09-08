@@ -1015,29 +1015,25 @@ func TestExpectedBeginOrder(t *testing.T) {
 }
 
 func TestPreparedStatementCloseExpectation(t *testing.T) {
-	// Open new mock database
-	mock, err := NewConn()
-	if err != nil {
-		fmt.Println("error creating mock database")
-		return
-	}
-	defer mock.Close(context.Background())
+	t.Parallel()
+	mock, _ := NewConn()
+	a := assert.New(t)
 
 	ep := mock.ExpectPrepare("foo", "INSERT INTO ORDERS").WillBeDeallocated()
 	ep.ExpectExec().WithArgs(AnyArg(), AnyArg()).WillReturnResult(NewResult("UPDATE", 1))
 
-	_, err = mock.Prepare(context.Background(), "foo", "INSERT INTO ORDERS(ID, STATUS) VALUES (?, ?)")
-	if err != nil {
-		t.Fatal(err)
-	}
+	stmt, err := mock.Prepare(context.Background(), "foo", "INSERT INTO ORDERS(ID, STATUS) VALUES (?, ?)")
+	a.NoError(err)
+	a.NotNil(stmt)
 
-	if _, err := mock.Exec(context.Background(), "foo", 1, "Hello"); err != nil {
-		t.Fatal(err)
-	}
+	_, err = mock.Exec(context.Background(), "foo", 1, "Hello")
+	a.NoError(err)
 
-	if err := mock.Deallocate(context.Background(), "foo"); err != nil {
-		t.Fatal(err)
-	}
+	err = mock.Deallocate(context.Background(), "baz")
+	a.Error(err, "wrong prepares stmt name should raise an error")
+
+	err = mock.Deallocate(context.Background(), "foo")
+	a.NoError(err)
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("there were unfulfilled expectations: %s", err)
