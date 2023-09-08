@@ -362,7 +362,10 @@ func (c *pgxmock) BeginTx(ctx context.Context, txOptions pgx.TxOptions) (pgx.Tx,
 	if err != nil {
 		return nil, err
 	}
-	return c, ex.waitForDelay(ctx)
+	if err = ex.waitForDelay(ctx); err != nil {
+		return nil, err
+	}
+	return c, nil
 }
 
 func (c *pgxmock) Prepare(ctx context.Context, name, query string) (*pgconn.StatementDescription, error) {
