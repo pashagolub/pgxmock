@@ -118,17 +118,17 @@ func TestMockCopyFrom(t *testing.T) {
 
 	res, err := mock.CopyFrom(context.Background(), pgx.Identifier{"error", "error"}, []string{"error"}, nil)
 	a.Error(err, "incorrect table should raise an error")
-	a.Less(res, 0)
+	a.EqualValues(res, -1)
 	a.Error(mock.ExpectationsWereMet(), "there must be unfulfilled expectations")
 
 	res, err = mock.CopyFrom(context.Background(), pgx.Identifier{"fooschema", "baztable"}, []string{"error"}, nil)
 	a.Error(err, "incorrect columns should raise an error")
-	a.Less(res, 0)
+	a.EqualValues(res, -1)
 	a.Error(mock.ExpectationsWereMet(), "there must be unfulfilled expectations")
 
 	res, err = mock.CopyFrom(context.Background(), pgx.Identifier{"fooschema", "baztable"}, []string{"col1"}, nil)
 	a.NoError(err)
-	a.Equal(res, 2)
+	a.EqualValues(res, 2)
 
 	mock.ExpectCopyFrom(pgx.Identifier{"fooschema", "baztable"}, []string{"col1"}).
 		WillReturnError(errors.New("error is here"))
@@ -238,23 +238,20 @@ func TestTransactionExpectations(t *testing.T) {
 
 func TestPrepareExpectations(t *testing.T) {
 	t.Parallel()
-	mock, err := NewConn()
-	if err != nil {
-		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
-	}
-	defer mock.Close(context.Background())
+	mock, _ := NewConn()
+	a := assert.New(t)
 
 	mock.ExpectPrepare("foo", "SELECT (.+) FROM articles WHERE id = ?").
 		WillReturnCloseError(errors.New("invaders must die")).
 		WillDelayFor(1 * time.Second)
 
-	stmt, err := mock.Prepare(context.Background(), "foo", "SELECT (.+) FROM articles WHERE id = $1")
-	if err != nil {
-		t.Errorf("error '%s' was not expected while creating a prepared statement", err)
-	}
-	if stmt == nil {
-		t.Errorf("stmt was expected while creating a prepared statement")
-	}
+	stmt, err := mock.Prepare(context.Background(), "baz", "SELECT (.+) FROM articles WHERE id = ?")
+	a.Error(err, "wrong prepare stmt name should raise an error")
+	a.Nil(stmt)
+
+	stmt, err = mock.Prepare(context.Background(), "foo", "SELECT (.+) FROM articles WHERE id = $1")
+	a.NoError(err)
+	a.NotNil(stmt)
 
 	// expect something else, w/o ExpectPrepare()
 	var id int
@@ -266,24 +263,15 @@ func TestPrepareExpectations(t *testing.T) {
 		WillReturnRows(rs)
 
 	err = mock.QueryRow(context.Background(), "foo", 5).Scan(&id, &title)
-	if err != nil {
-		t.Errorf("error '%s' was not expected while retrieving mock rows", err)
-	}
+	a.NoError(err)
 
 	mock.ExpectPrepare("foo", "SELECT (.+) FROM articles WHERE id = ?").
 		WillReturnError(fmt.Errorf("Some DB error occurred"))
 
 	stmt, err = mock.Prepare(context.Background(), "foo", "SELECT id FROM articles WHERE id = $1")
-	if err == nil {
-		t.Error("error was expected while creating a prepared statement")
-	}
-	if stmt != nil {
-		t.Errorf("stmt was not expected while creating a prepared statement returning error")
-	}
-
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("there were unfulfilled expectations: %s", err)
-	}
+	a.Error(err)
+	a.Nil(stmt)
+	a.NoError(mock.ExpectationsWereMet())
 }
 
 func TestPreparedQueryExecutions(t *testing.T) {
