@@ -16,6 +16,7 @@ import (
 var ctx = context.Background()
 
 func TestTimes(t *testing.T) {
+	t.Parallel()
 	mock, _ := NewConn()
 	a := assert.New(t)
 	mock.ExpectPing().Times(2)
@@ -28,6 +29,7 @@ func TestTimes(t *testing.T) {
 }
 
 func TestMaybe(t *testing.T) {
+	t.Parallel()
 	mock, _ := NewConn()
 	a := assert.New(t)
 	mock.ExpectPing().Maybe()
@@ -44,6 +46,7 @@ func TestMaybe(t *testing.T) {
 }
 
 func TestPanic(t *testing.T) {
+	t.Parallel()
 	mock, _ := NewConn()
 	a := assert.New(t)
 	defer func() {
@@ -58,10 +61,16 @@ func TestPanic(t *testing.T) {
 }
 
 func TestCallModifier(t *testing.T) {
+	t.Parallel()
 	mock, _ := NewConn()
 	a := assert.New(t)
 
 	mock.ExpectPing().WillDelayFor(time.Second).Maybe().Times(4)
+
+	c, f := context.WithCancel(ctx)
+	f()
+	a.Error(mock.Ping(c), "should raise error for cancelled context")
+
 	a.NoError(mock.ExpectationsWereMet()) //should produce no error since Ping() call is optional
 
 	a.NoError(mock.Ping(ctx))
