@@ -10,7 +10,7 @@ It's based on the well-known [sqlmock](https://github.com/DATA-DOG/go-sqlmock) l
 
 **pgxmock** has one and only purpose - to simulate **pgx** behavior in tests, without needing a real database connection. It helps to maintain correct **TDD** workflow.
 
-- written based on **go1.15** version, however, should be compatible with **go1.11** and above;
+- written based on **go1.21** version;
 - does not require any modifications to your source code;
 - has strict by default expectation order matching;
 - has no third party dependencies except **pgx** packages.
