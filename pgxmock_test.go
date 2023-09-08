@@ -194,65 +194,46 @@ func TestMockQueryTypes(t *testing.T) {
 
 func TestTransactionExpectations(t *testing.T) {
 	t.Parallel()
-	mock, err := NewConn()
-	if err != nil {
-		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
-	}
-	defer mock.Close(context.Background())
+	mock, _ := NewConn()
+	a := assert.New(t)
 
 	// begin and commit
 	mock.ExpectBegin()
 	mock.ExpectCommit()
 
-	tx, err := mock.Begin(context.Background())
-	if err != nil {
-		t.Errorf("an error '%s' was not expected when beginning a transaction", err)
-	}
-
-	err = tx.Commit(context.Background())
-	if err != nil {
-		t.Errorf("an error '%s' was not expected when committing a transaction", err)
-	}
+	tx, err := mock.Begin(ctx)
+	a.NoError(err)
+	err = tx.Commit(ctx)
+	a.NoError(err)
 
 	// beginTx and commit
-	mock.ExpectBeginTx(pgx.TxOptions{})
+	mock.ExpectBeginTx(pgx.TxOptions{AccessMode: pgx.ReadOnly})
 	mock.ExpectCommit()
 
-	tx, err = mock.BeginTx(context.Background(), pgx.TxOptions{})
-	if err != nil {
-		t.Errorf("an error '%s' was not expected when beginning a transaction", err)
-	}
+	tx, err = mock.BeginTx(ctx, pgx.TxOptions{})
+	a.Error(err, "wrong tx access mode should raise error")
 
-	err = tx.Commit(context.Background())
-	if err != nil {
-		t.Errorf("an error '%s' was not expected when committing a transaction", err)
-	}
+	tx, err = mock.BeginTx(ctx, pgx.TxOptions{AccessMode: pgx.ReadOnly})
+	a.NoError(err)
+	err = tx.Commit(ctx)
+	a.NoError(err)
 
 	// begin and rollback
 	mock.ExpectBegin()
 	mock.ExpectRollback()
 
-	tx, err = mock.Begin(context.Background())
-	if err != nil {
-		t.Errorf("an error '%s' was not expected when beginning a transaction", err)
-	}
-
-	err = tx.Rollback(context.Background())
-	if err != nil {
-		t.Errorf("an error '%s' was not expected when rolling back a transaction", err)
-	}
+	tx, err = mock.Begin(ctx)
+	a.NoError(err)
+	err = tx.Rollback(ctx)
+	a.NoError(err)
 
 	// begin with an error
-	mock.ExpectBegin().WillReturnError(fmt.Errorf("some err"))
+	mock.ExpectBegin().WillReturnError(errors.New("some err"))
 
-	_, err = mock.Begin(context.Background())
-	if err == nil {
-		t.Error("an error was expected when beginning a transaction, but got none")
-	}
+	_, err = mock.Begin(ctx)
+	a.Error(err)
 
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("there were unfulfilled expectations: %s", err)
-	}
+	a.NoError(mock.ExpectationsWereMet())
 }
 
 func TestPrepareExpectations(t *testing.T) {
