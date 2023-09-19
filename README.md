@@ -10,18 +10,18 @@ It's based on the well-known [sqlmock](https://github.com/DATA-DOG/go-sqlmock) l
 
 **pgxmock** has one and only purpose - to simulate **pgx** behavior in tests, without needing a real database connection. It helps to maintain correct **TDD** workflow.
 
-- written based on **go1.15** version, however, should be compatible with **go1.11** and above;
+- written based on **go1.21** version;
 - does not require any modifications to your source code;
 - has strict by default expectation order matching;
 - has no third party dependencies except **pgx** packages.
 
 ## Install
 
-    go get github.com/pashagolub/pgxmock/v2
+    go get github.com/pashagolub/pgxmock/v3
 
 ## Documentation and Examples
 
-Visit [godoc](http://pkg.go.dev/github.com/pashagolub/pgxmock/v2) for general examples and public api reference.
+Visit [godoc](http://pkg.go.dev/github.com/pashagolub/pgxmock/v3) for general examples and public api reference.
 
 See implementation examples:
 
@@ -92,7 +92,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/pashagolub/pgxmock/v2"
+	"github.com/pashagolub/pgxmock/v3"
 )
 
 // a successful case
@@ -175,7 +175,7 @@ provide a standard sql parsing matchers.
 ## Matching arguments like time.Time
 
 There may be arguments which are of `struct` type and cannot be compared easily by value like `time.Time`. In this case
-**pgxmock** provides an [Argument](https://pkg.go.dev/github.com/pashagolub/pgxmock/v2#Argument) interface which
+**pgxmock** provides an [Argument](https://pkg.go.dev/github.com/pashagolub/pgxmock/v3#Argument) interface which
 can be used in more sophisticated matching. Here is a simple example of time argument matching:
 
 ``` go

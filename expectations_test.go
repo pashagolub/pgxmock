@@ -9,54 +9,129 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/stretchr/testify/assert"
 )
+
+var ctx = context.Background()
+
+func TestTimes(t *testing.T) {
+	t.Parallel()
+	mock, _ := NewConn()
+	a := assert.New(t)
+	mock.ExpectPing().Times(2)
+	err := mock.Ping(ctx)
+	a.NoError(err)
+	a.Error(mock.ExpectationsWereMet()) // must be two Ping() calls
+	err = mock.Ping(ctx)
+	a.NoError(err)
+	a.NoError(mock.ExpectationsWereMet())
+}
+
+func TestMaybe(t *testing.T) {
+	t.Parallel()
+	mock, _ := NewConn()
+	a := assert.New(t)
+	mock.ExpectPing().Maybe()
+	mock.ExpectBegin().Maybe()
+	mock.ExpectQuery("SET TIME ZONE 'Europe/Rome'").Maybe() //only if we're in Italy
+	cmdtag := pgconn.NewCommandTag("SELECT 1")
+	mock.ExpectExec("select").WillReturnResult(cmdtag)
+	mock.ExpectCommit().Maybe()
+
+	res, err := mock.Exec(ctx, "select version()")
+	a.Equal(cmdtag, res)
+	a.NoError(err)
+	a.NoError(mock.ExpectationsWereMet())
+}
+
+func TestPanic(t *testing.T) {
+	t.Parallel()
+	mock, _ := NewConn()
+	a := assert.New(t)
+	defer func() {
+		a.NotNil(recover(), "The code did not panic")
+		a.NoError(mock.ExpectationsWereMet())
+	}()
+
+	ex := mock.ExpectPing()
+	ex.WillPanic("i'm tired")
+	fmt.Println(ex)
+	a.NoError(mock.Ping(ctx))
+}
+
+func TestCallModifier(t *testing.T) {
+	t.Parallel()
+	mock, _ := NewConn()
+	a := assert.New(t)
+
+	mock.ExpectPing().WillDelayFor(time.Second).Maybe().Times(4)
+
+	c, f := context.WithCancel(ctx)
+	f()
+	a.Error(mock.Ping(c), "should raise error for cancelled context")
+
+	a.NoError(mock.ExpectationsWereMet()) //should produce no error since Ping() call is optional
+
+	a.NoError(mock.Ping(ctx))
+	a.NoError(mock.ExpectationsWereMet()) //should produce no error since Ping() was called actually
+}
 
 func TestCopyFromBug(t *testing.T) {
 	mock, _ := NewConn()
-	defer func() {
-		err := mock.ExpectationsWereMet()
-		if err != nil {
-			t.Errorf("expectation were not met: %s", err)
-		}
-	}()
+	a := assert.New(t)
 
 	mock.ExpectCopyFrom(pgx.Identifier{"foo"}, []string{"bar"}).WillReturnResult(1)
 
 	var rows [][]any
 	rows = append(rows, []any{"baz"})
 
-	_, err := mock.CopyFrom(context.Background(), pgx.Identifier{"foo"}, []string{"bar"}, pgx.CopyFromRows(rows))
-	if err != nil {
-		t.Errorf("unexpected error: %s", err)
-	}
+	r, err := mock.CopyFrom(ctx, pgx.Identifier{"foo"}, []string{"bar"}, pgx.CopyFromRows(rows))
+	a.EqualValues(len(rows), r)
+	a.NoError(err)
+	a.NoError(mock.ExpectationsWereMet())
 }
 
 func ExampleExpectedExec() {
 	mock, _ := NewConn()
-	result := NewErrorResult(fmt.Errorf("some error"))
-	mock.ExpectExec("^INSERT (.+)").WillReturnResult(result)
-	res, _ := mock.Exec(context.Background(), "INSERT something")
-	s := res.String()
-	fmt.Println(s)
-	// Output: some error
-}
+	ex := mock.ExpectExec("^INSERT (.+)").WillReturnResult(NewResult("INSERT", 15))
+	ex.WillDelayFor(time.Second).Maybe().Times(2)
 
-func TestUnmonitoredPing(t *testing.T) {
-	mock, _ := NewConn()
-	p := mock.ExpectPing()
-	if p != nil {
-		t.Error("ExpectPing should return nil since MonitorPingsOption = false ")
-	}
+	fmt.Print(ex)
+	res, _ := mock.Exec(ctx, "INSERT something")
+	fmt.Println(res)
+	ex.WithArgs(42)
+	fmt.Print(ex)
+	res, _ = mock.Exec(ctx, "INSERT something", 42)
+	fmt.Print(res)
+	// Output:
+	// ExpectedExec => expecting call to Exec():
+	// 	- matches sql: '^INSERT (.+)'
+	// 	- is without arguments
+	// 	- returns result: INSERT 15
+	// 	- delayed execution for: 1s
+	// 	- execution is optional
+	// 	- execution calls awaited: 2
+	// INSERT 15
+	// ExpectedExec => expecting call to Exec():
+	// 	- matches sql: '^INSERT (.+)'
+	// 	- is with arguments:
+	// 		0 - 42
+	// 	- returns result: INSERT 15
+	// 	- delayed execution for: 1s
+	// 	- execution is optional
+	// 	- execution calls awaited: 2
+	// INSERT 15
 }
 
 func TestUnexpectedPing(t *testing.T) {
-	mock, _ := NewConn(MonitorPingsOption(true))
-	err := mock.Ping(context.Background())
+	mock, _ := NewConn()
+	err := mock.Ping(ctx)
 	if err == nil {
 		t.Error("Ping should return error for unexpected call")
 	}
 	mock.ExpectExec("foo")
-	err = mock.Ping(context.Background())
+	err = mock.Ping(ctx)
 	if err == nil {
 		t.Error("Ping should return error for unexpected call")
 	}
@@ -64,12 +139,12 @@ func TestUnexpectedPing(t *testing.T) {
 
 func TestUnexpectedPrepare(t *testing.T) {
 	mock, _ := NewConn()
-	_, err := mock.Prepare(context.Background(), "foo", "bar")
+	_, err := mock.Prepare(ctx, "foo", "bar")
 	if err == nil {
 		t.Error("Prepare should return error for unexpected call")
 	}
 	mock.ExpectExec("foo")
-	_, err = mock.Prepare(context.Background(), "foo", "bar")
+	_, err = mock.Prepare(ctx, "foo", "bar")
 	if err == nil {
 		t.Error("Prepare should return error for unexpected call")
 	}
@@ -77,19 +152,20 @@ func TestUnexpectedPrepare(t *testing.T) {
 
 func TestUnexpectedCopyFrom(t *testing.T) {
 	mock, _ := NewConn()
-	_, err := mock.CopyFrom(context.Background(), pgx.Identifier{"schema", "table"}, []string{"foo", "bar"}, nil)
+	_, err := mock.CopyFrom(ctx, pgx.Identifier{"schema", "table"}, []string{"foo", "bar"}, nil)
 	if err == nil {
 		t.Error("CopyFrom should return error for unexpected call")
 	}
 	mock.ExpectExec("foo")
-	_, err = mock.CopyFrom(context.Background(), pgx.Identifier{"schema", "table"}, []string{"foo", "bar"}, nil)
+	_, err = mock.CopyFrom(ctx, pgx.Identifier{"schema", "table"}, []string{"foo", "bar"}, nil)
 	if err == nil {
 		t.Error("CopyFrom should return error for unexpected call")
 	}
 }
 
 func TestBuildQuery(t *testing.T) {
-	mock, _ := NewConn(MonitorPingsOption(true))
+	mock, _ := NewConn()
+	a := assert.New(t)
 	query := `
 		SELECT
 			name,
@@ -105,18 +181,19 @@ func TestBuildQuery(t *testing.T) {
 	`
 
 	mock.ExpectPing().WillDelayFor(1 * time.Second).WillReturnError(errors.New("no ping please"))
-	mock.ExpectQuery(query)
-	mock.ExpectExec(query)
+	mock.ExpectQuery(query).WillReturnError(errors.New("oops"))
+	mock.ExpectExec(query).WillReturnResult(NewResult("SELECT", 1))
 	mock.ExpectPrepare("foo", query)
 
-	_ = mock.Ping(context.Background())
-	mock.QueryRow(context.Background(), query)
-	_, _ = mock.Exec(context.Background(), query)
-	_, _ = mock.Prepare(context.Background(), "foo", query)
+	err := mock.Ping(ctx)
+	a.Error(err)
+	mock.QueryRow(ctx, query)
+	_, err = mock.Exec(ctx, query)
+	a.NoError(err)
+	_, err = mock.Prepare(ctx, "foo", query)
+	a.NoError(err)
 
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Error(err)
-	}
+	a.NoError(mock.ExpectationsWereMet())
 }
 
 func TestQueryRowScan(t *testing.T) {
@@ -138,7 +215,7 @@ func TestQueryRowScan(t *testing.T) {
 	expectedIntValue := 2
 	expectedArrayValue := []string{"Three", "Four"}
 	mock.ExpectQuery(query).WillReturnRows(mock.NewRows([]string{"One", "Two", "Three"}).AddRow(expectedStringValue, expectedIntValue, []string{"Three", "Four"}))
-	row := mock.QueryRow(context.Background(), query)
+	row := mock.QueryRow(ctx, query)
 	var stringValue string
 	var intValue int
 	var arrayValue []string
@@ -164,7 +241,7 @@ func TestMissingWithArgs(t *testing.T) {
 	// No arguments expected
 	mock.ExpectExec("INSERT something")
 	// Receiving argument
-	_, err := mock.Exec(context.Background(), "INSERT something", "something")
+	_, err := mock.Exec(ctx, "INSERT something", "something")
 	if err == nil {
 		t.Error("arguments do not match error was expected")
 	}

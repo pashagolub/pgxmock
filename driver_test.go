@@ -33,6 +33,10 @@ func TestPools(t *testing.T) {
 	if mock == mock2 {
 		t.Errorf("expected not the same mock instance, but it is the same")
 	}
+	conn := mock.AsConn()
+	if conn == nil {
+		t.Error("expected connection strruct, but got nil")
+	}
 	mock.Close()
 	mock2.Close()
 }
