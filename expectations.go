@@ -134,20 +134,48 @@ type queryBasedExpectation struct {
 	args      []interface{}
 }
 
-func (e *queryBasedExpectation) argsMatches(args []interface{}) error {
-	if len(args) != len(e.args) {
-		return fmt.Errorf("expected %d, but got %d arguments", len(e.args), len(args))
+func (e *queryBasedExpectation) argsMatches(sql string, args []interface{}) error {
+	eargs := e.args
+	// check for any query rewriters
+	// according to current pgx docs, a QueryRewriter is only supported as the first
+	// argument.
+	if len(args) == 1 {
+		if qrw, ok := args[0].(pgx.QueryRewriter); ok {
+			// note: pgx.Conn is not currently used by the query rewriter, but is part
+			// of the method signature, so just create an empty pointer for now.
+			_, newArgs, err := qrw.RewriteQuery(context.Background(), new(pgx.Conn), sql, args)
+			if err != nil {
+				return fmt.Errorf("error rewriting query: %w", err)
+			}
+			args = newArgs
+		}
+		// also do rewriting on the expected args if a QueryRewriter is present
+		if len(eargs) == 1 {
+			if qrw, ok := eargs[0].(pgx.QueryRewriter); ok {
+				// note: pgx.Conn is not currently used by the query rewriter, but is part
+				// of the method signature, so just create an empty pointer for now.
+				_, newArgs, err := qrw.RewriteQuery(context.Background(), new(pgx.Conn), sql, eargs)
+				if err != nil {
+					return fmt.Errorf("error rewriting query expectation: %w", err)
+				}
+				eargs = newArgs
+			}
+		}
+	}
+
+	if len(args) != len(eargs) {
+		return fmt.Errorf("expected %d, but got %d arguments", len(eargs), len(args))
 	}
 	for k, v := range args {
 		// custom argument matcher
-		if matcher, ok := e.args[k].(Argument); ok {
+		if matcher, ok := eargs[k].(Argument); ok {
 			if !matcher.Match(v) {
 				return fmt.Errorf("matcher %T could not match %d argument %T - %+v", matcher, k, args[k], args[k])
 			}
 			continue
 		}
 
-		if darg := e.args[k]; !reflect.DeepEqual(darg, v) {
+		if darg := eargs[k]; !reflect.DeepEqual(darg, v) {
 			return fmt.Errorf("argument %d expected [%T - %+v] does not match actual [%T - %+v]", k, darg, darg, v, v)
 		}
 	}
