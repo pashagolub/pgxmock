@@ -137,34 +137,23 @@ type queryBasedExpectation struct {
 
 func (e *queryBasedExpectation) argsMatches(sql string, args []interface{}) (rewrittenSQL string, err error) {
 	eargs := e.args
-	// check for any query rewriters
-	// according to current pgx docs, a QueryRewriter is only supported as the first
-	// argument.
+	// check for any QueryRewriter arguments: only supported as the first argument
 	if len(args) == 1 {
 		if qrw, ok := args[0].(pgx.QueryRewriter); ok {
-			// note: pgx.Conn is not currently used by the query rewriter, but is part
-			// of the method signature, so just create an empty pointer for now.
-			rewrittenSQL, args, err = qrw.RewriteQuery(context.Background(), new(pgx.Conn), sql, args)
-			if err != nil {
+			// note: pgx.Conn is not currently used by the query rewriter
+			if rewrittenSQL, args, err = qrw.RewriteQuery(context.Background(), nil, sql, args); err != nil {
 				return rewrittenSQL, fmt.Errorf("error rewriting query: %w", err)
 			}
-			args = newArgs
 		}
 		// also do rewriting on the expected args if a QueryRewriter is present
 		if len(eargs) == 1 {
 			if qrw, ok := eargs[0].(pgx.QueryRewriter); ok {
-				// note: pgx.Conn is not currently used by the query rewriter, but is part
-				// of the method signature, so just create an empty pointer for now.
-				_, newArgs, err := qrw.RewriteQuery(context.Background(), new(pgx.Conn), sql, eargs)
-				if err != nil {
+				if _, eargs, err = qrw.RewriteQuery(context.Background(), nil, sql, eargs); err != nil {
 					return "", fmt.Errorf("error rewriting query expectation: %w", err)
 				}
-				e.expectRewrittenSQL = rewrittenSQL
-				eargs = newArgs
 			}
 		}
 	}
-
 	if len(args) != len(eargs) {
 		return rewrittenSQL, fmt.Errorf("expected %d, but got %d arguments", len(eargs), len(args))
 	}
@@ -176,7 +165,6 @@ func (e *queryBasedExpectation) argsMatches(sql string, args []interface{}) (rew
 			}
 			continue
 		}
-
 		if darg := eargs[k]; !reflect.DeepEqual(darg, v) {
 			return rewrittenSQL, fmt.Errorf("argument %d expected [%T - %+v] does not match actual [%T - %+v]", k, darg, darg, v, v)
 		}

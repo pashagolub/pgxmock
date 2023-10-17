@@ -91,7 +91,7 @@ func TestByteSliceNamedArgument(t *testing.T) {
 	username := []byte("user")
 	mock.ExpectExec(`INSERT INTO users\(username\) VALUES \(\@user\)`).
 		WithArgs(pgx.NamedArgs{"user": username}).
-		WithRewrittenSQL("INSERT INTO users(username) VALUES ($1)").
+		WithRewrittenSQL(`INSERT INTO users\(username\) VALUES \(\$1\)`).
 		WillReturnResult(NewResult("INSERT", 1))
 
 	_, err = mock.Exec(context.Background(),
