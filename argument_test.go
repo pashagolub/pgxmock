@@ -87,7 +87,7 @@ type failQryRW struct {
 	pgx.QueryRewriter
 }
 
-func (fqrw failQryRW) RewriteQuery(_ context.Context, _ *pgx.Conn, sql string, args []any) (newSQL string, newArgs []any, err error) {
+func (fqrw failQryRW) RewriteQuery(_ context.Context, _ *pgx.Conn, sql string, _ []any) (newSQL string, newArgs []any, err error) {
 	return "", nil, errors.New("cannot rewrite query " + sql)
 }
 
