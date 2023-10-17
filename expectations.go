@@ -144,7 +144,7 @@ func (e *queryBasedExpectation) argsMatches(sql string, args []interface{}) (rew
 		if qrw, ok := args[0].(pgx.QueryRewriter); ok {
 			// note: pgx.Conn is not currently used by the query rewriter, but is part
 			// of the method signature, so just create an empty pointer for now.
-			rewrittenSQL, newArgs, err := qrw.RewriteQuery(context.Background(), new(pgx.Conn), sql, args)
+			rewrittenSQL, args, err = qrw.RewriteQuery(context.Background(), new(pgx.Conn), sql, args)
 			if err != nil {
 				return rewrittenSQL, fmt.Errorf("error rewriting query: %w", err)
 			}
