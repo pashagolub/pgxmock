@@ -246,7 +246,7 @@ func (e *ExpectedExec) String() string {
 			msg += fmt.Sprintf("\t\t%d - %+v\n", i, arg)
 		}
 	}
-	if e.result.String() > "" {
+	if e.result.String() != "" {
 		msg += fmt.Sprintf("\t- returns result: %s\n", e.result)
 	}
 

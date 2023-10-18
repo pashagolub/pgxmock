@@ -434,7 +434,7 @@ func (c *pgxmock) Query(ctx context.Context, sql string, args ...interface{}) (p
 		}
 		if rewrittenSQL, err := queryExp.argsMatches(sql, args); err != nil {
 			return err
-		} else if rewrittenSQL > "" {
+		} else if rewrittenSQL != "" {
 			if err := c.queryMatcher.Match(queryExp.expectRewrittenSQL, rewrittenSQL); err != nil {
 				return err
 			}
@@ -474,7 +474,7 @@ func (c *pgxmock) Exec(ctx context.Context, query string, args ...interface{}) (
 		}
 		if rewrittenSQL, err := execExp.argsMatches(query, args); err != nil {
 			return err
-		} else if rewrittenSQL > "" {
+		} else if rewrittenSQL != "" {
 			if err := c.queryMatcher.Match(execExp.expectRewrittenSQL, rewrittenSQL); err != nil {
 				//pgx support QueryRewriter for arguments, now we can check if the query was actually rewriten
 				return err
