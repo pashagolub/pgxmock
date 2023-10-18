@@ -280,7 +280,8 @@ func (e *ExpectedPrepare) WillReturnCloseError(err error) *ExpectedPrepare {
 }
 
 // WillBeClosed is for backward compatibility only and will be removed soon.
-// One should use WillBeDeallocated() instead
+//
+// Deprecated: One should use WillBeDeallocated() instead.
 func (e *ExpectedPrepare) WillBeClosed() *ExpectedPrepare {
 	return e.WillBeDeallocated()
 }

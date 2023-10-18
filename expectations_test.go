@@ -249,3 +249,22 @@ func TestMissingWithArgs(t *testing.T) {
 		t.Error("expectation was not matched error was expected")
 	}
 }
+
+func TestWithRewrittenSQL(t *testing.T) {
+	t.Parallel()
+	mock, err := NewConn()
+	a := assert.New(t)
+	a.NoError(err)
+
+	mock.ExpectQuery(`INSERT INTO users\(username\) VALUES \(\@user\)`).
+		WithArgs(pgx.NamedArgs{"user": "John"}).
+		WithRewrittenSQL(`INSERT INTO users\(username\) VALUES \(\$1\)`).
+		WillReturnRows()
+
+	_, err = mock.Query(context.Background(),
+		"INSERT INTO users(username) VALUES (@user)",
+		pgx.NamedArgs{"user": "John"},
+	)
+	a.NoError(err)
+	a.NoError(mock.ExpectationsWereMet())
+}

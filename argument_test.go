@@ -99,9 +99,10 @@ func TestExpectQueryRewriterFail(t *testing.T) {
 		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 
-	mock.ExpectExec(`INSERT INTO users\(username\) VALUES \(\@user\)`).
+	mock.ExpectQuery(`INSERT INTO users\(username\) VALUES \(\@user\)`).
+		WithRewrittenSQL(`INSERT INTO users\(username\) VALUES \(\$1\)`).
 		WithArgs(failQryRW{})
-	_, err = mock.Exec(context.Background(), "INSERT INTO users(username) VALUES (@user)", "baz")
+	_, err = mock.Query(context.Background(), "INSERT INTO users(username) VALUES (@user)", "baz")
 	assert.Error(t, err)
 }
 
