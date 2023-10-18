@@ -166,7 +166,7 @@ which uses expected SQL string as a regular expression to match incoming query s
 In order to customize the QueryMatcher, use the following:
 
 ``` go
-	mock, err := pgxmock.New(context.Background(), sqlmock.QueryMatcherOption(pgxmock.QueryMatcherEqual))
+	mock, err := pgxmock.New(context.Background(), pgxmock.QueryMatcherOption(pgxmock.QueryMatcherEqual))
 ```
 
 The query matcher can be fully customized based on user needs. **pgxmock** will not
