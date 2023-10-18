@@ -130,28 +130,46 @@ func (e *commonExpectation) String() string {
 
 // queryBasedExpectation is a base class that adds a query matching logic
 type queryBasedExpectation struct {
-	expectSQL string
-	args      []interface{}
+	expectSQL          string
+	expectRewrittenSQL string
+	args               []interface{}
 }
 
-func (e *queryBasedExpectation) argsMatches(args []interface{}) error {
-	if len(args) != len(e.args) {
-		return fmt.Errorf("expected %d, but got %d arguments", len(e.args), len(args))
+func (e *queryBasedExpectation) argsMatches(sql string, args []interface{}) (rewrittenSQL string, err error) {
+	eargs := e.args
+	// check for any QueryRewriter arguments: only supported as the first argument
+	if len(args) == 1 {
+		if qrw, ok := args[0].(pgx.QueryRewriter); ok {
+			// note: pgx.Conn is not currently used by the query rewriter
+			if rewrittenSQL, args, err = qrw.RewriteQuery(context.Background(), nil, sql, args); err != nil {
+				return rewrittenSQL, fmt.Errorf("error rewriting query: %w", err)
+			}
+		}
+		// also do rewriting on the expected args if a QueryRewriter is present
+		if len(eargs) == 1 {
+			if qrw, ok := eargs[0].(pgx.QueryRewriter); ok {
+				if _, eargs, err = qrw.RewriteQuery(context.Background(), nil, sql, eargs); err != nil {
+					return "", fmt.Errorf("error rewriting query expectation: %w", err)
+				}
+			}
+		}
+	}
+	if len(args) != len(eargs) {
+		return rewrittenSQL, fmt.Errorf("expected %d, but got %d arguments", len(eargs), len(args))
 	}
 	for k, v := range args {
 		// custom argument matcher
-		if matcher, ok := e.args[k].(Argument); ok {
+		if matcher, ok := eargs[k].(Argument); ok {
 			if !matcher.Match(v) {
-				return fmt.Errorf("matcher %T could not match %d argument %T - %+v", matcher, k, args[k], args[k])
+				return rewrittenSQL, fmt.Errorf("matcher %T could not match %d argument %T - %+v", matcher, k, args[k], args[k])
 			}
 			continue
 		}
-
-		if darg := e.args[k]; !reflect.DeepEqual(darg, v) {
-			return fmt.Errorf("argument %d expected [%T - %+v] does not match actual [%T - %+v]", k, darg, darg, v, v)
+		if darg := eargs[k]; !reflect.DeepEqual(darg, v) {
+			return rewrittenSQL, fmt.Errorf("argument %d expected [%T - %+v] does not match actual [%T - %+v]", k, darg, darg, v, v)
 		}
 	}
-	return nil
+	return
 }
 
 // ExpectedClose is used to manage pgx.Close expectation
@@ -208,6 +226,13 @@ func (e *ExpectedExec) WithArgs(args ...interface{}) *ExpectedExec {
 	return e
 }
 
+// WithRewrittenSQL will match given expected expression to a rewritten SQL statement by
+// an pgx.QueryRewriter argument
+func (e *ExpectedExec) WithRewrittenSQL(sql string) *ExpectedExec {
+	e.expectRewrittenSQL = sql
+	return e
+}
+
 // String returns string representation
 func (e *ExpectedExec) String() string {
 	msg := "ExpectedExec => expecting call to Exec():\n"
@@ -221,7 +246,7 @@ func (e *ExpectedExec) String() string {
 			msg += fmt.Sprintf("\t\t%d - %+v\n", i, arg)
 		}
 	}
-	if e.result.String() > "" {
+	if e.result.String() != "" {
 		msg += fmt.Sprintf("\t- returns result: %s\n", e.result)
 	}
 
@@ -255,7 +280,8 @@ func (e *ExpectedPrepare) WillReturnCloseError(err error) *ExpectedPrepare {
 }
 
 // WillBeClosed is for backward compatibility only and will be removed soon.
-// One should use WillBeDeallocated() instead
+//
+// Deprecated: One should use WillBeDeallocated() instead.
 func (e *ExpectedPrepare) WillBeClosed() *ExpectedPrepare {
 	return e.WillBeDeallocated()
 }
@@ -321,6 +347,13 @@ type ExpectedQuery struct {
 // arguments an pgxmock.Argument interface can be used to match an argument.
 func (e *ExpectedQuery) WithArgs(args ...interface{}) *ExpectedQuery {
 	e.args = args
+	return e
+}
+
+// WithRewrittenSQL will match given expected expression to a rewritten SQL statement by
+// an pgx.QueryRewriter argument
+func (e *ExpectedQuery) WithRewrittenSQL(sql string) *ExpectedQuery {
+	e.expectRewrittenSQL = sql
 	return e
 }
 

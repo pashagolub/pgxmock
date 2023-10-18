@@ -203,6 +203,7 @@ func (c *pgxmock) ExpectationsWereMet() error {
 func (c *pgxmock) ExpectQuery(expectedSQL string) *ExpectedQuery {
 	e := &ExpectedQuery{}
 	e.expectSQL = expectedSQL
+	e.expectRewrittenSQL = expectedSQL
 	c.expectations = append(c.expectations, e)
 	return e
 }
@@ -234,6 +235,7 @@ func (c *pgxmock) ExpectBeginTx(txOptions pgx.TxOptions) *ExpectedBegin {
 func (c *pgxmock) ExpectExec(expectedSQL string) *ExpectedExec {
 	e := &ExpectedExec{}
 	e.expectSQL = expectedSQL
+	e.expectRewrittenSQL = expectedSQL
 	c.expectations = append(c.expectations, e)
 	return e
 }
@@ -430,8 +432,12 @@ func (c *pgxmock) Query(ctx context.Context, sql string, args ...interface{}) (p
 		if err := c.queryMatcher.Match(queryExp.expectSQL, sql); err != nil {
 			return err
 		}
-		if err := queryExp.argsMatches(args); err != nil {
+		if rewrittenSQL, err := queryExp.argsMatches(sql, args); err != nil {
 			return err
+		} else if rewrittenSQL != "" {
+			if err := c.queryMatcher.Match(queryExp.expectRewrittenSQL, rewrittenSQL); err != nil {
+				return err
+			}
 		}
 		if queryExp.err == nil && queryExp.rows == nil {
 			return fmt.Errorf("Query must return a result rows or raise an error: %v", queryExp)
@@ -466,8 +472,13 @@ func (c *pgxmock) Exec(ctx context.Context, query string, args ...interface{}) (
 		if err := c.queryMatcher.Match(execExp.expectSQL, query); err != nil {
 			return err
 		}
-		if err := execExp.argsMatches(args); err != nil {
+		if rewrittenSQL, err := execExp.argsMatches(query, args); err != nil {
 			return err
+		} else if rewrittenSQL != "" {
+			if err := c.queryMatcher.Match(execExp.expectRewrittenSQL, rewrittenSQL); err != nil {
+				//pgx support QueryRewriter for arguments, now we can check if the query was actually rewriten
+				return err
+			}
 		}
 		if execExp.result.String() == "" && execExp.err == nil {
 			return fmt.Errorf("Exec must return a result or raise an error: %s", execExp)

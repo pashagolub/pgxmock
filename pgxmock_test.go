@@ -1019,7 +1019,7 @@ func TestPreparedStatementCloseExpectation(t *testing.T) {
 	mock, _ := NewConn()
 	a := assert.New(t)
 
-	ep := mock.ExpectPrepare("foo", "INSERT INTO ORDERS").WillBeDeallocated()
+	ep := mock.ExpectPrepare("foo", "INSERT INTO ORDERS").WillBeClosed()
 	ep.ExpectExec().WithArgs(AnyArg(), AnyArg()).WillReturnResult(NewResult("UPDATE", 1))
 
 	stmt, err := mock.Prepare(context.Background(), "foo", "INSERT INTO ORDERS(ID, STATUS) VALUES (?, ?)")

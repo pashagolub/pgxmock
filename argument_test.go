@@ -2,8 +2,12 @@ package pgxmock
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
+
+	pgx "github.com/jackc/pgx/v5"
+	"github.com/stretchr/testify/assert"
 )
 
 type AnyTime struct{}
@@ -35,6 +39,30 @@ func TestAnyTimeArgument(t *testing.T) {
 	}
 }
 
+func TestAnyTimeNamedArgument(t *testing.T) {
+	t.Parallel()
+	mock, err := NewConn()
+	if err != nil {
+		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+
+	mock.ExpectExec("INSERT INTO users").
+		WithArgs(pgx.NamedArgs{"name": "john", "time": AnyTime{}}).
+		WillReturnResult(NewResult("INSERT", 1))
+
+	_, err = mock.Exec(context.Background(),
+		"INSERT INTO users(name, created_at) VALUES (@name, @time)",
+		pgx.NamedArgs{"name": "john", "time": time.Now()},
+	)
+	if err != nil {
+		t.Errorf("error '%s' was not expected, while inserting a row", err)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
+}
+
 func TestByteSliceArgument(t *testing.T) {
 	t.Parallel()
 	mock, err := NewConn()
@@ -46,6 +74,68 @@ func TestByteSliceArgument(t *testing.T) {
 	mock.ExpectExec("INSERT INTO users").WithArgs(username).WillReturnResult(NewResult("INSERT", 1))
 
 	_, err = mock.Exec(context.Background(), "INSERT INTO users(username) VALUES (?)", username)
+	if err != nil {
+		t.Errorf("error '%s' was not expected, while inserting a row", err)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
+}
+
+type failQryRW struct {
+	pgx.QueryRewriter
+}
+
+func (fqrw failQryRW) RewriteQuery(_ context.Context, _ *pgx.Conn, sql string, _ []any) (newSQL string, newArgs []any, err error) {
+	return "", nil, errors.New("cannot rewrite query " + sql)
+}
+
+func TestExpectQueryRewriterFail(t *testing.T) {
+
+	t.Parallel()
+	mock, err := NewConn()
+	if err != nil {
+		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+
+	mock.ExpectQuery(`INSERT INTO users\(username\) VALUES \(\@user\)`).
+		WithRewrittenSQL(`INSERT INTO users\(username\) VALUES \(\$1\)`).
+		WithArgs(failQryRW{})
+	_, err = mock.Query(context.Background(), "INSERT INTO users(username) VALUES (@user)", "baz")
+	assert.Error(t, err)
+}
+
+func TestQueryRewriterFail(t *testing.T) {
+
+	t.Parallel()
+	mock, err := NewConn()
+	if err != nil {
+		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	mock.ExpectExec(`INSERT INTO .+`).WithArgs("foo")
+	_, err = mock.Exec(context.Background(), "INSERT INTO users(username) VALUES (@user)", failQryRW{})
+	assert.Error(t, err)
+
+}
+
+func TestByteSliceNamedArgument(t *testing.T) {
+	t.Parallel()
+	mock, err := NewConn()
+	if err != nil {
+		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+
+	username := []byte("user")
+	mock.ExpectExec(`INSERT INTO users\(username\) VALUES \(\@user\)`).
+		WithArgs(pgx.NamedArgs{"user": username}).
+		WithRewrittenSQL(`INSERT INTO users\(username\) VALUES \(\$1\)`).
+		WillReturnResult(NewResult("INSERT", 1))
+
+	_, err = mock.Exec(context.Background(),
+		"INSERT INTO users(username) VALUES (@user)",
+		pgx.NamedArgs{"user": username},
+	)
 	if err != nil {
 		t.Errorf("error '%s' was not expected, while inserting a row", err)
 	}
@@ -67,6 +157,29 @@ func TestAnyArgument(t *testing.T) {
 		WillReturnResult(NewResult("INSERT", 1))
 
 	_, err = mock.Exec(context.Background(), "INSERT INTO users(name, created_at) VALUES (?, ?)", "john", time.Now())
+	if err != nil {
+		t.Errorf("error '%s' was not expected, while inserting a row", err)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
+}
+
+func TestAnyNamedArgument(t *testing.T) {
+	t.Parallel()
+	mock, err := NewConn()
+	if err != nil {
+		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+
+	mock.ExpectExec("INSERT INTO users").
+		WithArgs("john", AnyArg()).
+		WillReturnResult(NewResult("INSERT", 1))
+
+	_, err = mock.Exec(context.Background(), "INSERT INTO users(name, created_at) VALUES (@name, @created)",
+		pgx.NamedArgs{"name": "john", "created": time.Now()},
+	)
 	if err != nil {
 		t.Errorf("error '%s' was not expected, while inserting a row", err)
 	}
