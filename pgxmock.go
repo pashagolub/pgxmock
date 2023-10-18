@@ -436,12 +436,8 @@ func (c *pgxmock) Query(ctx context.Context, sql string, args ...interface{}) (p
 			return err
 		} else if rewrittenSQL > "" {
 			if err := c.queryMatcher.Match(queryExp.expectRewrittenSQL, rewrittenSQL); err != nil {
-				//pgx support QueryRewriter for arguments, now we can check if the query was actually rewriten
 				return err
 			}
-		}
-		if err := c.queryMatcher.Match(queryExp.expectSQL, sql); err != nil {
-			return err
 		}
 		if queryExp.err == nil && queryExp.rows == nil {
 			return fmt.Errorf("Query must return a result rows or raise an error: %v", queryExp)

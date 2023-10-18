@@ -252,13 +252,13 @@ func TestMissingWithArgs(t *testing.T) {
 
 func TestWithRewrittenSQL(t *testing.T) {
 	t.Parallel()
-	mock, err := NewConn()
+	mock, err := NewConn(QueryMatcherOption(QueryMatcherEqual))
 	a := assert.New(t)
 	a.NoError(err)
 
-	mock.ExpectQuery(`INSERT INTO users\(username\) VALUES \(\@user\)`).
+	mock.ExpectQuery(`INSERT INTO users(username) VALUES (@user)`).
 		WithArgs(pgx.NamedArgs{"user": "John"}).
-		WithRewrittenSQL(`INSERT INTO users\(username\) VALUES \(\$1\)`).
+		WithRewrittenSQL(`INSERT INTO users(username) VALUES ($1)`).
 		WillReturnRows()
 
 	_, err = mock.Query(context.Background(),
@@ -267,4 +267,16 @@ func TestWithRewrittenSQL(t *testing.T) {
 	)
 	a.NoError(err)
 	a.NoError(mock.ExpectationsWereMet())
+
+	mock.ExpectQuery(`INSERT INTO users(username, password) VALUES (@user, @password)`).
+		WithArgs(pgx.NamedArgs{"user": "John", "password": "strong"}).
+		WithRewrittenSQL(`INSERT INTO users(username, password) VALUES ($1)`).
+		WillReturnRows()
+
+	_, err = mock.Query(context.Background(),
+		"INSERT INTO users(username) VALUES (@user)",
+		pgx.NamedArgs{"user": "John", "password": "strong"},
+	)
+	a.Error(err)
+	a.Error(mock.ExpectationsWereMet())
 }
