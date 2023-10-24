@@ -225,3 +225,8 @@ and will be treated cautiously
 ## License
 
 The [three clause BSD license](http://en.wikipedia.org/wiki/BSD_licenses)
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=pashagolub/pgxmock&type=Date)](https://star-history.com/#pashagolub/pgxmock&Date)
+
