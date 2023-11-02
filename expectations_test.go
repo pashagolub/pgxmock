@@ -10,6 +10,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -250,21 +251,37 @@ func TestMissingWithArgs(t *testing.T) {
 	}
 }
 
+type user struct {
+	ID    int64
+	name  string
+	email pgtype.Text
+}
+
+func (u *user) RewriteQuery(_ context.Context, _ *pgx.Conn, sql string, _ []any) (newSQL string, newArgs []any, err error) {
+	switch sql {
+	case "INSERT":
+		return `INSERT INTO users (username, email) VALUES ($1, $2) RETURNING id`, []any{u.name, u.email}, nil
+	case "UPDATE":
+		return `UPDATE users SET username = $1, email = $2 WHERE id = $1`, []any{u.ID, u.name, u.email}, nil
+	case "DELETE":
+		return `DELETE FROM users WHERE id = $1`, []any{u.ID}, nil
+	}
+	return
+}
+
 func TestWithRewrittenSQL(t *testing.T) {
 	t.Parallel()
 	mock, err := NewConn(QueryMatcherOption(QueryMatcherEqual))
 	a := assert.New(t)
 	a.NoError(err)
 
-	mock.ExpectQuery(`INSERT INTO users(username) VALUES (@user)`).
-		WithArgs(pgx.NamedArgs{"user": "John"}).
-		WithRewrittenSQL(`INSERT INTO users(username) VALUES ($1)`).
+	u := user{name: "John", email: pgtype.Text{String: "john@example.com", Valid: true}}
+	mock.ExpectQuery(`INSERT`).
+		WithArgs(&u).
+		WithRewrittenSQL(`INSERT INTO users (username, email) VALUES ($1, $2) RETURNING id`).
 		WillReturnRows()
 
-	_, err = mock.Query(context.Background(),
-		"INSERT INTO users(username) VALUES (@user)",
-		pgx.NamedArgs{"user": "John"},
-	)
+	_, err = mock.Query(context.Background(), "INSERT", &u)
 	a.NoError(err)
 	a.NoError(mock.ExpectationsWereMet())
 
@@ -279,4 +296,29 @@ func TestWithRewrittenSQL(t *testing.T) {
 	)
 	a.Error(err)
 	a.Error(mock.ExpectationsWereMet())
+}
+
+func TestQueryRewriter(t *testing.T) {
+	t.Parallel()
+	mock, err := NewConn(QueryMatcherOption(QueryMatcherEqual))
+	a := assert.New(t)
+	a.NoError(err)
+
+	update := `UPDATE "user" SET email = @email, password = @password, updated_utc = @updated_utc WHERE id = @id`
+
+	mock.ExpectExec(update).WithArgs(pgx.NamedArgs{
+		"id":          "mockUser.ID",
+		"email":       "mockUser.Email",
+		"password":    "mockUser.Password",
+		"updated_utc": AnyArg(),
+	}).WillReturnError(errPanic)
+
+	_, err = mock.Exec(context.Background(), update, pgx.NamedArgs{
+		"id":          "mockUser.ID",
+		"email":       "mockUser.Email",
+		"password":    "mockUser.Password",
+		"updated_utc": time.Now().UTC(),
+	})
+	a.Error(err)
+	a.NoError(mock.ExpectationsWereMet())
 }
