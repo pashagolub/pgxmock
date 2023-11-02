@@ -671,3 +671,32 @@ func TestMockQueryWithCollect(t *testing.T) {
 func TestRowsConn(t *testing.T) {
 	assert.Nil(t, (&rowSets{}).Conn())
 }
+
+func TestRowsKind(t *testing.T) {
+	var alphabet = []string{"a", "b", "c", "d", "e", "f"}
+	rows := NewRows([]string{"id", "alphabet"})
+
+	for id, b := range alphabet {
+		rows.AddRow(id, b)
+	}
+
+	kindRows := rows.Kind()
+
+	for i := 0; kindRows.Next(); i++ {
+		var (
+			letter string
+			index  int
+		)
+		if err := kindRows.Scan(&index, &letter); err != nil {
+			t.Fatalf("unexpected error: %s", err)
+		}
+
+		if index != i {
+			t.Fatalf("expected %d, but got %d", i, index)
+		}
+
+		if letter != alphabet[i] {
+			t.Fatalf("expected %s, but got %s", alphabet[i], letter)
+		}
+	}
+}

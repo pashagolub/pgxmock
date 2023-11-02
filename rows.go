@@ -275,6 +275,14 @@ func (r *Rows) FromCSVString(s string) *Rows {
 	return r
 }
 
+// Kind returns rows corresponding to the interface pgx.Rows
+// useful for testing entities that implement an interface pgx.RowScanner
+func (r *Rows) Kind() pgx.Rows {
+	return &rowSets{
+		sets: []*Rows{r},
+	}
+}
+
 // NewRowsWithColumnDefinition return rows with columns metadata
 func NewRowsWithColumnDefinition(columns ...pgconn.FieldDescription) *Rows {
 	return &Rows{
