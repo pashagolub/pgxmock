@@ -52,7 +52,10 @@ func (e *commonExpectation) fulfill() {
 }
 
 func (e *commonExpectation) fulfilled() bool {
-	return e.triggered >= max(e.plannedCalls, 1)
+	if e.plannedCalls <= 0 {
+		return e.triggered >= 1
+	}
+	return e.triggered >= e.plannedCalls
 }
 
 func (e *commonExpectation) required() bool {
