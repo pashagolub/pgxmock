@@ -44,47 +44,71 @@ func NewBatch() *Batch {
 	return &Batch{}
 }
 
-// BatchResults is an interface for mocking .SendBatch() response
-type BatchResults interface {
-	// Exec reads the results from the next query in the batch as if the query has been sent with Conn.Exec.
-	Exec() (pgconn.CommandTag, error)
-
-	// Query reads the results from the next query in the batch as if the query has been sent with Conn.Query. Prefer
-	Query() (pgx.Rows, error)
-
-	// QueryRow reads the results from the next query in the batch as if the query has been sent with Conn.QueryRow.
-	QueryRow() pgx.Row
-
-	// Close closes the batch operation.
-	Close() error
-}
-
 type batchResults struct {
-	err    error
-	b      []*BatchElement
-	closed bool
-}
-
-func NewBatchResults() BatchResults {
-	return &batchResults{}
+	br *BatchResults
+	ex *ExpectedBatch
 }
 
 func (b *batchResults) Query() (pgx.Rows, error) {
-	return nil, nil
+	if b.br.queryErr != nil {
+		return nil, b.br.queryErr
+	}
+	rs := &rowSets{sets: []*Rows{b.br.rows}}
+	rs.Next()
+	return rs, nil
 }
 
 func (b *batchResults) Exec() (pgconn.CommandTag, error) {
-	return pgconn.CommandTag{}, nil
+	if b.br.execErr != nil {
+		return pgconn.CommandTag{}, b.br.execErr
+	}
+	return b.br.commandTag, nil
 }
 
 func (b *batchResults) QueryRow() pgx.Row {
-	return nil
+	rs := &rowSets{sets: []*Rows{b.br.rows}}
+	rs.Next()
+	return rs
 }
 
 func (b *batchResults) Close() error {
-	return nil
+	b.ex.batchWasClosed = true
+	return b.br.closeErr
 }
 
-func (b *batchResults) WithError(err error) {
-	b.err = err
+type BatchResults struct {
+	commandTag pgconn.CommandTag
+	rows       *Rows
+	queryErr   error
+	execErr    error
+	closeErr   error
+}
+
+func NewBatchResults() *BatchResults {
+	return &BatchResults{}
+}
+
+func (b *BatchResults) QueryError(err error) *BatchResults {
+	b.queryErr = err
+	return b
+}
+
+func (b *BatchResults) ExecError(err error) *BatchResults {
+	b.execErr = err
+	return b
+}
+
+func (b *BatchResults) CloseError(err error) *BatchResults {
+	b.closeErr = err
+	return b
+}
+
+func (b *BatchResults) WillReturnRows(rows *Rows) *BatchResults {
+	b.rows = rows
+	return b
+}
+
+func (b *BatchResults) AddCommandTag(ct pgconn.CommandTag) *BatchResults {
+	b.commandTag = ct
+	return b
 }

@@ -155,20 +155,47 @@ func TestSendBatch(t *testing.T) {
 		NewBatchElement("CREATE TABLE *", 1, "aaa"),
 		NewBatchElement("SELECT *"))
 
-	mock.ExpectSendBatch(batchMock).WillReturnResult(NewBatchResults())
+	rows := NewRows([]string{"id", "name", "email"}).
+		AddRow("some-id-1", "some-name-1", "some-email-1").
+		AddRow("some-id-2", "some-name-2", "some-email-2")
+
+	batchResultsMock := NewBatchResults().WillReturnRows(rows)
+
+	mock.ExpectBegin()
+	mock.ExpectSendBatch(batchMock).
+		WillReturnBatchResults(batchResultsMock).
+		BatchResultsWillBeClosed()
+	mock.ExpectCommit()
 
 	// create batches that will be tested
 	batch := new(pgx.Batch)
 	batch.Queue(create, 1, "aaa")
 	batch.Queue(query)
 
+	tx, err := mock.Begin(ctx)
 	// send batch and validate if response is not nil
-	br := mock.SendBatch(ctx, batch)
+	br := tx.SendBatch(ctx, batch)
 	a.NotNil(br)
 
 	// run exec and expect no error
-	_, err := br.Exec()
+	_, err = br.Exec()
 	a.NoError(err)
+
+	r, err := br.Query()
+	a.NoError(err)
+
+	// validate if values were returned
+	v, _ := r.Values()
+	a.Len(v, 3)
+	// assert that there is still next row availablem
+	a.True(r.Next())
+
+	// close the batch operation and commit
+	err = br.Close()
+	a.NoError(err)
+	err = tx.Commit(ctx)
+	a.NoError(err)
+
 	a.NoError(mock.ExpectationsWereMet())
 }
 

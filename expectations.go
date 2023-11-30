@@ -446,7 +446,9 @@ func (e *ExpectedRollback) String() string {
 type ExpectedBatch struct {
 	commonExpectation
 	expectedBatch         []queryBasedExpectation
-	expectedBatchResponse BatchResults
+	expectedBatchResponse pgx.BatchResults
+	batchMustBeClosed     bool
+	batchWasClosed        bool
 }
 
 // String returns string representation.
@@ -472,8 +474,13 @@ func (e *ExpectedBatch) String() string {
 	return msg + e.commonExpectation.String()
 }
 
-// WillReturnResult arranges for an expected SendBatch() to return given batch results.
-func (e *ExpectedBatch) WillReturnResult(batchResults pgx.BatchResults) *ExpectedBatch {
-	e.expectedBatchResponse = batchResults
+// WillReturnBatchResults arranges for an expected SendBatch() to return given batch results.
+func (e *ExpectedBatch) WillReturnBatchResults(br *BatchResults) *ExpectedBatch {
+	e.expectedBatchResponse = &batchResults{br: br, ex: e}
+	return e
+}
+
+func (e *ExpectedBatch) BatchResultsWillBeClosed() *ExpectedBatch {
+	e.batchMustBeClosed = true
 	return e
 }

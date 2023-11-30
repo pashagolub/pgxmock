@@ -111,7 +111,7 @@ type pgxMockIface interface {
 	// New Column allows to create a Column
 	NewColumn(name string) *pgconn.FieldDescription
 
-	NewBatchResults() BatchResults
+	NewBatchResults() *BatchResults
 
 	NewBatch() *Batch
 
@@ -203,6 +203,13 @@ func (c *pgxmock) ExpectationsWereMet() error {
 		if query, ok := e.(*ExpectedQuery); ok {
 			if query.rowsMustBeClosed && !query.rowsWereClosed {
 				return fmt.Errorf("expected query rows to be closed, but it was not: %s", query)
+			}
+		}
+
+		// must check whether all expected batches are closed
+		if batch, ok := e.(*ExpectedBatch); ok {
+			if batch.batchMustBeClosed && !batch.batchWasClosed {
+				return fmt.Errorf("expected batch to be closed, but it was not: %s", batch)
 			}
 		}
 	}
@@ -315,7 +322,7 @@ func (c *pgxmock) NewColumn(name string) *pgconn.FieldDescription {
 	return &pgconn.FieldDescription{Name: name}
 }
 
-func (c *pgxmock) NewBatchResults() BatchResults {
+func (c *pgxmock) NewBatchResults() *BatchResults {
 	return NewBatchResults()
 }
 
