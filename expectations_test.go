@@ -125,6 +125,53 @@ func ExampleExpectedExec() {
 	// INSERT 15
 }
 
+func TestSendBatch(t *testing.T) {
+	mock, _ := NewConn()
+	a := assert.New(t)
+	create := `
+		CREATE TABLE IF NOT EXISTS user (
+		    id text, 
+		    name text, 
+		    email text, 
+		    address text, 
+		    anotherfield text
+		    )
+	`
+	query := `
+		SELECT
+			name,
+			email,
+			address,
+			anotherfield
+		FROM user
+		where
+			name    = 'John'
+			and
+			address = 'Jakarta'
+	`
+
+	// create mocked batches that we expect to happen
+	batchMock := NewBatch().AddBatchElements(
+		NewBatchElement("CREATE TABLE *", 1, "aaa"),
+		NewBatchElement("SELECT *"))
+
+	mock.ExpectSendBatch(batchMock).WillReturnResult(NewBatchResults())
+
+	// create batches that will be tested
+	batch := new(pgx.Batch)
+	batch.Queue(create, 1, "aaa")
+	batch.Queue(query)
+
+	// send batch and validate if response is not nil
+	br := mock.SendBatch(ctx, batch)
+	a.NotNil(br)
+
+	// run exec and expect no error
+	_, err := br.Exec()
+	a.NoError(err)
+	a.NoError(mock.ExpectationsWereMet())
+}
+
 func TestUnexpectedPing(t *testing.T) {
 	mock, _ := NewConn()
 	err := mock.Ping(ctx)

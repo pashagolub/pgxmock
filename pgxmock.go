@@ -14,6 +14,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"unsafe"
 
 	pgx "github.com/jackc/pgx/v5"
 	pgconn "github.com/jackc/pgx/v5/pgconn"
@@ -68,6 +69,8 @@ type pgxMockIface interface {
 	// the *ExpectedRollback allows to mock database response
 	ExpectRollback() *ExpectedRollback
 
+	ExpectSendBatch(expectedBatch *Batch) *ExpectedBatch
+
 	// ExpectPing expected pgx.Conn.Ping to be called.
 	// the *ExpectedPing allows to mock database response
 	//
@@ -107,6 +110,12 @@ type pgxMockIface interface {
 
 	// New Column allows to create a Column
 	NewColumn(name string) *pgconn.FieldDescription
+
+	NewBatchResults() BatchResults
+
+	NewBatch() *Batch
+
+	NewBatchElement(sql string, args ...interface{}) *BatchElement
 
 	Config() *pgxpool.Config
 
@@ -263,6 +272,19 @@ func (c *pgxmock) ExpectPrepare(expectedStmtName, expectedSQL string) *ExpectedP
 	return e
 }
 
+func (c *pgxmock) ExpectSendBatch(expectedBatch *Batch) *ExpectedBatch {
+	e := &ExpectedBatch{}
+	for _, b := range expectedBatch.elements {
+		e.expectedBatch = append(e.expectedBatch, queryBasedExpectation{
+			expectSQL:          b.sql,
+			expectRewrittenSQL: b.rewrittenSQL,
+			args:               b.args,
+		})
+	}
+	c.expectations = append(c.expectations, e)
+	return e
+}
+
 //endregion Expectations
 
 // NewRows allows Rows to be created from a
@@ -291,6 +313,18 @@ func (c *pgxmock) NewRowsWithColumnDefinition(columns ...pgconn.FieldDescription
 // using OfType/Nullable/WithLength/WithPrecisionAndScale methods.
 func (c *pgxmock) NewColumn(name string) *pgconn.FieldDescription {
 	return &pgconn.FieldDescription{Name: name}
+}
+
+func (c *pgxmock) NewBatchResults() BatchResults {
+	return NewBatchResults()
+}
+
+func (c *pgxmock) NewBatch() *Batch {
+	return NewBatch()
+}
+
+func (c *pgxmock) NewBatchElement(sql string, args ...interface{}) *BatchElement {
+	return NewBatchElement(sql, args)
 }
 
 // open a mock database driver connection
@@ -340,8 +374,45 @@ func (c *pgxmock) CopyFrom(ctx context.Context, tableName pgx.Identifier, column
 	return ex.rowsAffected, ex.waitForDelay(ctx)
 }
 
-func (c *pgxmock) SendBatch(context.Context, *pgx.Batch) pgx.BatchResults {
-	return nil
+func (c *pgxmock) SendBatch(ctx context.Context, batch *pgx.Batch) pgx.BatchResults {
+	ex, err := findExpectationFunc[*ExpectedBatch](c, "SendBatch()", func(batchExp *ExpectedBatch) error {
+		v := reflect.ValueOf(*batch)
+
+		if batch.Len() != len(batchExp.expectedBatch) {
+			return fmt.Errorf("batch length has to match the expected batch length")
+		}
+
+		for i, q := range batchExp.expectedBatch {
+			qqValue := v.FieldByName("queuedQueries").Index(i)
+			qq := reflect.NewAt(qqValue.Type(), unsafe.Pointer(qqValue.UnsafeAddr())).Elem().Interface().(*pgx.QueuedQuery)
+
+			query := reflect.ValueOf(*qq).FieldByName("query").String()
+			if err := c.queryMatcher.Match(q.expectSQL, query); err != nil {
+				return err
+			}
+
+			argsValue := reflect.ValueOf(*qq).FieldByName("arguments")
+			args := reflectBatchElementArguments(argsValue)
+
+			if rewrittenSQL, err := q.argsMatches(query, args); err != nil {
+				return err
+			} else if rewrittenSQL != "" && q.expectRewrittenSQL != "" {
+				if err := c.queryMatcher.Match(q.expectRewrittenSQL, rewrittenSQL); err != nil {
+					return err
+				}
+			}
+		}
+
+		if batchExp.expectedBatchResponse == nil && batchExp.err == nil {
+			return fmt.Errorf("exec must return a result or raise an error: %s", batchExp)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil
+	}
+
+	return ex.expectedBatchResponse
 }
 
 func (c *pgxmock) LargeObjects() pgx.LargeObjects {
@@ -557,4 +628,14 @@ func findExpectationFunc[ET ExpectationType[t], t any](c *pgxmock, method string
 
 func findExpectation[ET ExpectationType[t], t any](c *pgxmock, method string) (ET, error) {
 	return findExpectationFunc[ET, t](c, method, func(_ ET) error { return nil })
+}
+
+func reflectBatchElementArguments(argsValue reflect.Value) []interface{} {
+	var args []interface{}
+	for i := 0; i < argsValue.Len(); i++ {
+		argValue := argsValue.Index(i)
+		arg := reflect.NewAt(argValue.Type(), unsafe.Pointer(argValue.UnsafeAddr())).Elem().Interface().(interface{})
+		args = append(args, arg)
+	}
+	return args
 }

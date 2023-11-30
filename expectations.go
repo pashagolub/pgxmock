@@ -440,3 +440,40 @@ func (e *ExpectedRollback) String() string {
 	}
 	return msg
 }
+
+// ExpectedBatch is used to manage pgx.SendBatch, pgx.Tx.SendBatch expectations.
+// Returned by pgxmock.ExpectBatch.
+type ExpectedBatch struct {
+	commonExpectation
+	expectedBatch         []queryBasedExpectation
+	expectedBatchResponse BatchResults
+}
+
+// String returns string representation.
+func (e *ExpectedBatch) String() string {
+	msg := "ExpectedBatch => expecting call to SendBatch():\n"
+	for _, b := range e.expectedBatch {
+		msg += "\texpecting query that:\n"
+		msg += fmt.Sprintf("\t\t- matches sql: '%s'\n", b.expectSQL)
+
+		if len(b.args) == 0 {
+			msg += "\t\t- is without arguments\n"
+		} else {
+			msg += "\t\t- is with arguments:\n"
+			for i, arg := range b.args {
+				msg += fmt.Sprintf("\t\t\t%d - %+v\n", i, arg)
+			}
+		}
+	}
+
+	if e.expectedBatch != nil {
+		msg += fmt.Sprintf("%v\n", e.expectedBatch)
+	}
+	return msg + e.commonExpectation.String()
+}
+
+// WillReturnResult arranges for an expected SendBatch() to return given batch results.
+func (e *ExpectedBatch) WillReturnResult(batchResults pgx.BatchResults) *ExpectedBatch {
+	e.expectedBatchResponse = batchResults
+	return e
+}
