@@ -82,6 +82,9 @@ func (rs *rowSets) Scan(dest ...interface{}) error {
 	if len(r.rows) == 0 {
 		return pgx.ErrNoRows
 	}
+	if len(r.rows) == 1 && r.recNo == 0 {
+		r.recNo++
+	}
 	for i, col := range r.rows[r.recNo-1] {
 		if dest[i] == nil {
 			//behave compatible with pgx

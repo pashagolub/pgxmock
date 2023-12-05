@@ -517,6 +517,32 @@ func TestRowsScanWithScannerIface(t *testing.T) {
 
 }
 
+func TestSingleRowScanWithScannerIface(t *testing.T) {
+	mock, err := NewConn()
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	defer mock.Close(context.Background())
+
+	r := NewRows([]string{"col1"}).AddRow(int64(23))
+	mock.ExpectQuery("SELECT").WillReturnRows(r)
+
+	rs, err := mock.Query(context.Background(), "SELECT")
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+
+	var result testScanner
+	if rs.Scan(&result) != nil {
+		t.Fatal("unexpected error for scan")
+	}
+
+	if result.Value != int64(23) {
+		t.Fatalf("expected Value to be 23 but got: %d", result.Value)
+	}
+
+}
+
 func TestRowsScanErrorOnScannerIface(t *testing.T) {
 	mock, err := NewConn()
 	if err != nil {
