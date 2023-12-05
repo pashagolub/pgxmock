@@ -416,6 +416,8 @@ func (c *pgxmock) SendBatch(ctx context.Context, batch *pgx.Batch) pgx.BatchResu
 		return nil
 	})
 	if err != nil {
+		//printing as we cannot return this error
+		fmt.Println(err)
 		return nil
 	}
 
