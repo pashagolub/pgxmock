@@ -69,6 +69,8 @@ type pgxMockIface interface {
 	// the *ExpectedRollback allows to mock database response
 	ExpectRollback() *ExpectedRollback
 
+	// ExpectSendBatch expects pgx.Tx.SendBatch() to be called with expected Batch
+	// structure. The *ExpectedBatch allows to mock database response
 	ExpectSendBatch(expectedBatch *Batch) *ExpectedBatch
 
 	// ExpectPing expected pgx.Conn.Ping to be called.
@@ -108,13 +110,19 @@ type pgxMockIface interface {
 	// sql driver.Value slice with a definition of sql metadata
 	NewRowsWithColumnDefinition(columns ...pgconn.FieldDescription) *Rows
 
-	// New Column allows to create a Column
+	// NewColumn allows to create a Column
 	NewColumn(name string) *pgconn.FieldDescription
 
+	// NewBatchResults creates the mock structure for pgx.BatchResults interface
+	// which is returned by a SendBatch() function
 	NewBatchResults() *BatchResults
 
+	// NewBatch creates the mock structure for pgx.Batch
+	// allows to validate correctly queries passed to SendBatch() function
 	NewBatch() *Batch
 
+	// NewBatchElement allows to pass sql queries with arguments
+	// to the Batch mock structure used in SendBatch()
 	NewBatchElement(sql string, args ...interface{}) *BatchElement
 
 	Config() *pgxpool.Config
@@ -322,14 +330,19 @@ func (c *pgxmock) NewColumn(name string) *pgconn.FieldDescription {
 	return &pgconn.FieldDescription{Name: name}
 }
 
+// NewBatchResults allows to mock a BatchResult interface with defined
+// rows or errors to return
 func (c *pgxmock) NewBatchResults() *BatchResults {
 	return NewBatchResults()
 }
 
+// NewBatch allows to mock pgx.Batch structure
 func (c *pgxmock) NewBatch() *Batch {
 	return NewBatch()
 }
 
+// NewBatchElement is an element that consists of sql string and arguments
+// that can be passed to AddBatchElements() function
 func (c *pgxmock) NewBatchElement(sql string, args ...interface{}) *BatchElement {
 	return NewBatchElement(sql, args)
 }
@@ -389,6 +402,11 @@ func (c *pgxmock) SendBatch(ctx context.Context, batch *pgx.Batch) pgx.BatchResu
 			return fmt.Errorf("batch length has to match the expected batch length")
 		}
 
+		// For now the solution is to use unsafe.Pointer() to retrieve unexported field 'queuedQueries',
+		// and inside pgx.QueuedQuery unexported fields 'query' and 'arguments' that allows
+		// to properly use queryMatcher.Match() and argsMatches() functions.
+		// Other way would be to use reflect.DeepCopy(), but the limitation of this solution is that
+		// batch passed to this func would have to be the exact as batch structure in mock.
 		for i, q := range batchExp.expectedBatch {
 			qqValue := v.FieldByName("queuedQueries").Index(i)
 			qq := reflect.NewAt(qqValue.Type(), unsafe.Pointer(qqValue.UnsafeAddr())).Elem().Interface().(*pgx.QueuedQuery)
@@ -416,7 +434,7 @@ func (c *pgxmock) SendBatch(ctx context.Context, batch *pgx.Batch) pgx.BatchResu
 		return nil
 	})
 	if err != nil {
-		//printing as we cannot return this error
+		// Printing, as we cannot return this error
 		fmt.Println(err)
 		return nil
 	}

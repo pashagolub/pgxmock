@@ -442,7 +442,7 @@ func (e *ExpectedRollback) String() string {
 }
 
 // ExpectedBatch is used to manage pgx.SendBatch, pgx.Tx.SendBatch expectations.
-// Returned by pgxmock.ExpectBatch.
+// Returned by pgxmock.ExpectBatch
 type ExpectedBatch struct {
 	commonExpectation
 	expectedBatch         []queryBasedExpectation
@@ -451,7 +451,7 @@ type ExpectedBatch struct {
 	batchWasClosed        bool
 }
 
-// String returns string representation.
+// String returns string representation
 func (e *ExpectedBatch) String() string {
 	msg := "ExpectedBatch => expecting call to SendBatch():\n"
 	for _, b := range e.expectedBatch {
@@ -474,12 +474,14 @@ func (e *ExpectedBatch) String() string {
 	return msg + e.commonExpectation.String()
 }
 
-// WillReturnBatchResults arranges for an expected SendBatch() to return given batch results.
+// WillReturnBatchResults arranges for an expected SendBatch() to return given batch results
 func (e *ExpectedBatch) WillReturnBatchResults(br *BatchResults) *ExpectedBatch {
 	e.expectedBatchResponse = &batchResults{br: br, ex: e}
 	return e
 }
 
+// BatchResultsWillBeClosed indicates that batchResults has to be closed.
+// batchMustBeClosed will be checked in pgxmock.ExpectationsWereMet()
 func (e *ExpectedBatch) BatchResultsWillBeClosed() *ExpectedBatch {
 	e.batchMustBeClosed = true
 	return e
