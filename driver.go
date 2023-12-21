@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	pgx "github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -17,6 +18,10 @@ func NewConn(options ...func(*pgxmock) error) (PgxConnIface, error) {
 	smock := &pgxmockConn{}
 	smock.ordered = true
 	return smock, smock.open(options)
+}
+
+func (c *pgxmockConn) Config() *pgx.ConnConfig {
+	return &pgx.ConnConfig{}
 }
 
 type pgxmockPool struct {
@@ -37,6 +42,10 @@ func (p *pgxmockPool) Close() {
 
 func (p *pgxmockPool) Acquire(context.Context) (*pgxpool.Conn, error) {
 	return nil, errors.New("pgpool.Acquire() method is not implemented")
+}
+
+func (p *pgxmockPool) Config() *pgxpool.Config {
+	return &pgxpool.Config{}
 }
 
 // AsConn is similar to Acquire but returns proper mocking interface

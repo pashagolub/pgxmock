@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func cancelOrder(db pgxIface, orderID int) error {
+func cancelOrder(db PgxCommonIface, orderID int) error {
 	tx, _ := db.Begin(context.Background())
 	_, _ = tx.Query(context.Background(), "SELECT * FROM orders {0} FOR UPDATE", orderID)
 	err := tx.Rollback(context.Background())
@@ -1143,7 +1143,7 @@ func TestQueryWithTimeout(t *testing.T) {
 	}
 }
 
-func queryWithTimeout(t time.Duration, db pgxIface, query string, args ...interface{}) (pgx.Rows, error) {
+func queryWithTimeout(t time.Duration, db PgxCommonIface, query string, args ...interface{}) (pgx.Rows, error) {
 	rowsChan := make(chan pgx.Rows, 1)
 	errChan := make(chan error, 1)
 
@@ -1170,7 +1170,7 @@ func TestUnmockedMethods(t *testing.T) {
 	mock, _ := NewPool()
 	a := assert.New(t)
 	a.NotNil(mock.Config())
-	a.NotNil(mock.PgConn())
+	a.NotNil(mock.AsConn().Config())
 	a.NotNil(mock.AcquireAllIdle(ctx))
 	a.Nil(mock.AcquireFunc(ctx, func(*pgxpool.Conn) error { return nil }))
 	a.Nil(mock.SendBatch(ctx, nil))
@@ -1180,8 +1180,10 @@ func TestUnmockedMethods(t *testing.T) {
 
 func TestNewRowsWithColumnDefinition(t *testing.T) {
 	mock, _ := NewConn()
+	a := assert.New(t)
+	a.NotNil(mock.PgConn())
 	r := mock.NewRowsWithColumnDefinition(*mock.NewColumn("foo"))
-	assert.Equal(t, 1, len(r.defs))
+	a.Equal(1, len(r.defs))
 }
 
 func TestExpectReset(t *testing.T) {
