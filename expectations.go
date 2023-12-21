@@ -13,8 +13,8 @@ import (
 	pgconn "github.com/jackc/pgx/v5/pgconn"
 )
 
-// an Expectation interface
-type Expectation interface {
+// an expectation interface
+type expectation interface {
 	error() error
 	required() bool
 	fulfilled() bool

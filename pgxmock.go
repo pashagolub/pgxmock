@@ -20,19 +20,19 @@ import (
 	pgxpool "github.com/jackc/pgx/v5/pgxpool"
 )
 
-// pgxMockIface interface serves to create expectations
+// Expecter interface serves to create expectations
 // for any kind of database action in order to mock
 // and test real database behavior.
-type pgxMockIface interface {
-	// ExpectClose queues an expectation for this database
-	// action to be triggered. the *ExpectedClose allows
-	// to mock database response
-	ExpectClose() *ExpectedClose
-
+type Expecter interface {
 	// ExpectationsWereMet checks whether all queued expectations
 	// were met in order (unless MatchExpectationsInOrder set to false).
 	// If any of them was not met - an error is returned.
 	ExpectationsWereMet() error
+
+	// ExpectClose queues an expectation for this database
+	// action to be triggered. The *ExpectedClose allows
+	// to mock database response
+	ExpectClose() *ExpectedClose
 
 	// ExpectPrepare expects Prepare() to be called with expectedSQL query.
 	// the *ExpectedPrepare allows to mock database response.
@@ -68,19 +68,12 @@ type pgxMockIface interface {
 	// the *ExpectedRollback allows to mock database response
 	ExpectRollback() *ExpectedRollback
 
-	// ExpectPing expected pgx.Conn.Ping to be called.
-	// the *ExpectedPing allows to mock database response
-	//
-	// Ping support only exists in the SQL library in Go 1.8 and above.
-	// ExpectPing in Go <=1.7 will return an ExpectedPing but not register
-	// any expectations.
-	//
-	// You must enable pings using MonitorPingsOption for this to register
-	// any expectations.
+	// ExpectPing expected Ping() to be called.
+	// The *ExpectedPing allows to mock database response
 	ExpectPing() *ExpectedPing
 
 	// ExpectCopyFrom expects pgx.CopyFrom to be called.
-	// the *ExpectCopyFrom allows to mock database response
+	// The *ExpectCopyFrom allows to mock database response
 	ExpectCopyFrom(expectedTableName pgx.Identifier, expectedColumns []string) *ExpectedCopyFrom
 
 	// MatchExpectationsInOrder gives an option whether to match all
@@ -96,45 +89,38 @@ type pgxMockIface interface {
 	// expectations will be expected in order
 	MatchExpectationsInOrder(bool)
 
-	// NewRows allows Rows to be created from a
-	// sql driver.Value slice or from the CSV string and
-	// to be used as sql driver.Rows.
+	// NewRows allows Rows to be created from a []string slice.
 	NewRows(columns []string) *Rows
 
 	// NewRowsWithColumnDefinition allows Rows to be created from a
-	// sql driver.Value slice with a definition of sql metadata
+	// pgconn.FieldDescription slice with a definition of sql metadata
 	NewRowsWithColumnDefinition(columns ...pgconn.FieldDescription) *Rows
 
 	// New Column allows to create a Column
 	NewColumn(name string) *pgconn.FieldDescription
-
-	Config() *pgxpool.Config
-
-	PgConn() *pgconn.PgConn
 }
 
-type pgxIface interface {
-	pgxMockIface
-	Begin(context.Context) (pgx.Tx, error)
-	BeginTx(ctx context.Context, txOptions pgx.TxOptions) (pgx.Tx, error)
-	Exec(context.Context, string, ...interface{}) (pgconn.CommandTag, error)
-	Query(context.Context, string, ...interface{}) (pgx.Rows, error)
-	QueryRow(context.Context, string, ...interface{}) pgx.Row
-	Ping(context.Context) error
-	Prepare(context.Context, string, string) (*pgconn.StatementDescription, error)
-	PgConn() *pgconn.PgConn
-}
-
-type PgxConnIface interface {
-	pgxIface
+// PgxCommonIface represents common interface for all pgx connection interfaces:
+// pgxpool.Pool, pgx.Conn and pgx.Tx
+type PgxCommonIface interface {
+	Expecter
 	pgx.Tx
+	BeginTx(ctx context.Context, txOptions pgx.TxOptions) (pgx.Tx, error)
+	Ping(context.Context) error
+}
+
+// PgxConnIface represents pgx.Conn specific interface
+type PgxConnIface interface {
+	PgxCommonIface
 	Close(ctx context.Context) error
 	Deallocate(ctx context.Context, name string) error
+	Config() *pgx.ConnConfig
+	PgConn() *pgconn.PgConn
 }
 
+// PgxPoolIface represents pgxpool.Pool specific interface
 type PgxPoolIface interface {
-	pgxIface
-	pgx.Tx
+	PgxCommonIface
 	Acquire(ctx context.Context) (*pgxpool.Conn, error)
 	AcquireAllIdle(ctx context.Context) []*pgxpool.Conn
 	AcquireFunc(ctx context.Context, f func(*pgxpool.Conn) error) error
@@ -142,16 +128,13 @@ type PgxPoolIface interface {
 	Close()
 	Stat() *pgxpool.Stat
 	Reset()
+	Config() *pgxpool.Config
 }
 
 type pgxmock struct {
 	ordered      bool
 	queryMatcher QueryMatcher
-	expectations []Expectation
-}
-
-func (c *pgxmock) Config() *pgxpool.Config {
-	return &pgxpool.Config{}
+	expectations []expectation
 }
 
 func (c *pgxmock) AcquireAllIdle(_ context.Context) []*pgxpool.Conn {
@@ -504,12 +487,12 @@ func (c *pgxmock) Reset() {
 	_ = ex.waitForDelay(context.Background())
 }
 
-type ExpectationType[t any] interface {
+type expectationType[t any] interface {
 	*t
-	Expectation
+	expectation
 }
 
-func findExpectationFunc[ET ExpectationType[t], t any](c *pgxmock, method string, cmp func(ET) error) (ET, error) {
+func findExpectationFunc[ET expectationType[t], t any](c *pgxmock, method string, cmp func(ET) error) (ET, error) {
 	var expected ET
 	var fulfilled int
 	var ok bool
@@ -555,6 +538,6 @@ func findExpectationFunc[ET ExpectationType[t], t any](c *pgxmock, method string
 	return expected, nil
 }
 
-func findExpectation[ET ExpectationType[t], t any](c *pgxmock, method string) (ET, error) {
+func findExpectation[ET expectationType[t], t any](c *pgxmock, method string) (ET, error) {
 	return findExpectationFunc[ET, t](c, method, func(_ ET) error { return nil })
 }
