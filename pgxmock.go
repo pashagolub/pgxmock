@@ -115,10 +115,6 @@ type Expecter interface {
 	// NewBatchElement allows to pass sql queries with arguments
 	// to the Batch mock structure used in SendBatch()
 	NewBatchElement(sql string, args ...interface{}) *BatchElement
-
-	Config() *pgxpool.Config
-
-	PgConn() *pgconn.PgConn
 }
 
 // PgxCommonIface represents common interface for all pgx connection interfaces:
@@ -381,7 +377,7 @@ func (c *pgxmock) CopyFrom(ctx context.Context, tableName pgx.Identifier, column
 	return ex.rowsAffected, ex.waitForDelay(ctx)
 }
 
-func (c *pgxmock) SendBatch(ctx context.Context, batch *pgx.Batch) pgx.BatchResults {
+func (c *pgxmock) SendBatch(_ context.Context, batch *pgx.Batch) pgx.BatchResults {
 	ex, err := findExpectationFunc[*ExpectedBatch](c, "SendBatch()", func(batchExp *ExpectedBatch) error {
 		v := reflect.ValueOf(*batch)
 
