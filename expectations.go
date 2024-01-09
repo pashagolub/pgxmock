@@ -13,8 +13,8 @@ import (
 	pgconn "github.com/jackc/pgx/v5/pgconn"
 )
 
-// an Expectation interface
-type Expectation interface {
+// an expectation interface
+type expectation interface {
 	error() error
 	required() bool
 	fulfilled() bool
@@ -23,11 +23,20 @@ type Expectation interface {
 	fmt.Stringer
 }
 
-type CallModifyer interface {
-	Maybe() CallModifyer
-	Times(n uint) CallModifyer
-	WillDelayFor(duration time.Duration) CallModifyer
+// CallModifier interface represents common interface for all expectations supported
+type CallModifier interface {
+	// Maybe allows the expected method call to be optional.
+	// Not calling an optional method will not cause an error while asserting expectations
+	Maybe() CallModifier
+	// Times indicates that that the expected method should only fire the indicated number of times.
+	// Zero value is ignored and means the same as one.
+	Times(n uint) CallModifier
+	// WillDelayFor allows to specify duration for which it will delay
+	// result. May be used together with Context
+	WillDelayFor(duration time.Duration) CallModifier
+	// WillReturnError allows to set an error for the expected method
 	WillReturnError(err error)
+	// WillPanic allows to force the expected method to panic
 	WillPanic(v any)
 }
 
@@ -72,35 +81,27 @@ func (e *commonExpectation) waitForDelay(ctx context.Context) (err error) {
 	return err
 }
 
-// Maybe allows the expected method call to be optional.
-// Not calling an optional method will not cause an error while asserting expectations
-func (e *commonExpectation) Maybe() CallModifyer {
+func (e *commonExpectation) Maybe() CallModifier {
 	e.optional = true
 	return e
 }
 
-// Times indicates that that the expected method should only fire the indicated number of times.
-// Zero value is ignored and means the same as one.
-func (e *commonExpectation) Times(n uint) CallModifyer {
+func (e *commonExpectation) Times(n uint) CallModifier {
 	e.plannedCalls = n
 	return e
 }
 
-// WillDelayFor allows to specify duration for which it will delay
-// result. May be used together with Context
-func (e *commonExpectation) WillDelayFor(duration time.Duration) CallModifyer {
+func (e *commonExpectation) WillDelayFor(duration time.Duration) CallModifier {
 	e.plannedDelay = duration
 	return e
 }
 
-// WillReturnError allows to set an error for the expected method
 func (e *commonExpectation) WillReturnError(err error) {
 	e.err = err
 }
 
 var errPanic = errors.New("pgxmock panic")
 
-// WillPanic allows to force the expected method to panic
 func (e *commonExpectation) WillPanic(v any) {
 	e.err = errPanic
 	e.panicArgument = v
