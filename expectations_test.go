@@ -176,6 +176,7 @@ func TestSendBatch(t *testing.T) {
 	// send batch and validate if response is not nil
 	br := tx.SendBatch(ctx, batch)
 	a.NotNil(br)
+	a.Nil(err)
 
 	// run exec and expect no error
 	_, err = br.Exec()

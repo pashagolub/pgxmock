@@ -36,9 +36,7 @@ type Batch struct {
 // AddBatchElements adds any number of BatchElement to Batch
 // that is used for mocking pgx.SendBatch()
 func (b *Batch) AddBatchElements(bes ...*BatchElement) *Batch {
-	for _, be := range bes {
-		b.elements = append(b.elements, be)
-	}
+	b.elements = append(b.elements, bes...)
 	return b
 }
 

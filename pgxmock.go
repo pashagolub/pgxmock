@@ -68,7 +68,7 @@ type Expecter interface {
 	// ExpectRollback expects pgx.Tx.Rollback to be called.
 	// the *ExpectedRollback allows to mock database response
 	ExpectRollback() *ExpectedRollback
-	
+
 	// ExpectSendBatch expects pgx.Tx.SendBatch() to be called with expected Batch
 	// structure. The *ExpectedBatch allows to mock database response
 	ExpectSendBatch(expectedBatch *Batch) *ExpectedBatch
@@ -644,7 +644,7 @@ func reflectBatchElementArguments(argsValue reflect.Value) []interface{} {
 	var args []interface{}
 	for i := 0; i < argsValue.Len(); i++ {
 		argValue := argsValue.Index(i)
-		arg := reflect.NewAt(argValue.Type(), unsafe.Pointer(argValue.UnsafeAddr())).Elem().Interface().(interface{})
+		arg := reflect.NewAt(argValue.Type(), unsafe.Pointer(argValue.UnsafeAddr())).Elem().Interface()
 		args = append(args, arg)
 	}
 	return args
