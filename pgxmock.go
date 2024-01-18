@@ -112,9 +112,9 @@ type Expecter interface {
 	// allows to validate correctly queries passed to SendBatch() function
 	NewBatch() *Batch
 
-	// NewBatchElement allows to pass sql queries with arguments
+	// NewBatchQuery allows to pass sql queries with arguments
 	// to the Batch mock structure used in SendBatch()
-	NewBatchElement(sql string, args ...interface{}) *BatchElement
+	NewBatchQuery(sql string, args ...interface{}) *BatchQuery
 }
 
 // PgxCommonIface represents common interface for all pgx connection interfaces:
@@ -324,10 +324,10 @@ func (c *pgxmock) NewBatch() *Batch {
 	return NewBatch()
 }
 
-// NewBatchElement is an element that consists of sql string and arguments
-// that can be passed to AddBatchElements() function
-func (c *pgxmock) NewBatchElement(sql string, args ...interface{}) *BatchElement {
-	return NewBatchElement(sql, args)
+// NewBatchQuery is an element that consists of sql string and arguments
+// that can be passed to AddBatchQueries() function
+func (c *pgxmock) NewBatchQuery(sql string, args ...interface{}) *BatchQuery {
+	return NewBatchQuery(sql, args)
 }
 
 // open a mock database driver connection

@@ -5,17 +5,17 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-// BatchElement helps to create batches for testing
-type BatchElement struct {
+// BatchQuery helps to create batches for testing
+type BatchQuery struct {
 	sql          string
 	rewrittenSQL string
 	args         []interface{}
 }
 
-// NewBatchElement creates new query that will be queued in batch.
+// NewBatchQuery creates new query that will be queued in batch.
 // Function accepts sql string and optionally arguments
-func NewBatchElement(sql string, args ...interface{}) *BatchElement {
-	return &BatchElement{
+func NewBatchQuery(sql string, args ...interface{}) *BatchQuery {
+	return &BatchQuery{
 		sql:  sql,
 		args: args,
 	}
@@ -23,19 +23,19 @@ func NewBatchElement(sql string, args ...interface{}) *BatchElement {
 
 // WithRewrittenSQL will match given expected expression to a rewritten SQL statement by
 // a pgx.QueryRewriter argument
-func (be *BatchElement) WithRewrittenSQL(sql string) *BatchElement {
+func (be *BatchQuery) WithRewrittenSQL(sql string) *BatchQuery {
 	be.rewrittenSQL = sql
 	return be
 }
 
 // Batch is a batch mock that helps to create batches for testing
 type Batch struct {
-	elements []*BatchElement
+	elements []*BatchQuery
 }
 
-// AddBatchElements adds any number of BatchElement to Batch
+// AddBatchQueries adds any number of BatchQuery to Batch
 // that is used for mocking pgx.SendBatch()
-func (b *Batch) AddBatchElements(bes ...*BatchElement) *Batch {
+func (b *Batch) AddBatchQueries(bes ...*BatchQuery) *Batch {
 	b.elements = append(b.elements, bes...)
 	return b
 }

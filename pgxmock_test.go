@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/jackc/pgx/v5/pgconn"
 	"strconv"
 	"sync"
 	"testing"
@@ -1140,6 +1141,39 @@ func TestQueryWithTimeout(t *testing.T) {
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
+}
+
+func TestNewBatchResults(t *testing.T) {
+	t.Parallel()
+	mock, err := NewConn()
+	if err != nil {
+		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	defer mock.Close(context.Background())
+	columns := []string{"col1", "col2"}
+	rows := NewRows(columns)
+
+	r := mock.NewBatchResults().WillReturnRows(rows).AddCommandTag(pgconn.NewCommandTag("SELECT 1"))
+
+	if len(r.rows.defs) != len(columns) || r.rows.defs[0].Name != columns[0] || r.rows.defs[1].Name != columns[1] {
+		t.Errorf("expecting to create a row with columns %v, actual colmns are %v", r.rows.defs, columns)
+	}
+}
+
+func TestNewBatchQuery(t *testing.T) {
+	t.Parallel()
+	mock, err := NewConn()
+	if err != nil {
+		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	defer mock.Close(context.Background())
+	sql := "SELECT *"
+
+	r := mock.NewBatchQuery("SELECT *", 1)
+
+	if len(r.args) != 1 || r.sql != sql {
+		t.Errorf("expecting to create a batch query with sql %s and args %d, actual sql %s and args %d", r.sql, len(r.args), sql, 1)
 	}
 }
 

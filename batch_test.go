@@ -20,9 +20,9 @@ func TestBatchClosed(t *testing.T) {
 	defer mock.Close(context.Background())
 
 	expectedBatch := mock.NewBatch().
-		AddBatchElements(
-			NewBatchElement("SELECT *", 1),
-			NewBatchElement("SELECT *"),
+		AddBatchQueries(
+			NewBatchQuery("SELECT *", 1),
+			NewBatchQuery("SELECT *"),
 		)
 
 	batchResultsMock := NewBatchResults()
@@ -51,12 +51,12 @@ func TestBatchWithRewrittenSQL(t *testing.T) {
 	u := user{name: "John", email: pgtype.Text{String: "john@example.com", Valid: true}}
 
 	expectedBatch := mock.NewBatch().
-		AddBatchElements(
+		AddBatchQueries(
 			//first batch query is correct
-			NewBatchElement("INSERT", &u).
+			NewBatchQuery("INSERT", &u).
 				WithRewrittenSQL("INSERT INTO users (username, email) VALUES ($1, $2) RETURNING id"),
 			//second batch query is not correct
-			NewBatchElement("INSERT INTO users(username, password) VALUES (@user, @password)", pgx.NamedArgs{"user": "John", "password": "strong"}).
+			NewBatchQuery("INSERT INTO users(username, password) VALUES (@user, @password)", pgx.NamedArgs{"user": "John", "password": "strong"}).
 				WithRewrittenSQL("INSERT INTO users(username, password) VALUES ($1)"),
 		)
 	batchResultsMock := NewBatchResults()
@@ -84,9 +84,9 @@ func TestBatchQuery(t *testing.T) {
 	defer mock.Close(context.Background())
 
 	expectedBatch := mock.NewBatch().
-		AddBatchElements(
-			NewBatchElement("SELECT *", 1),
-			NewBatchElement("SELECT *"),
+		AddBatchQueries(
+			NewBatchQuery("SELECT *", 1),
+			NewBatchQuery("SELECT *"),
 		)
 
 	rows := NewRows([]string{"id", "name", "email"}).
@@ -129,9 +129,9 @@ func TestBatchErrors(t *testing.T) {
 	defer mock.Close(context.Background())
 
 	expectedBatch := mock.NewBatch().
-		AddBatchElements(
-			NewBatchElement("SELECT *", 1),
-			NewBatchElement("SELECT *"),
+		AddBatchQueries(
+			NewBatchQuery("SELECT *", 1),
+			NewBatchQuery("SELECT *"),
 		)
 
 	batchResultsMock := NewBatchResults().
@@ -171,9 +171,9 @@ func TestBatchQueryRow(t *testing.T) {
 	defer mock.Close(context.Background())
 
 	expectedBatch := mock.NewBatch().
-		AddBatchElements(
-			NewBatchElement("SELECT *", 1),
-			NewBatchElement("SELECT *"),
+		AddBatchQueries(
+			NewBatchQuery("SELECT *", 1),
+			NewBatchQuery("SELECT *"),
 		)
 
 	rows := NewRows([]string{"id", "name", "email"}).

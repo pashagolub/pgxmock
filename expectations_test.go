@@ -151,9 +151,9 @@ func TestSendBatch(t *testing.T) {
 	`
 
 	// create mocked batches that we expect to happen
-	batchMock := NewBatch().AddBatchElements(
-		NewBatchElement("CREATE TABLE *", 1, "aaa"),
-		NewBatchElement("SELECT *"))
+	batchMock := NewBatch().AddBatchQueries(
+		NewBatchQuery("CREATE TABLE *", 1, "aaa"),
+		NewBatchQuery("SELECT *"))
 
 	rows := NewRows([]string{"id", "name", "email"}).
 		AddRow("some-id-1", "some-name-1", "some-email-1").
@@ -198,6 +198,114 @@ func TestSendBatch(t *testing.T) {
 	a.NoError(err)
 
 	a.NoError(mock.ExpectationsWereMet())
+}
+
+func TestSendBatchErrors(t *testing.T) {
+	mock, _ := NewConn()
+	a := assert.New(t)
+	create := `
+		CREATE TABLE IF NOT EXISTS user (
+		    id text, 
+		    name text, 
+		    email text, 
+		    address text, 
+		    anotherfield text
+		    )
+	`
+	query := `
+		SELECT
+			name,
+			email,
+			address,
+			anotherfield
+		FROM user
+		where
+			name    = 'John'
+			and
+			address = 'Jakarta'
+	`
+
+	// create mocked batches that we expect to happen
+	batchMock := NewBatch().AddBatchQueries(
+		NewBatchQuery("CREATE TABLE *", 1, "aaa"))
+
+	rows := NewRows([]string{"id", "name", "email"}).
+		AddRow("some-id-1", "some-name-1", "some-email-1").
+		AddRow("some-id-2", "some-name-2", "some-email-2")
+
+	batchResultsMock := NewBatchResults().WillReturnRows(rows)
+
+	mock.ExpectBegin()
+	mock.ExpectSendBatch(batchMock).
+		WillReturnBatchResults(batchResultsMock)
+
+	// create batches that will be tested
+	batch := new(pgx.Batch)
+	batch.Queue(create, 1, "aaa")
+	batch.Queue(query)
+
+	// error when length of expected batch is different from given batch
+	tx, err := mock.Begin(ctx)
+	a.Nil(err)
+	// send batch and validate if response is not nil
+	br := tx.SendBatch(ctx, batch)
+	a.Nil(br)
+	a.Error(mock.ExpectationsWereMet())
+
+	// error when arguments does not match
+	// create new batch
+	batch = new(pgx.Batch)
+	batch.Queue(create, 1, "bbb")
+
+	// send batch and validate if response is not nil
+	br = tx.SendBatch(ctx, batch)
+	a.Nil(br)
+	a.Error(mock.ExpectationsWereMet())
+}
+
+func TestExpectedBatchWasNotClosed(t *testing.T) {
+	mock, _ := NewConn()
+	a := assert.New(t)
+	create := `
+		CREATE TABLE IF NOT EXISTS user (
+		    id text, 
+		    name text, 
+		    email text, 
+		    address text, 
+		    anotherfield text
+		    )
+	`
+
+	// create mocked batches that we expect to happen
+	batchMock := NewBatch().AddBatchQueries(
+		NewBatchQuery("CREATE TABLE *"))
+
+	rows := NewRows([]string{"id", "name"})
+
+	batchResultsMock := NewBatchResults().WillReturnRows(rows)
+
+	mock.ExpectBegin()
+	mock.ExpectSendBatch(batchMock).
+		WillReturnBatchResults(batchResultsMock).
+		BatchResultsWillBeClosed()
+	mock.ExpectCommit()
+
+	// create batches that will be tested
+	batch := new(pgx.Batch)
+	batch.Queue(create)
+
+	// error when length of expected batch is different from given batch
+	tx, err := mock.Begin(ctx)
+	a.Nil(err)
+	// send batch and validate if response is not nil
+	br := tx.SendBatch(ctx, batch)
+	a.NotNil(br)
+
+	// run exec and expect no error
+	_, err = br.Exec()
+	a.NoError(err)
+	// expect error as batch was not closed
+	a.Error(mock.ExpectationsWereMet())
 }
 
 func TestUnexpectedPing(t *testing.T) {
