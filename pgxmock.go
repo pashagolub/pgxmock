@@ -387,6 +387,9 @@ func (c *pgxmock) Deallocate(ctx context.Context, name string) error {
 	if expected == nil {
 		return fmt.Errorf("Deallocate: prepared statement name '%s' doesn't exist", name)
 	}
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
 	expected.deallocated = true
 	return expected.deallocateErr
 }
