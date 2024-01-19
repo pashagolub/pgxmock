@@ -57,7 +57,7 @@ func (b *batchResults) Query() (pgx.Rows, error) {
 	if b.br.queryErr != nil {
 		return nil, b.br.queryErr
 	}
-	rs := &rowSets{sets: []*Rows{b.br.rows}}
+	rs := b.br.rows.Kind()
 	rs.Next()
 	return rs, nil
 }
@@ -72,7 +72,7 @@ func (b *batchResults) Exec() (pgconn.CommandTag, error) {
 
 // QueryRow is a mock for QueryRow() function in pgx.BatchResults interface
 func (b *batchResults) QueryRow() pgx.Row {
-	rs := &rowSets{sets: []*Rows{b.br.rows}}
+	rs := b.br.rows.Kind()
 	rs.Next()
 	return rs
 }
