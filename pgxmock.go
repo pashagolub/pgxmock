@@ -387,8 +387,11 @@ func (c *pgxmock) Deallocate(ctx context.Context, name string) error {
 	if expected == nil {
 		return fmt.Errorf("Deallocate: prepared statement name '%s' doesn't exist", name)
 	}
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
 	expected.deallocated = true
-	return expected.waitForDelay(ctx)
+	return expected.deallocateErr
 }
 
 func (c *pgxmock) Commit(ctx context.Context) error {
@@ -480,11 +483,9 @@ func (c *pgxmock) Ping(ctx context.Context) (err error) {
 }
 
 func (c *pgxmock) Reset() {
-	ex, err := findExpectation[*ExpectedReset](c, "Reset()")
-	if err != nil {
-		return
+	if ex, err := findExpectation[*ExpectedReset](c, "Reset()"); err == nil {
+		_ = ex.waitForDelay(context.Background())
 	}
-	_ = ex.waitForDelay(context.Background())
 }
 
 type expectationType[t any] interface {

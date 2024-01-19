@@ -240,9 +240,9 @@ func TestPrepareExpectations(t *testing.T) {
 	t.Parallel()
 	mock, _ := NewConn()
 	a := assert.New(t)
-
+	expErr := errors.New("invaders must die")
 	mock.ExpectPrepare("foo", "SELECT (.+) FROM articles WHERE id = ?").
-		WillReturnCloseError(errors.New("invaders must die")).
+		WillReturnCloseError(expErr).
 		WillDelayFor(1 * time.Second)
 
 	stmt, err := mock.Prepare(context.Background(), "baz", "SELECT (.+) FROM articles WHERE id = ?")
@@ -252,6 +252,8 @@ func TestPrepareExpectations(t *testing.T) {
 	stmt, err = mock.Prepare(context.Background(), "foo", "SELECT (.+) FROM articles WHERE id = $1")
 	a.NoError(err)
 	a.NotNil(stmt)
+	err = mock.Deallocate(context.Background(), "foo")
+	a.EqualError(err, expErr.Error())
 
 	// expect something else, w/o ExpectPrepare()
 	var id int
