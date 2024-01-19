@@ -483,11 +483,9 @@ func (c *pgxmock) Ping(ctx context.Context) (err error) {
 }
 
 func (c *pgxmock) Reset() {
-	ex, err := findExpectation[*ExpectedReset](c, "Reset()")
-	if err != nil {
-		return
+	if ex, err := findExpectation[*ExpectedReset](c, "Reset()"); err == nil {
+		_ = ex.waitForDelay(context.Background())
 	}
-	_ = ex.waitForDelay(context.Background())
 }
 
 type expectationType[t any] interface {
