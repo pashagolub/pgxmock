@@ -388,7 +388,7 @@ func (c *pgxmock) Deallocate(ctx context.Context, name string) error {
 		return fmt.Errorf("Deallocate: prepared statement name '%s' doesn't exist", name)
 	}
 	expected.deallocated = true
-	return expected.waitForDelay(ctx)
+	return expected.deallocateErr
 }
 
 func (c *pgxmock) Commit(ctx context.Context) error {
