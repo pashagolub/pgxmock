@@ -58,7 +58,7 @@ func TestAddRows(t *testing.T) {
 	t.Parallel()
 	mock, err := NewConn()
 	if err != nil {
-		fmt.Println("failed to open sqlmock database:", err)
+		t.Fatal("failed to open sqlmock database:", err)
 	}
 	defer mock.Close(context.Background())
 
@@ -103,6 +103,7 @@ func ExampleRows_AddRows() {
 	mock, err := NewConn()
 	if err != nil {
 		fmt.Println("failed to open sqlmock database:", err)
+		return
 	}
 	defer mock.Close(context.Background())
 
@@ -140,6 +141,7 @@ func ExampleRows() {
 	mock, err := NewConn()
 	if err != nil {
 		fmt.Println("failed to open pgxmock database:", err)
+		return
 	}
 	defer mock.Close(context.Background())
 
@@ -178,6 +180,7 @@ func ExampleRows_rowError() {
 	mock, err := NewConn()
 	if err != nil {
 		fmt.Println("failed to open pgxmock database:", err)
+		return
 	}
 	// defer mock.Close(context.Background())
 
@@ -209,6 +212,7 @@ func ExampleRows_expectToBeClosed() {
 	mock, err := NewConn()
 	if err != nil {
 		fmt.Println("failed to open pgxmock database:", err)
+		return
 	}
 	defer mock.Close(context.Background())
 
@@ -242,6 +246,7 @@ func ExampleRows_customDriverValue() {
 	mock, err := NewConn()
 	if err != nil {
 		fmt.Println("failed to open pgxmock database:", err)
+		return
 	}
 	defer mock.Close(context.Background())
 
@@ -383,6 +388,7 @@ func ExampleRows_values() {
 	mock, err := NewConn()
 	if err != nil {
 		fmt.Println("failed to open pgxmock database:", err)
+		return
 	}
 	defer mock.Close(context.Background())
 
@@ -395,6 +401,7 @@ func ExampleRows_values() {
 	rs, err := mock.Query(context.Background(), "SELECT")
 	if err != nil {
 		fmt.Print(err)
+		return
 	}
 	defer rs.Close()
 
@@ -411,6 +418,7 @@ func ExampleRows_rawValues() {
 	mock, err := NewConn()
 	if err != nil {
 		fmt.Println("failed to open pgxmock database:", err)
+		return
 	}
 	defer mock.Close(context.Background())
 
@@ -423,6 +431,7 @@ func ExampleRows_rawValues() {
 	rs, err := mock.Query(context.Background(), "SELECT")
 	if err != nil {
 		fmt.Print(err)
+		return
 	}
 	defer rs.Close()
 
@@ -623,7 +632,7 @@ func TestMockQueryWithCollect(t *testing.T) {
 	t.Parallel()
 	mock, err := NewConn()
 	if err != nil {
-		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 	defer mock.Close(context.Background())
 	type rowStructType struct {
@@ -638,21 +647,21 @@ func TestMockQueryWithCollect(t *testing.T) {
 
 	rows, err := mock.Query(context.Background(), "SELECT (.+) FROM articles WHERE id = ?", 5)
 	if err != nil {
-		t.Errorf("error '%s' was not expected while retrieving mock rows", err)
+		t.Fatalf("error '%s' was not expected while retrieving mock rows", err)
 	}
 
 	defer rows.Close()
 
 	rawMap, err := pgx.CollectRows(rows, pgx.RowToAddrOfStructByPos[rowStructType])
 	if err != nil {
-		t.Errorf("error '%s' was not expected while trying to collect rows", err)
+		t.Fatalf("error '%s' was not expected while trying to collect rows", err)
 	}
 
 	var id = rawMap[0].ID
 	var title = rawMap[0].Title
 
 	if err != nil {
-		t.Errorf("error '%s' was not expected while trying to scan row", err)
+		t.Fatalf("error '%s' was not expected while trying to scan row", err)
 	}
 
 	if id != 5 {

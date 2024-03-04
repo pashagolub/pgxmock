@@ -22,7 +22,7 @@ func TestAnyTimeArgument(t *testing.T) {
 	t.Parallel()
 	mock, err := NewConn()
 	if err != nil {
-		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 
 	mock.ExpectExec("INSERT INTO users").
@@ -43,7 +43,7 @@ func TestAnyTimeNamedArgument(t *testing.T) {
 	t.Parallel()
 	mock, err := NewConn()
 	if err != nil {
-		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 
 	mock.ExpectExec("INSERT INTO users").
@@ -67,7 +67,7 @@ func TestByteSliceArgument(t *testing.T) {
 	t.Parallel()
 	mock, err := NewConn()
 	if err != nil {
-		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 
 	username := []byte("user")
@@ -96,7 +96,7 @@ func TestExpectQueryRewriterFail(t *testing.T) {
 	t.Parallel()
 	mock, err := NewConn()
 	if err != nil {
-		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 
 	mock.ExpectQuery(`INSERT INTO users\(username\) VALUES \(\@user\)`).
@@ -111,7 +111,7 @@ func TestQueryRewriterFail(t *testing.T) {
 	t.Parallel()
 	mock, err := NewConn()
 	if err != nil {
-		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 	mock.ExpectExec(`INSERT INTO .+`).WithArgs("foo")
 	_, err = mock.Exec(context.Background(), "INSERT INTO users(username) VALUES (@user)", failQryRW{})
@@ -123,7 +123,7 @@ func TestByteSliceNamedArgument(t *testing.T) {
 	t.Parallel()
 	mock, err := NewConn()
 	if err != nil {
-		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 
 	username := []byte("user")
@@ -149,7 +149,7 @@ func TestAnyArgument(t *testing.T) {
 	t.Parallel()
 	mock, err := NewConn()
 	if err != nil {
-		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 
 	mock.ExpectExec("INSERT INTO users").
@@ -170,7 +170,7 @@ func TestAnyNamedArgument(t *testing.T) {
 	t.Parallel()
 	mock, err := NewConn()
 	if err != nil {
-		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 
 	mock.ExpectExec("INSERT INTO users").
