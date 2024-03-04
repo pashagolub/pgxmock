@@ -8,11 +8,11 @@ import (
 func TestTwoOpenConnectionsOnTheSameDSN(t *testing.T) {
 	mock, err := NewConn()
 	if err != nil {
-		t.Errorf("expected no error, but got: %s", err)
+		t.Fatalf("expected no error, but got: %s", err)
 	}
 	mock2, err := NewConn()
 	if err != nil {
-		t.Errorf("expected no error, but got: %s", err)
+		t.Fatalf("expected no error, but got: %s", err)
 	}
 	if mock == mock2 {
 		t.Errorf("expected not the same mock instance, but it is the same")
@@ -24,11 +24,11 @@ func TestTwoOpenConnectionsOnTheSameDSN(t *testing.T) {
 func TestPools(t *testing.T) {
 	mock, err := NewPool()
 	if err != nil {
-		t.Errorf("expected no error, but got: %s", err)
+		t.Fatalf("expected no error, but got: %s", err)
 	}
 	mock2, err := NewPool()
 	if err != nil {
-		t.Errorf("expected no error, but got: %s", err)
+		t.Fatalf("expected no error, but got: %s", err)
 	}
 	if mock == mock2 {
 		t.Errorf("expected not the same mock instance, but it is the same")
@@ -44,7 +44,7 @@ func TestPools(t *testing.T) {
 func TestAcquire(t *testing.T) {
 	mock, err := NewPool()
 	if err != nil {
-		t.Errorf("expected no error, but got: %s", err)
+		t.Fatalf("expected no error, but got: %s", err)
 	}
 	_, err = mock.Acquire(context.Background())
 	if err == nil {
@@ -55,7 +55,7 @@ func TestAcquire(t *testing.T) {
 func TestPoolStat(t *testing.T) {
 	mock, err := NewPool()
 	if err != nil {
-		t.Errorf("expected no error, but got: %s", err)
+		t.Fatalf("expected no error, but got: %s", err)
 	}
 	s := mock.Stat()
 	if s == nil {

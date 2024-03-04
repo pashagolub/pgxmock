@@ -28,7 +28,7 @@ func TestIssue14EscapeSQL(t *testing.T) {
 	t.Parallel()
 	mock, err := NewConn()
 	if err != nil {
-		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 	defer mock.Close(context.Background())
 	mock.ExpectExec("INSERT INTO mytable\\(a, b\\)").
@@ -51,7 +51,7 @@ func TestIssue4(t *testing.T) {
 	t.Parallel()
 	mock, err := NewConn()
 	if err != nil {
-		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 	defer mock.Close(context.Background())
 
@@ -67,7 +67,7 @@ func TestMockQuery(t *testing.T) {
 	t.Parallel()
 	mock, err := NewConn()
 	if err != nil {
-		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 	defer mock.Close(context.Background())
 
@@ -79,13 +79,13 @@ func TestMockQuery(t *testing.T) {
 
 	rows, err := mock.Query(context.Background(), "SELECT (.+) FROM articles WHERE id = ?", 5)
 	if err != nil {
-		t.Errorf("error '%s' was not expected while retrieving mock rows", err)
+		t.Fatalf("error '%s' was not expected while retrieving mock rows", err)
 	}
 
 	defer rows.Close()
 
 	if !rows.Next() {
-		t.Error("it must have had one row as result, but got empty result set instead")
+		t.Fatal("it must have had one row as result, but got empty result set instead")
 	}
 
 	var id int
@@ -143,7 +143,7 @@ func TestMockQueryTypes(t *testing.T) {
 	t.Parallel()
 	mock, err := NewConn()
 	if err != nil {
-		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 	defer mock.Close(context.Background())
 
@@ -159,7 +159,7 @@ func TestMockQueryTypes(t *testing.T) {
 
 	rows, err := mock.Query(context.Background(), "SELECT (.+) FROM sales WHERE id = ?", 5)
 	if err != nil {
-		t.Errorf("error '%s' was not expected while retrieving mock rows", err)
+		t.Fatalf("error '%s' was not expected while retrieving mock rows", err)
 	}
 	defer rows.Close()
 	if !rows.Next() {
@@ -280,7 +280,7 @@ func TestPreparedQueryExecutions(t *testing.T) {
 	t.Parallel()
 	mock, err := NewConn()
 	if err != nil {
-		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 	defer mock.Close(context.Background())
 
@@ -298,7 +298,7 @@ func TestPreparedQueryExecutions(t *testing.T) {
 
 	_, err = mock.Prepare(context.Background(), "foo", "SELECT id, title FROM articles WHERE id = ?")
 	if err != nil {
-		t.Errorf("error '%s' was not expected while creating a prepared statement", err)
+		t.Fatalf("error '%s' was not expected while creating a prepared statement", err)
 	}
 
 	var id int
@@ -338,7 +338,7 @@ func TestUnorderedPreparedQueryExecutions(t *testing.T) {
 	t.Parallel()
 	mock, err := NewConn()
 	if err != nil {
-		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 	defer mock.Close(context.Background())
 
@@ -358,7 +358,7 @@ func TestUnorderedPreparedQueryExecutions(t *testing.T) {
 
 	_, err = mock.Prepare(context.Background(), "authors_stmt", "SELECT id, name FROM authors WHERE id = ?")
 	if err != nil {
-		t.Errorf("error '%s' was not expected while creating a prepared statement", err)
+		t.Fatalf("error '%s' was not expected while creating a prepared statement", err)
 	}
 
 	err = mock.QueryRow(context.Background(), "authors_stmt", 1).Scan(&id, &name)
@@ -375,14 +375,14 @@ func TestUnexpectedOperations(t *testing.T) {
 	t.Parallel()
 	mock, err := NewConn()
 	if err != nil {
-		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 	defer mock.Close(context.Background())
 
 	mock.ExpectPrepare("foo", "SELECT (.+) FROM articles WHERE id = ?")
 	_, err = mock.Prepare(context.Background(), "foo", "SELECT id, title FROM articles WHERE id = ?")
 	if err != nil {
-		t.Errorf("error '%s' was not expected while creating a prepared statement", err)
+		t.Fatalf("error '%s' was not expected while creating a prepared statement", err)
 	}
 
 	var id int
@@ -404,7 +404,7 @@ func TestWrongExpectations(t *testing.T) {
 	t.Parallel()
 	mock, err := NewConn()
 	if err != nil {
-		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 	defer mock.Close(context.Background())
 
@@ -451,7 +451,7 @@ func TestExecExpectations(t *testing.T) {
 	t.Parallel()
 	mock, err := NewConn()
 	if err != nil {
-		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 	defer mock.Close(context.Background())
 
@@ -462,7 +462,7 @@ func TestExecExpectations(t *testing.T) {
 
 	res, err := mock.Exec(context.Background(), "INSERT INTO articles (title) VALUES (?)", "hello")
 	if err != nil {
-		t.Errorf("error '%s' was not expected, while inserting a row", err)
+		t.Fatalf("error '%s' was not expected, while inserting a row", err)
 	}
 
 	if res.RowsAffected() != 1 {
@@ -478,7 +478,7 @@ func TestRowBuilderAndNilTypes(t *testing.T) {
 	t.Parallel()
 	mock, err := NewConn()
 	if err != nil {
-		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 	defer mock.Close(context.Background())
 
@@ -490,7 +490,7 @@ func TestRowBuilderAndNilTypes(t *testing.T) {
 
 	rows, err := mock.Query(context.Background(), "SELECT * FROM sales")
 	if err != nil {
-		t.Errorf("error '%s' was not expected while retrieving mock rows", err)
+		t.Fatalf("error '%s' was not expected while retrieving mock rows", err)
 	}
 	defer rows.Close()
 
@@ -503,7 +503,7 @@ func TestRowBuilderAndNilTypes(t *testing.T) {
 	)
 
 	if !rows.Next() {
-		t.Error("it must have had row in rows, but got empty result set instead")
+		t.Fatal("it must have had row in rows, but got empty result set instead")
 	}
 
 	err = rows.Scan(&id, &active, &created, &status)
@@ -533,7 +533,7 @@ func TestRowBuilderAndNilTypes(t *testing.T) {
 
 	// test second row
 	if !rows.Next() {
-		t.Error("it must have had row in rows, but got empty result set instead")
+		t.Fatal("it must have had row in rows, but got empty result set instead")
 	}
 
 	err = rows.Scan(&id, &active, &created, &status)
@@ -566,7 +566,7 @@ func TestArgumentReflectValueTypeError(t *testing.T) {
 	t.Parallel()
 	mock, err := NewConn()
 	if err != nil {
-		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 	defer mock.Close(context.Background())
 
@@ -584,7 +584,7 @@ func TestGoroutineExecutionWithUnorderedExpectationMatching(t *testing.T) {
 	t.Parallel()
 	mock, err := NewConn()
 	if err != nil {
-		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 	defer mock.Close(context.Background())
 
@@ -726,7 +726,7 @@ func TestEmptyRowSet(t *testing.T) {
 	t.Parallel()
 	mock, err := NewConn()
 	if err != nil {
-		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 	defer mock.Close(context.Background())
 
@@ -738,7 +738,7 @@ func TestEmptyRowSet(t *testing.T) {
 
 	rows, err := mock.Query(context.Background(), "SELECT (.+) FROM articles WHERE id = ?", 5)
 	if err != nil {
-		t.Errorf("error '%s' was not expected while retrieving mock rows", err)
+		t.Fatalf("error '%s' was not expected while retrieving mock rows", err)
 	}
 	defer rows.Close()
 
@@ -757,7 +757,7 @@ func TestPrepareExpectationNotFulfilled(t *testing.T) {
 	t.Parallel()
 	mock, err := NewConn()
 	if err != nil {
-		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 	defer mock.Close(context.Background())
 
@@ -1046,7 +1046,7 @@ func TestExecExpectationErrorDelay(t *testing.T) {
 	t.Parallel()
 	mock, err := NewConn()
 	if err != nil {
-		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 	defer mock.Close(context.Background())
 
@@ -1107,7 +1107,7 @@ func TestNewRows(t *testing.T) {
 	t.Parallel()
 	mock, err := NewConn()
 	if err != nil {
-		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 	defer mock.Close(context.Background())
 	columns := []string{"col1", "col2"}
@@ -1124,7 +1124,7 @@ func TestNewRows(t *testing.T) {
 func TestQueryWithTimeout(t *testing.T) {
 	mock, err := NewConn()
 	if err != nil {
-		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 	defer mock.Close(context.Background())
 
