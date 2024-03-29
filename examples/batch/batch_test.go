@@ -30,7 +30,7 @@ func TestShouldRollbackOnFailure(t *testing.T) {
 	mock.ExpectRollback()
 
 	// now we execute our method
-	if err = selectBatch(mock); err == nil {
+	if err = requestBatch(mock); err == nil {
 		t.Errorf("was expecting an error, but there was none")
 	}
 
