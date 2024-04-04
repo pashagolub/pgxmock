@@ -47,7 +47,7 @@ func (r *connRow) Scan(dest ...any) (err error) {
 		return rows.Err()
 	}
 
-	rows.Scan(dest...)
+	_ = rows.Scan(dest...)
 	rows.Close()
 	return rows.Err()
 }
