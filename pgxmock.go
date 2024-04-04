@@ -445,10 +445,9 @@ func (er errRow) Scan(...interface{}) error {
 func (c *pgxmock) QueryRow(ctx context.Context, sql string, args ...interface{}) pgx.Row {
 	rows, err := c.Query(ctx, sql, args...)
 	if err != nil {
-		return errRow{err}
+		return errRow{err: err}
 	}
-	_ = rows.Next()
-	return rows
+	return (*connRow)(rows.(*rowSets))
 }
 
 func (c *pgxmock) Exec(ctx context.Context, query string, args ...interface{}) (pgconn.CommandTag, error) {
