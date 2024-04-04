@@ -724,12 +724,13 @@ func TestConnRow(t *testing.T) {
 
 	// check no rows returned case
 	var id int
-	mock.ExpectQuery("SELECT").WillReturnRows(NewRows([]string{"id"}))
+	rows := NewRows([]string{"id"})
+	mock.ExpectQuery("SELECT").WillReturnRows(rows)
 	err = mock.QueryRow(context.Background(), "SELECT").Scan(&id)
 	a.ErrorIs(err, pgx.ErrNoRows)
 
 	// check single row returned case
-	rows := NewRows([]string{"id"}).AddRow(1)
+	rows = NewRows([]string{"id"}).AddRow(1)
 	mock.ExpectQuery("SELECT").WillReturnRows(rows)
 	err = mock.QueryRow(context.Background(), "SELECT").Scan(&id)
 	a.NoError(err)
