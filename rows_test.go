@@ -709,3 +709,39 @@ func TestRowsKind(t *testing.T) {
 		}
 	}
 }
+
+// TestConnRow tests the ConnRow interface implementation for Conn.QueryRow.
+func TestConnRow(t *testing.T) {
+	t.Parallel()
+	mock, _ := NewConn()
+	a := assert.New(t)
+
+	// check error case
+	expectedErr := errors.New("error")
+	mock.ExpectQuery("SELECT").WillReturnError(expectedErr)
+	err := mock.QueryRow(context.Background(), "SELECT").Scan(nil)
+	a.ErrorIs(err, expectedErr)
+
+	// check no rows returned case
+	var id int
+	rows := NewRows([]string{"id"})
+	mock.ExpectQuery("SELECT").WillReturnRows(rows)
+	err = mock.QueryRow(context.Background(), "SELECT").Scan(&id)
+	a.ErrorIs(err, pgx.ErrNoRows)
+
+	// check single row returned case
+	rows = NewRows([]string{"id"}).AddRow(1)
+	mock.ExpectQuery("SELECT").WillReturnRows(rows)
+	err = mock.QueryRow(context.Background(), "SELECT").Scan(&id)
+	a.NoError(err)
+	a.Equal(1, id)
+
+	// check multiple rows returned case
+	rows = NewRows([]string{"id"}).AddRow(1).AddRow(42)
+	mock.ExpectQuery("SELECT").WillReturnRows(rows)
+	err = mock.QueryRow(context.Background(), "SELECT").Scan(&id)
+	a.NoError(err)
+	a.Equal(1, id)
+
+	a.NoError(mock.ExpectationsWereMet())
+}

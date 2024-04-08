@@ -9,6 +9,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // CSVColumnParser is a function which converts trimmed csv
@@ -20,6 +21,35 @@ var CSVColumnParser = func(s string) interface{} {
 		return nil
 	}
 	return s
+}
+
+// connRow implements the Row interface for Conn.QueryRow.
+type connRow rowSets
+
+func (r *connRow) Scan(dest ...any) (err error) {
+	rows := (*rowSets)(r)
+
+	if rows.Err() != nil {
+		return rows.Err()
+	}
+
+	for _, d := range dest {
+		if _, ok := d.(*pgtype.DriverBytes); ok {
+			rows.Close()
+			return fmt.Errorf("cannot scan into *pgtype.DriverBytes from QueryRow")
+		}
+	}
+
+	if !rows.Next() {
+		if rows.Err() == nil {
+			return pgx.ErrNoRows
+		}
+		return rows.Err()
+	}
+
+	_ = rows.Scan(dest...)
+	rows.Close()
+	return rows.Err()
 }
 
 type rowSets struct {
