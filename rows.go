@@ -80,7 +80,9 @@ func (rs *rowSets) FieldDescriptions() []pgconn.FieldDescription {
 // }
 
 func (rs *rowSets) Close() {
-	rs.ex.rowsWereClosed = true
+	if rs.ex != nil {
+		rs.ex.rowsWereClosed = true
+	}
 	// return rs.sets[rs.pos].closeErr
 }
 
