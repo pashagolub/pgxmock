@@ -708,6 +708,10 @@ func TestRowsKind(t *testing.T) {
 			t.Fatalf("expected %s, but got %s", alphabet[i], letter)
 		}
 	}
+
+	// Test closing as this is called by the pgx library in pgx.CollectRows
+	// Previously this caused a nil pointer exception when Close was called on kindRows
+	kindRows.Close()
 }
 
 // TestConnRow tests the ConnRow interface implementation for Conn.QueryRow.
