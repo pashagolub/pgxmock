@@ -262,6 +262,43 @@ func (e *ExpectedExec) WillReturnResult(result pgconn.CommandTag) *ExpectedExec 
 	return e
 }
 
+// ExpectedBatch is used to manage pgx.Batch expectations.
+// Returned by pgxmock.ExpectBatch.
+type ExpectedBatch struct {
+	commonExpectation
+	mock            *pgxmock
+	expectedQueries []*queryBasedExpectation
+	closed          bool
+	mustBeClosed    bool
+}
+
+// ExpectExec allows to expect Queue().Exec() on this batch.
+func (e *ExpectedBatch) ExpectExec(query string) *ExpectedExec {
+	ee := &ExpectedExec{}
+	ee.expectSQL = query
+	e.expectedQueries = append(e.expectedQueries, &ee.queryBasedExpectation)
+	e.mock.expectations = append(e.mock.expectations, ee)
+	return ee
+}
+
+// ExpectQuery allows to expect Queue().Query() or Queue().QueryRow() on this batch.
+func (e *ExpectedBatch) ExpectQuery(query string) *ExpectedQuery {
+	eq := &ExpectedQuery{}
+	eq.expectSQL = query
+	e.expectedQueries = append(e.expectedQueries, &eq.queryBasedExpectation)
+	e.mock.expectations = append(e.mock.expectations, eq)
+	return eq
+}
+
+// String returns string representation
+func (e *ExpectedBatch) String() string {
+	msg := "ExpectedBatch => expecting call to SendBatch()\n"
+	if e.mustBeClosed {
+		msg += "\t- batch must be closed\n"
+	}
+	return msg + e.commonExpectation.String()
+}
+
 // ExpectedPrepare is used to manage pgx.Prepare or pgx.Tx.Prepare expectations.
 // Returned by pgxmock.ExpectPrepare.
 type ExpectedPrepare struct {
