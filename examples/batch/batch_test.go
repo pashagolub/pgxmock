@@ -6,7 +6,7 @@ import (
 	"github.com/pashagolub/pgxmock/v3"
 )
 
-// a successful case
+// a successful test case
 func TestShouldSelectRows(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {
