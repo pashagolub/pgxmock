@@ -1,21 +1,14 @@
 ## PostgreSQL Batch Example in Go
 
-This example is subdivided into three steps.
-1. databaseSetup
-2. requestBatch, where a list of sql queries is executed.
-3. databaseCleanup
-
-**Description:**
-
-This Go program demonstrates interacting with a PostgreSQL database using batch operations for improved efficiency. It leverages the `pgx/v5` library for database connectivity.
+This Go program demonstrates interacting with a PostgreSQL database using batch operations for improved efficiency. It leverages the `pgx/v5` library.
 
 **Features:**
 
-- **Database Setup:** Creates a table named `ledger` to store data (description and amount).
-- **Batch Requests:** Executes multiple SQL statements within a single database transaction using `pgx.Batch`. This includes inserts (`INSERT`), selects (`SELECT`), and an aggregate function (`SUM`).
-- **Error Handling:** Gracefully handles potential errors during database operations and panics for critical failures.
-- **Transaction Management:** Ensures data consistency by using transactions with `Begin`, `Commit`, and `Rollback`.
-- **Cleanup:** Deletes all rows from the `ledger` table after processing.
+* Creates a table named `ledger` to store data (description and amount).
+* Executes multiple SQL statements within a single database transaction using `pgx.Batch`. This includes inserts (`INSERT`), selects (`SELECT`), and iterating over results.
+* Handles potential errors during database operations.
+* Ensures data consistency by using transactions with `Begin`, `Commit`, and `Rollback`.
+* Deletes all rows from the `ledger` table after processing.
 
 **Requirements:**
 

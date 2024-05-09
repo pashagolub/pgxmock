@@ -85,20 +85,20 @@ func requestBatch(db PgxIface) (err error) {
 	// Iterate over a batch of queued queries
 	for _, query := range batch.QueuedQueries {
 
-		// Print SQL statement of a queued query
+		// Print SQL statement of the current query
 		fmt.Println(query.SQL)
 
-		// BatchResult.Query reads results from a queued query
+		// BatchResult.Query reads results from the current query
 		rows, err := br.Query()
 		if err != nil {
 			return fmt.Errorf("requestBatch: %s", err)
 		}
 
-		// Iterate over results to print each row
-		var id, qt int64
+		// Iterate over the results to print each selected row
+		var id, amount int64
 		var descr string
-		_, err = pgx.ForEachRow(rows, []any{&id, &descr, &qt}, func() error {
-			fmt.Printf("  (%v, \"%v\", %v)\n", id, descr, qt)
+		_, err = pgx.ForEachRow(rows, []any{&id, &descr, &amount}, func() error {
+			fmt.Printf("  (%v, \"%v\", %v)\n", id, descr, amount)
 			return nil
 		})
 		fmt.Println("")
@@ -142,7 +142,7 @@ func databaseCleanup(db PgxIface) (err error) {
 func main() {
 
 	// @NOTE: the real connection is not required for tests
-	db, err := pgxpool.New(context.Background(), "postgres://postgres:password@localhost/postgres")
+	db, err := pgxpool.New(context.Background(), "postgres://<user>:<password>@<hostname>/<database>")
 	if err != nil {
 		panic(err)
 	}
@@ -158,7 +158,7 @@ func main() {
 		panic(err)
 	}
 
-	// Delete all rows in table ladger
+	// Delete all rows in table ledger
 	if err = databaseCleanup(db); err != nil {
 		panic(err)
 	}
