@@ -43,7 +43,7 @@ func databaseSetup(db PgxIface) (err error) {
 		return fmt.Errorf("databaseSetup: %s", err)
 	}
 
-	return
+	return err
 }
 
 func requestBatch(db PgxIface) (err error) {
@@ -67,28 +67,47 @@ func requestBatch(db PgxIface) (err error) {
 	batch := &pgx.Batch{}
 
 	// Add SQL commands to queue
-	batch.Queue("insert into ledger(description, amount) values($1, $2)", "q1", 1)
-	batch.Queue("insert into ledger(description, amount) values($1, $2)", "q2", 2)
-	batch.Queue("insert into ledger(description, amount) values($1, $2)", "q3", 3)
-	batch.Queue("select id, description, amount from ledger order by id")
-	batch.Queue("select id, description, amount from ledger order by amount")
-	batch.Queue("select * from ledger where false")
-	batch.Queue("select sum(amount) from ledger")
+	batch.Queue(
+		`INSERT INTO ledger(description, amount) VALUES ($1, $2), ($3, $4)`,
+		"first item", 1, "second item", 2)
 
-	// Create a BatchRequest object
+	batch.Queue("SELECT * FROM ledger")
+	batch.Queue("SELECT * FROM ledger WHERE amount = 1")
+
+	// Efficiently transmits queued queries as a single transaction.
+	// After the queries are run, a BatchResults object is returned.
 	br := tx.SendBatch(context.Background(), batch)
 	if br == nil {
 		return errors.New("SendBatch returns a NIL object")
 	}
 	defer br.Close()
 
-	// Execute a BatchRequest
-	_, err = br.Exec()
-	if err != nil {
-		return fmt.Errorf("requestBatch: %s", err)
-	}
+	// Iterate over a batch of queued queries
+	for _, query := range batch.QueuedQueries {
 
-	return
+		// Print SQL statement of a queued query
+		fmt.Println(query.SQL)
+
+		// BatchResult.Query reads results from a queued query
+		rows, err := br.Query()
+		if err != nil {
+			return fmt.Errorf("requestBatch: %s", err)
+		}
+
+		// Iterate over results to print each row
+		var id, qt int64
+		var descr string
+		_, err = pgx.ForEachRow(rows, []any{&id, &descr, &qt}, func() error {
+			fmt.Printf("  (%v, \"%v\", %v)\n", id, descr, qt)
+			return nil
+		})
+		fmt.Println("")
+
+		if err != nil {
+			return fmt.Errorf("requestBatch: %s", err)
+		}
+	}
+	return err
 }
 
 func databaseCleanup(db PgxIface) (err error) {
@@ -108,7 +127,7 @@ func databaseCleanup(db PgxIface) (err error) {
 		}
 	}()
 
-	// Delete all rows in a table
+	// Delete all rows in table ledger
 	sql := `DELETE FROM ledger ;`
 
 	// Execute SQL commands
@@ -117,7 +136,7 @@ func databaseCleanup(db PgxIface) (err error) {
 		return fmt.Errorf("databaseCleanup: %s", err)
 	}
 
-	return
+	return err
 }
 
 func main() {
@@ -139,7 +158,7 @@ func main() {
 		panic(err)
 	}
 
-	// Delete all rows in table
+	// Delete all rows in table ladger
 	if err = databaseCleanup(db); err != nil {
 		panic(err)
 	}
