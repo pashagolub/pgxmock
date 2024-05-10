@@ -290,7 +290,7 @@ type ExpectedDeallocate struct {
 func (e *ExpectedDeallocate) String() string {
 	msg := "ExpectedDeallocate => expecting call to Deallocate():\n"
 	if e.expectAll {
-		msg += fmt.Sprintf("\t- matches all statements\n")
+		msg += "\t- matches all statements\n"
 	} else {
 		msg += fmt.Sprintf("\t- matches statement name: '%s'", e.expectStmtName)
 	}
