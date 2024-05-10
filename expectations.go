@@ -266,58 +266,33 @@ func (e *ExpectedExec) WillReturnResult(result pgconn.CommandTag) *ExpectedExec 
 // Returned by pgxmock.ExpectPrepare.
 type ExpectedPrepare struct {
 	commonExpectation
-	mock           *pgxmock
 	expectStmtName string
 	expectSQL      string
-	deallocateErr  error
-	mustBeClosed   bool
-	deallocated    bool
-}
-
-// WillReturnCloseError allows to set an error for this prepared statement Close action
-func (e *ExpectedPrepare) WillReturnCloseError(err error) *ExpectedPrepare {
-	e.deallocateErr = err
-	return e
-}
-
-// WillBeClosed is for backward compatibility only and will be removed soon.
-//
-// Deprecated: One should use WillBeDeallocated() instead.
-func (e *ExpectedPrepare) WillBeClosed() *ExpectedPrepare {
-	return e.WillBeDeallocated()
-}
-
-// WillBeDeallocated expects this prepared statement to be deallocated
-func (e *ExpectedPrepare) WillBeDeallocated() *ExpectedPrepare {
-	e.mustBeClosed = true
-	return e
-}
-
-// ExpectQuery allows to expect Query() or QueryRow() on this prepared statement.
-// This method is convenient in order to prevent duplicating sql query string matching.
-func (e *ExpectedPrepare) ExpectQuery() *ExpectedQuery {
-	eq := &ExpectedQuery{}
-	eq.expectSQL = e.expectStmtName
-	e.mock.expectations = append(e.mock.expectations, eq)
-	return eq
-}
-
-// ExpectExec allows to expect Exec() on this prepared statement.
-// This method is convenient in order to prevent duplicating sql query string matching.
-func (e *ExpectedPrepare) ExpectExec() *ExpectedExec {
-	eq := &ExpectedExec{}
-	eq.expectSQL = e.expectStmtName
-	e.mock.expectations = append(e.mock.expectations, eq)
-	return eq
 }
 
 // String returns string representation
 func (e *ExpectedPrepare) String() string {
-	msg := "ExpectedPrepare => expecting call to Prepare():"
+	msg := "ExpectedPrepare => expecting call to Prepare():\n"
 	msg += fmt.Sprintf("\t- matches statement name: '%s'", e.expectStmtName)
 	msg += fmt.Sprintf("\t- matches sql: '%s'\n", e.expectSQL)
-	if e.deallocateErr != nil {
-		msg += fmt.Sprintf("\t- returns error on Close: %s", e.deallocateErr)
+	return msg + e.commonExpectation.String()
+}
+
+// ExpectedDeallocate is used to manage pgx.Deallocate and pgx.DeallocateAll expectations.
+// Returned by pgxmock.ExpectDeallocate(string) and pgxmock.ExpectDeallocateAll().
+type ExpectedDeallocate struct {
+	commonExpectation
+	expectStmtName string
+	expectAll      bool
+}
+
+// String returns string representation
+func (e *ExpectedDeallocate) String() string {
+	msg := "ExpectedDeallocate => expecting call to Deallocate():\n"
+	if e.expectAll {
+		msg += fmt.Sprintf("\t- matches all statements\n")
+	} else {
+		msg += fmt.Sprintf("\t- matches statement name: '%s'", e.expectStmtName)
 	}
 	return msg + e.commonExpectation.String()
 }
