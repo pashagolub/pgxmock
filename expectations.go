@@ -292,7 +292,7 @@ func (e *ExpectedDeallocate) String() string {
 	if e.expectAll {
 		msg += "\t- matches all statements\n"
 	} else {
-		msg += fmt.Sprintf("\t- matches statement name: '%s'", e.expectStmtName)
+		msg += fmt.Sprintf("\t- matches statement name: '%s'\n", e.expectStmtName)
 	}
 	return msg + e.commonExpectation.String()
 }
