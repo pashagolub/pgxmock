@@ -71,11 +71,10 @@ func (br *batchResults) Close() error {
 	return br.err
 }
 
-func (br *batchResults) callQuedQueryFn(_ *pgx.QueuedQuery) error {
-	// wating for https://github.com/jackc/pgx/pull/1996
-	// if qq.Fn != nil {
-	// 	 return qq.Fn(br)
-	// }
+func (br *batchResults) callQuedQueryFn(qq *pgx.QueuedQuery) error {
+	if qq.Fn != nil {
+		return qq.Fn(br)
+	}
 	_, err := br.Exec()
 	return err
 }

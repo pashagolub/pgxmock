@@ -16,7 +16,7 @@ func TestBatch(t *testing.T) {
 
 	// define our expectations
 	eb := mock.ExpectBatch()
-	eb.ExpectExec("select").WillReturnResult(NewResult("SELECT", 1))
+	eb.ExpectQuery("select").WillReturnRows(NewRows([]string{"sum"}).AddRow(2))
 	eb.ExpectExec("update").WithArgs(true, 1).WillReturnResult(NewResult("UPDATE", 1))
 
 	// run the test
