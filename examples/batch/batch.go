@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 
 	pgx "github.com/jackc/pgx/v5"
 	pgxpool "github.com/jackc/pgx/v5/pgxpool"
@@ -37,10 +38,46 @@ func databaseSetup(db PgxIface) (err error) {
 		description TEXT NOT NULL,
 		amount BIGINT NOT NULL);`
 
-	// Execute SQL commands
+	// Execute SQL statement
 	_, err = tx.Exec(context.Background(), sql)
+
+	return err
+}
+
+func iterateResults(br pgx.BatchResults, QueuedQueries []*pgx.QueuedQuery) error {
+
+	file, err := os.Create("OUTPUT.md")
 	if err != nil {
-		return fmt.Errorf("databaseSetup: %s", err)
+		return fmt.Errorf("iterateResults: %s", err)
+	}
+	defer file.Close()
+
+	fmt.Fprintf(file, "## PostgreSQL Batch Example output\n")
+
+	// Iterate over a batch of queued queries
+	for _, query := range QueuedQueries {
+
+		// Print SQL field of the current query
+		fmt.Fprintf(file, "### %v \n", query.SQL)
+
+		//  reads results from the current query
+		rows, err := br.Query()
+		if err != nil {
+			return fmt.Errorf("iterateResults: %s", err)
+		}
+
+		// Print column headers
+		fmt.Fprintf(file, "- *DESCRIPTION* , *AMOUNT* \n")
+		// Iterate over the resulted rows
+		//
+		var id, amount, descr = int64(0), int64(0), string("")
+		_, err = pgx.ForEachRow(rows, []any{&id, &descr, &amount}, func() error {
+			fmt.Fprintf(file, "- \"%v\" , %d \n", descr, amount)
+			return nil
+		})
+		if err != nil {
+			return fmt.Errorf("iterateResults: %s", err)
+		}
 	}
 
 	return err
@@ -76,38 +113,23 @@ func requestBatch(db PgxIface) (err error) {
 
 	// Efficiently transmits queued queries as a single transaction.
 	// After the queries are run, a BatchResults object is returned.
+	//
 	br := tx.SendBatch(context.Background(), batch)
 	if br == nil {
 		return errors.New("SendBatch returns a NIL object")
 	}
 	defer br.Close()
 
-	// Iterate over a batch of queued queries
-	for _, query := range batch.QueuedQueries {
-
-		// Print SQL statement of the current query
-		fmt.Println(query.SQL)
-
-		// BatchResult.Query reads results from the current query
-		rows, err := br.Query()
-		if err != nil {
-			return fmt.Errorf("requestBatch: %s", err)
-		}
-
-		// Iterate over the results to print each selected row
-		var id, amount int64
-		var descr string
-		_, err = pgx.ForEachRow(rows, []any{&id, &descr, &amount}, func() error {
-			fmt.Printf("  (%v, \"%v\", %v)\n", id, descr, amount)
-			return nil
-		})
-		fmt.Println("")
-
-		if err != nil {
-			return fmt.Errorf("requestBatch: %s", err)
-		}
+	// Read the first query
+	_, err = br.Exec()
+	if err != nil {
+		return err
 	}
-	return err
+	// Iterate over batch results and queries.
+	// Note: the first query is left out of the queue.
+	//
+	return iterateResults(br, batch.QueuedQueries[1:])
+
 }
 
 func databaseCleanup(db PgxIface) (err error) {
@@ -132,9 +154,6 @@ func databaseCleanup(db PgxIface) (err error) {
 
 	// Execute SQL commands
 	_, err = tx.Exec(context.Background(), sql)
-	if err != nil {
-		return fmt.Errorf("databaseCleanup: %s", err)
-	}
 
 	return err
 }
