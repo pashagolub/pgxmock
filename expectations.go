@@ -273,7 +273,7 @@ type ExpectedPrepare struct {
 // String returns string representation
 func (e *ExpectedPrepare) String() string {
 	msg := "ExpectedPrepare => expecting call to Prepare():\n"
-	msg += fmt.Sprintf("\t- matches statement name: '%s'", e.expectStmtName)
+	msg += fmt.Sprintf("\t- matches statement name: '%s'\n", e.expectStmtName)
 	msg += fmt.Sprintf("\t- matches sql: '%s'\n", e.expectSQL)
 	return msg + e.commonExpectation.String()
 }
