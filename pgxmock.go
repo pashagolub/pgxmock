@@ -35,10 +35,12 @@ type Expecter interface {
 	ExpectClose() *ExpectedClose
 
 	// ExpectPrepare expects Prepare() to be called with expectedSQL query.
-	// the *ExpectedPrepare allows to mock database response.
-	// Note that you may expect Query() or Exec() on the *ExpectedPrepare
-	// statement to prevent repeating expectedSQL
 	ExpectPrepare(expectedStmtName, expectedSQL string) *ExpectedPrepare
+
+	// ExpectDeallocate expects Deallocate() to be called with expectedStmtName.
+	// The *ExpectedDeallocate allows to mock database response
+	ExpectDeallocate(expectedStmtName string) *ExpectedDeallocate
+	ExpectDeallocateAll() *ExpectedDeallocate
 
 	// ExpectQuery expects Query() or QueryRow() to be called with expectedSQL query.
 	// the *ExpectedQuery allows to mock database response.
@@ -114,6 +116,7 @@ type PgxConnIface interface {
 	PgxCommonIface
 	Close(ctx context.Context) error
 	Deallocate(ctx context.Context, name string) error
+	DeallocateAll(ctx context.Context) error
 	Config() *pgx.ConnConfig
 	PgConn() *pgconn.PgConn
 }
@@ -164,13 +167,6 @@ func (c *pgxmock) ExpectationsWereMet() error {
 
 		if !fulfilled {
 			return fmt.Errorf("there is a remaining expectation which was not matched: %s", e)
-		}
-
-		// for expected prepared statement check whether it was closed if expected
-		if prep, ok := e.(*ExpectedPrepare); ok {
-			if prep.mustBeClosed && !prep.deallocated {
-				return fmt.Errorf("expected prepared statement to be closed, but it was not: %s", prep)
-			}
 		}
 
 		// must check whether all expected queried rows are closed
@@ -241,7 +237,19 @@ func (c *pgxmock) ExpectPing() *ExpectedPing {
 }
 
 func (c *pgxmock) ExpectPrepare(expectedStmtName, expectedSQL string) *ExpectedPrepare {
-	e := &ExpectedPrepare{expectSQL: expectedSQL, expectStmtName: expectedStmtName, mock: c}
+	e := &ExpectedPrepare{expectSQL: expectedSQL, expectStmtName: expectedStmtName}
+	c.expectations = append(c.expectations, e)
+	return e
+}
+
+func (c *pgxmock) ExpectDeallocate(expectedStmtName string) *ExpectedDeallocate {
+	e := &ExpectedDeallocate{expectStmtName: expectedStmtName}
+	c.expectations = append(c.expectations, e)
+	return e
+}
+
+func (c *pgxmock) ExpectDeallocateAll() *ExpectedDeallocate {
+	e := &ExpectedDeallocate{expectAll: true}
 	c.expectations = append(c.expectations, e)
 	return e
 }
@@ -371,27 +379,32 @@ func (c *pgxmock) Prepare(ctx context.Context, name, query string) (*pgconn.Stat
 }
 
 func (c *pgxmock) Deallocate(ctx context.Context, name string) error {
-	var (
-		expected *ExpectedPrepare
-		ok       bool
-	)
-	for _, next := range c.expectations {
-		next.Lock()
-		expected, ok = next.(*ExpectedPrepare)
-		ok = ok && expected.expectStmtName == name
-		next.Unlock()
-		if ok {
-			break
+	ex, err := findExpectationFunc[*ExpectedDeallocate](c, "Deallocate()", func(deallocateExp *ExpectedDeallocate) error {
+		if deallocateExp.expectAll {
+			return fmt.Errorf("Deallocate: all prepared statements were expected to be deallocated, instead only '%s' specified", name)
 		}
+		if deallocateExp.expectStmtName != name {
+			return fmt.Errorf("Deallocate: prepared statement name '%s' was not expected, expected name is '%s'", name, deallocateExp.expectStmtName)
+		}
+		return nil
+	})
+	if err != nil {
+		return err
 	}
-	if expected == nil {
-		return fmt.Errorf("Deallocate: prepared statement name '%s' doesn't exist", name)
+	return ex.waitForDelay(ctx)
+}
+
+func (c *pgxmock) DeallocateAll(ctx context.Context) error {
+	ex, err := findExpectationFunc[*ExpectedDeallocate](c, "DeallocateAll()", func(deallocateExp *ExpectedDeallocate) error {
+		if !deallocateExp.expectAll {
+			return fmt.Errorf("Deallocate: deallocate all prepared statements was not expected, expected name is '%s'", deallocateExp.expectStmtName)
+		}
+		return nil
+	})
+	if err != nil {
+		return err
 	}
-	if ctx.Err() != nil {
-		return ctx.Err()
-	}
-	expected.deallocated = true
-	return expected.deallocateErr
+	return ex.waitForDelay(ctx)
 }
 
 func (c *pgxmock) Commit(ctx context.Context) error {

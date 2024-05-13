@@ -242,8 +242,8 @@ func TestPrepareExpectations(t *testing.T) {
 	a := assert.New(t)
 	expErr := errors.New("invaders must die")
 	mock.ExpectPrepare("foo", "SELECT (.+) FROM articles WHERE id = ?").
-		WillReturnCloseError(expErr).
 		WillDelayFor(1 * time.Second)
+	mock.ExpectDeallocate("foo").WillReturnError(expErr)
 
 	stmt, err := mock.Prepare(context.Background(), "baz", "SELECT (.+) FROM articles WHERE id = ?")
 	a.Error(err, "wrong prepare stmt name should raise an error")
@@ -344,12 +344,12 @@ func TestUnorderedPreparedQueryExecutions(t *testing.T) {
 
 	mock.MatchExpectationsInOrder(false)
 
-	mock.ExpectPrepare("articles_stmt", "SELECT (.+) FROM articles WHERE id = ?").
-		ExpectQuery().
+	mock.ExpectPrepare("articles_stmt", "SELECT (.+) FROM articles WHERE id = ?")
+	mock.ExpectQuery("articles_stmt").
 		WithArgs(5).
 		WillReturnRows(NewRows([]string{"id", "title"}).AddRow(5, "The quick brown fox"))
-	mock.ExpectPrepare("authors_stmt", "SELECT (.+) FROM authors WHERE id = ?").
-		ExpectQuery().
+	mock.ExpectPrepare("authors_stmt", "SELECT (.+) FROM authors WHERE id = ?")
+	mock.ExpectQuery("authors_stmt").
 		WithArgs(1).
 		WillReturnRows(NewRows([]string{"id", "title"}).AddRow(1, "Betty B."))
 
@@ -911,9 +911,9 @@ func TestPrepareExec(t *testing.T) {
 	}
 	defer mock.Close(context.Background())
 	mock.ExpectBegin()
-	ep := mock.ExpectPrepare("foo", "INSERT INTO ORDERS\\(ID, STATUS\\) VALUES \\(\\?, \\?\\)")
+	mock.ExpectPrepare("foo", "INSERT INTO ORDERS\\(ID, STATUS\\) VALUES \\(\\?, \\?\\)")
 	for i := 0; i < 3; i++ {
-		ep.ExpectExec().WithArgs(AnyArg(), AnyArg()).WillReturnResult(NewResult("UPDATE", 1))
+		mock.ExpectExec("foo").WithArgs(AnyArg(), AnyArg()).WillReturnResult(NewResult("UPDATE", 1))
 	}
 	mock.ExpectCommit()
 	tx, _ := mock.Begin(context.Background())
@@ -942,8 +942,8 @@ func TestPrepareQuery(t *testing.T) {
 	}
 	defer mock.Close(context.Background())
 	mock.ExpectBegin()
-	ep := mock.ExpectPrepare("foo", "SELECT ID, STATUS FROM ORDERS WHERE ID = \\?")
-	ep.ExpectQuery().WithArgs(101).WillReturnRows(NewRows([]string{"ID", "STATUS"}).AddRow(101, "Hello"))
+	mock.ExpectPrepare("foo", "SELECT ID, STATUS FROM ORDERS WHERE ID = \\?")
+	mock.ExpectQuery("foo").WithArgs(101).WillReturnRows(NewRows([]string{"ID", "STATUS"}).AddRow(101, "Hello"))
 	mock.ExpectCommit()
 	tx, _ := mock.Begin(context.Background())
 	_, err = tx.Prepare(context.Background(), "foo", "SELECT ID, STATUS FROM ORDERS WHERE ID = ?")
@@ -1021,8 +1021,10 @@ func TestPreparedStatementCloseExpectation(t *testing.T) {
 	mock, _ := NewConn()
 	a := assert.New(t)
 
-	ep := mock.ExpectPrepare("foo", "INSERT INTO ORDERS").WillBeClosed()
-	ep.ExpectExec().WithArgs(AnyArg(), AnyArg()).WillReturnResult(NewResult("UPDATE", 1))
+	mock.ExpectPrepare("foo", "INSERT INTO ORDERS")
+	mock.ExpectExec("foo").WithArgs(AnyArg(), AnyArg()).WillReturnResult(NewResult("UPDATE", 1))
+	mock.ExpectDeallocate("foo")
+	mock.ExpectDeallocateAll()
 
 	stmt, err := mock.Prepare(context.Background(), "foo", "INSERT INTO ORDERS(ID, STATUS) VALUES (?, ?)")
 	a.NoError(err)
@@ -1034,7 +1036,22 @@ func TestPreparedStatementCloseExpectation(t *testing.T) {
 	err = mock.Deallocate(context.Background(), "baz")
 	a.Error(err, "wrong prepares stmt name should raise an error")
 
+	err = mock.DeallocateAll(context.Background())
+	a.Error(err, "we're expecting one statement deallocation, not all")
+
+	err = mock.Ping(context.Background())
+	a.Error(err, "ping should raise an error, we're expecting deallocate")
+
 	err = mock.Deallocate(context.Background(), "foo")
+	a.NoError(err)
+
+	err = mock.Ping(context.Background())
+	a.Error(err, "ping should raise an error, we're expecting deallocate")
+
+	err = mock.Deallocate(context.Background(), "baz")
+	a.Error(err, "wrong prepares stmt name should raise an error")
+
+	err = mock.DeallocateAll(context.Background())
 	a.NoError(err)
 
 	if err := mock.ExpectationsWereMet(); err != nil {
