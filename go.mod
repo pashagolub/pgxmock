@@ -3,7 +3,7 @@ module github.com/pashagolub/pgxmock/v3
 go 1.21
 
 require (
-	github.com/jackc/pgx/v5 v5.5.5
+	github.com/jackc/pgx/v5 v5.6.0
 	github.com/stretchr/testify v1.9.0
 )
 
