@@ -29,6 +29,10 @@ type Expecter interface {
 	// If any of them was not met - an error is returned.
 	ExpectationsWereMet() error
 
+	// ExpectBatch expects pgx.Batch to be called. The *ExpectedBatch
+	// allows to mock database response
+	ExpectBatch() *ExpectedBatch
+
 	// ExpectClose queues an expectation for this database
 	// action to be triggered. The *ExpectedClose allows
 	// to mock database response
@@ -149,6 +153,12 @@ func (c *pgxmock) AcquireFunc(_ context.Context, _ func(*pgxpool.Conn) error) er
 }
 
 // region Expectations
+func (c *pgxmock) ExpectBatch() *ExpectedBatch {
+	e := &ExpectedBatch{mock: c}
+	c.expectations = append(c.expectations, e)
+	return e
+}
+
 func (c *pgxmock) ExpectClose() *ExpectedClose {
 	e := &ExpectedClose{}
 	c.expectations = append(c.expectations, e)
@@ -331,8 +341,32 @@ func (c *pgxmock) CopyFrom(ctx context.Context, tableName pgx.Identifier, column
 	return ex.rowsAffected, ex.waitForDelay(ctx)
 }
 
-func (c *pgxmock) SendBatch(context.Context, *pgx.Batch) pgx.BatchResults {
-	return nil
+func (c *pgxmock) SendBatch(ctx context.Context, b *pgx.Batch) pgx.BatchResults {
+	ex, err := findExpectationFunc[*ExpectedBatch](c, "Batch()", func(batchExp *ExpectedBatch) error {
+		if len(batchExp.expectedQueries) != len(b.QueuedQueries) {
+			return fmt.Errorf("SendBatch: number of queries in batch '%d' was not expected, expected number of queries is '%d'",
+				len(b.QueuedQueries), len(batchExp.expectedQueries))
+		}
+		for i, query := range b.QueuedQueries {
+			if err := c.queryMatcher.Match(batchExp.expectedQueries[i].expectSQL, query.SQL); err != nil {
+				return err
+			}
+			if rewrittenSQL, err := batchExp.expectedQueries[i].argsMatches(query.SQL, query.Arguments); err != nil {
+				return err
+			} else if rewrittenSQL != "" && batchExp.expectedQueries[i].expectRewrittenSQL != "" {
+				if err := c.queryMatcher.Match(batchExp.expectedQueries[i].expectRewrittenSQL, rewrittenSQL); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	})
+	br := &batchResults{mock: c, batch: b, expectedBatch: ex, err: err}
+	if err != nil {
+		return br
+	}
+	br.err = ex.waitForDelay(ctx)
+	return br
 }
 
 func (c *pgxmock) LargeObjects() pgx.LargeObjects {
