@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	"github.com/pashagolub/pgxmock/v3"
+	"github.com/pashagolub/pgxmock/v4"
 )
 
 // a successful test case
