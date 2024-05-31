@@ -1,16 +1,14 @@
-package pgxmock_test
+package pgxmock
 
 import (
 	"context"
 	"database/sql"
 	"testing"
 	"time"
-
-	pgxmock "github.com/pashagolub/pgxmock/v3"
 )
 
 func TestScanTime(t *testing.T) {
-	mock, err := pgxmock.NewPool()
+	mock, err := NewPool()
 	if err != nil {
 		panic(err)
 	}
