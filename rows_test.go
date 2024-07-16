@@ -750,16 +750,38 @@ func TestConnRow(t *testing.T) {
 	a.NoError(mock.ExpectationsWereMet())
 }
 
-func TestInvalidsQueryScan(t *testing.T) {
+func TestInvalidsQueryRow(t *testing.T) {
 	mock, _ := NewPool()
 	a := assert.New(t)
 
-	mock.ExpectQuery("SELECT").WillReturnRows(
-		mock.NewRows([]string{"seq"}).AddRow("not-an-int"),
-	)
-
+	// check invalid argument type
+	mock.ExpectQuery("SELECT").WillReturnRows(mock.NewRows([]string{"seq"}).AddRow("not-an-int"))
 	var expectedInt int
 	err := mock.QueryRow(ctx, "SELECT").Scan(&expectedInt)
 	a.Error(err)
-	// assert.ErrorContains(t, err, "Destination kind 'int' not supported for value kind")
+
+	// check BOF error
+	rs := mock.NewRows([]string{"seq"})
+	rs.AddRow("not-an-int").RowError(-1, errors.New("error")) // emulate pre-Next() error
+	mock.ExpectQuery("SELECT").WillReturnRows(rs)
+	err = mock.QueryRow(ctx, "SELECT").Scan(&expectedInt)
+	a.Error(err)
+
+	// check no row error
+	rs = mock.NewRows([]string{"seq"})
+	mock.ExpectQuery("SELECT").WillReturnRows(rs)
+	err = mock.QueryRow(ctx, "SELECT").Scan(&expectedInt)
+	a.Error(err)
+
+	//check first row error
+	rs = mock.NewRows([]string{"seq"}).RowError(0, errors.New("error"))
+	mock.ExpectQuery("SELECT").WillReturnRows(rs)
+	err = mock.QueryRow(ctx, "SELECT").Scan(&expectedInt)
+	a.Error(err)
+
+	// check pgtype.DriverBytes error
+	mock.ExpectQuery("SELECT").WillReturnRows(mock.NewRows([]string{"seq"}).AddRow("not-an-int"))
+	var d pgtype.DriverBytes
+	err = mock.QueryRow(ctx, "SELECT").Scan(&d)
+	a.Error(err)
 }
