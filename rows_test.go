@@ -749,3 +749,17 @@ func TestConnRow(t *testing.T) {
 
 	a.NoError(mock.ExpectationsWereMet())
 }
+
+func TestInvalidsQueryScan(t *testing.T) {
+	mock, _ := NewPool()
+	a := assert.New(t)
+
+	mock.ExpectQuery("SELECT").WillReturnRows(
+		mock.NewRows([]string{"seq"}).AddRow("not-an-int"),
+	)
+
+	var expectedInt int
+	err := mock.QueryRow(ctx, "SELECT").Scan(&expectedInt)
+	a.Error(err)
+	// assert.ErrorContains(t, err, "Destination kind 'int' not supported for value kind")
+}

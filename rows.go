@@ -3,6 +3,7 @@ package pgxmock
 import (
 	"encoding/csv"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -46,10 +47,8 @@ func (r *connRow) Scan(dest ...any) (err error) {
 		}
 		return rows.Err()
 	}
-
-	_ = rows.Scan(dest...)
-	rows.Close()
-	return rows.Err()
+	defer rows.Close()
+	return errors.Join(rows.Scan(dest...), rows.Err())
 }
 
 type rowSets struct {

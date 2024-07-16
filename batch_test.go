@@ -22,7 +22,7 @@ func TestBatch(t *testing.T) {
 	// run the test
 	batch := &pgx.Batch{}
 	batch.Queue("select 1 + 1").QueryRow(func(row pgx.Row) error {
-		var n int32
+		var n int
 		return row.Scan(&n)
 	})
 	batch.Queue("update users set active = $1 where id = $2", true, 1).Exec(func(ct pgconn.CommandTag) (err error) {
