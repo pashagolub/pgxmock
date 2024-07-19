@@ -347,6 +347,9 @@ func (c *pgxmock) SendBatch(ctx context.Context, b *pgx.Batch) pgx.BatchResults 
 			return fmt.Errorf("SendBatch: number of queries in batch '%d' was not expected, expected number of queries is '%d'",
 				len(b.QueuedQueries), len(batchExp.expectedQueries))
 		}
+		if !c.ordered { // postpone the check of every query until/if it is called
+			return nil
+		}
 		for i, query := range b.QueuedQueries {
 			if err := c.queryMatcher.Match(batchExp.expectedQueries[i].expectSQL, query.SQL); err != nil {
 				return err

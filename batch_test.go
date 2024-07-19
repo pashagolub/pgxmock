@@ -83,3 +83,44 @@ func TestExplicitBatch(t *testing.T) {
 
 	a.NoError(mock.ExpectationsWereMet())
 }
+
+func processBatch(db PgxPoolIface) error {
+	batch := &pgx.Batch{}
+	// Random order
+	batch.Queue("SELECT id FROM normalized_queries WHERE query = $1", "some query")
+	batch.Queue("INSERT INTO normalized_queries (query) VALUES ($1) RETURNING id", "some query")
+
+	results := db.SendBatch(ctx, batch)
+	defer results.Close()
+
+	for i := 0; i < batch.Len(); i++ {
+		var id int
+		err := results.QueryRow().Scan(&id)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func TestUnorderedBatchExpectations(t *testing.T) {
+	t.Parallel()
+	a := assert.New(t)
+
+	mock, err := NewPool()
+	a.NoError(err)
+	defer mock.Close()
+
+	mock.MatchExpectationsInOrder(false)
+
+	expectedBatch := mock.ExpectBatch()
+	expectedBatch.ExpectQuery("INSERT INTO").WithArgs("some query").
+		WillReturnRows(NewRows([]string{"id"}).AddRow(10))
+	expectedBatch.ExpectQuery("SELECT id").WithArgs("some query").
+		WillReturnRows(NewRows([]string{"id"}).AddRow(20))
+
+	err = processBatch(mock)
+	a.NoError(err)
+	a.NoError(mock.ExpectationsWereMet())
+}
