@@ -3,22 +3,34 @@ package main
 import (
 	"testing"
 
+	pgx "github.com/jackc/pgx/v5"
 	"github.com/pashagolub/pgxmock/v4"
 )
 
 // a successful test case
-func TestShouldSelectRows(t *testing.T) {
+func TestExpectBatch(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer mock.Close()
 
-	// TODO
+	mock.ExpectBatch()
+
+	// Setup the example
+	var example = ExampleBatch{db: mock, batch: &pgx.Batch{}}
+
+	// now we execute our method
+	example.requestBatch()
+
+	// we make sure that all expectations were met
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
 }
 
 // a failing test case
-func TestShouldRollbackOnFailure(t *testing.T) {
+func TestExpectBegin(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {
 		t.Fatal(err)
@@ -26,13 +38,12 @@ func TestShouldRollbackOnFailure(t *testing.T) {
 	defer mock.Close()
 
 	mock.ExpectBegin()
-	// TODO: mock.ExpectBatch()
-	mock.ExpectRollback()
+
+	// Setup the example
+	var example = ExampleBatch{db: mock, batch: &pgx.Batch{}}
 
 	// now we execute our method
-	if err = requestBatch(mock); err == nil {
-		t.Errorf("was expecting an error, but there was none")
-	}
+	example.requestBatch()
 
 	// we make sure that all expectations were met
 	if err := mock.ExpectationsWereMet(); err != nil {
