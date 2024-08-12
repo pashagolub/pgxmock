@@ -554,28 +554,22 @@ func findExpectationFunc[ET expectationType[t], t any](c *pgxmock, method string
 			fulfilled++
 			continue
 		}
-
 		if expected, ok = next.(ET); ok {
-			err = cmp(expected)
-			if err == nil {
-				// Note: next.Unlock not called yet, as we delay fulfill
+			if err = cmp(expected); err == nil {
 				break
 			}
 		}
-		// reset expected to nil if not matched, to avoid double mutex unlock panic below
 		expected = nil
+		next.Unlock()
 		if c.ordered {
-			if (!ok || err != nil) && !next.required() {
-				next.Unlock()
+			if !next.required() {
 				continue
 			}
-			next.Unlock()
 			if err != nil {
 				return nil, err
 			}
 			return nil, fmt.Errorf("call to method %s, was not expected, next expectation is: %s", method, next)
 		}
-		next.Unlock()
 	}
 
 	if expected == nil {
@@ -585,7 +579,6 @@ func findExpectationFunc[ET expectationType[t], t any](c *pgxmock, method string
 		}
 		return nil, fmt.Errorf(msg)
 	}
-	// only unlock to fulfill matching expectation
 	defer expected.Unlock()
 
 	expected.fulfill()
