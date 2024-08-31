@@ -12,6 +12,7 @@ package pgxmock
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 
@@ -577,7 +578,7 @@ func findExpectationFunc[ET expectationType[t], t any](c *pgxmock, method string
 		if fulfilled == len(c.expectations) {
 			msg = "all expectations were already fulfilled, " + msg
 		}
-		return nil, fmt.Errorf(msg)
+		return nil, errors.New(msg)
 	}
 	defer expected.Unlock()
 
