@@ -12,6 +12,7 @@ package pgxmock
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 
@@ -554,25 +555,22 @@ func findExpectationFunc[ET expectationType[t], t any](c *pgxmock, method string
 			fulfilled++
 			continue
 		}
-
 		if expected, ok = next.(ET); ok {
-			err = cmp(expected)
-			if err == nil {
+			if err = cmp(expected); err == nil {
 				break
 			}
 		}
+		expected = nil
+		next.Unlock()
 		if c.ordered {
-			if (!ok || err != nil) && !next.required() {
-				next.Unlock()
+			if !next.required() {
 				continue
 			}
-			next.Unlock()
 			if err != nil {
 				return nil, err
 			}
 			return nil, fmt.Errorf("call to method %s, was not expected, next expectation is: %s", method, next)
 		}
-		next.Unlock()
 	}
 
 	if expected == nil {
@@ -580,7 +578,7 @@ func findExpectationFunc[ET expectationType[t], t any](c *pgxmock, method string
 		if fulfilled == len(c.expectations) {
 			msg = "all expectations were already fulfilled, " + msg
 		}
-		return nil, fmt.Errorf(msg)
+		return nil, errors.New(msg)
 	}
 	defer expected.Unlock()
 

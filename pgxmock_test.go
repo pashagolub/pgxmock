@@ -1216,3 +1216,16 @@ func TestExpectReset(t *testing.T) {
 	mock.ExpectReset()
 	a.Error(mock.ExpectationsWereMet())
 }
+
+func TestDoubleUnlock(t *testing.T) {
+	mock, _ := NewConn()
+	mock.MatchExpectationsInOrder(false)
+	a := assert.New(t)
+
+	mock.ExpectExec("insert").WillReturnResult(NewResult("ok", 1))
+	mock.ExpectExec("update").WillReturnResult(NewResult("ok", 1))
+
+	_, err := mock.Exec(ctx, "foo")
+	a.Error(err)
+	a.NotPanics(func() { _ = mock.Ping(ctx) })
+}
