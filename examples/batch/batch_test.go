@@ -3,49 +3,93 @@ package main
 import (
 	"testing"
 
-	pgx "github.com/jackc/pgx/v5"
-	"github.com/pashagolub/pgxmock/v4"
+	pgxmock "github.com/pashagolub/pgxmock/v4"
 )
 
-// a successful test case
-func TestExpectBatch(t *testing.T) {
+func TestNewExample(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer mock.Close()
 
-	mock.ExpectBatch()
+	// Expect a call to Exec
+	mock.ExpectExec(`^CREATE TABLE IF NOT EXISTS (.+)`).
+		WillReturnResult(pgxmock.NewResult("CREATE TABLE", 0))
 
-	// Setup the example
-	var example = ExampleBatch{db: mock, batch: &pgx.Batch{}}
+	_, err = NewExample(mock)
+	if err != nil {
+		t.Errorf("creating new example error: %s", err)
+	}
 
-	// now we execute our method
-	example.requestBatch()
-
-	// we make sure that all expectations were met
+	// We make sure that all expectations were met
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("there were unfulfilled expectations: %s", err)
 	}
 }
 
-// a failing test case
-func TestExpectBegin(t *testing.T) {
+func TestSendCustomBatch(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer mock.Close()
 
-	mock.ExpectBegin()
+	// Expect a call to Exec and pgx.Batch
+	mock.ExpectExec(`^CREATE TABLE IF NOT EXISTS (.+)`).
+		WillReturnResult(pgxmock.NewResult("CREATE TABLE", 0))
+	mock.ExpectBatch()
 
-	// Setup the example
-	var example = ExampleBatch{db: mock, batch: &pgx.Batch{}}
+	example, err := NewExample(mock)
+	if err != nil {
+		t.Errorf("creating new example error: %s", err)
+	}
 
-	// now we execute our method
-	example.requestBatch()
+	err = example.SendCustomBatch([]string{
+		"SELECT title FROM metadata",
+		"SELECT authors FROM metadata",
+		"SELECT subject, description FROM metadata",
+	})
+	if err != nil {
+		t.Errorf("SendCustomBatch error: %s", err)
+	}
 
-	// we make sure that all expectations were met
+	err = example.TestCustomResults()
+	if err != nil {
+		t.Errorf("TestCustomResults error: %s", err)
+	}
+
+	// We make sure that all expectations were met
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
+}
+func TestBulkInsert(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	// Expect a call to Exec and pgx.Batch
+	mock.ExpectExec(`^CREATE TABLE IF NOT EXISTS (.+)`).
+		WillReturnResult(pgxmock.NewResult("CREATE TABLE", 0))
+	mock.ExpectBatch()
+
+	example, err := NewExample(mock)
+	if err != nil {
+		t.Errorf("creating new example error: %s", err)
+	}
+
+	// Insert multiple rows into the database
+	err = example.BulkInsertMetadata([]metadata{
+		{`title`, `author`, `subject`, `description`},
+	})
+	if err != nil {
+		t.Errorf("bulk insert error: %s", err)
+	}
+
+	// We make sure that all expectations were met
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("there were unfulfilled expectations: %s", err)
 	}
