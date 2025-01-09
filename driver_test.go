@@ -70,10 +70,10 @@ func TestPoolConfig(t *testing.T) {
 	}
 	c := mock.Config()
 	if c == nil {
-		t.Error("expected config object, but got nil")
+		t.Fatal("expected config object, but got nil")
 	}
 	if c.ConnConfig == nil {
-		t.Error("expected conn config object, but got nil")
+		t.Fatal("expected conn config object, but got nil")
 	}
 }
 
@@ -84,6 +84,6 @@ func TestConnConfig(t *testing.T) {
 	}
 	c := mock.Config()
 	if c == nil {
-		t.Error("expected config object, but got nil")
+		t.Fatal("expected config object, but got nil")
 	}
 }
