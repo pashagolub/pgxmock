@@ -45,7 +45,7 @@ func (p *pgxmockPool) Acquire(context.Context) (*pgxpool.Conn, error) {
 }
 
 func (p *pgxmockPool) Config() *pgxpool.Config {
-	return &pgxpool.Config{}
+	return &pgxpool.Config{ConnConfig: &pgx.ConnConfig{}}
 }
 
 // AsConn is similar to Acquire but returns proper mocking interface
