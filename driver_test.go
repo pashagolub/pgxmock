@@ -62,3 +62,28 @@ func TestPoolStat(t *testing.T) {
 		t.Error("expected stat object, but got nil")
 	}
 }
+
+func TestPoolConfig(t *testing.T) {
+	mock, err := NewPool()
+	if err != nil {
+		t.Fatalf("expected no error, but got: %s", err)
+	}
+	c := mock.Config()
+	if c == nil {
+		t.Fatal("expected config object, but got nil")
+	}
+	if c.ConnConfig == nil {
+		t.Fatal("expected conn config object, but got nil")
+	}
+}
+
+func TestConnConfig(t *testing.T) {
+	mock, err := NewConn()
+	if err != nil {
+		t.Fatalf("expected no error, but got: %s", err)
+	}
+	c := mock.Config()
+	if c == nil {
+		t.Fatal("expected config object, but got nil")
+	}
+}
