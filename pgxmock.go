@@ -327,7 +327,7 @@ func (c *pgxmock) Conn() *pgx.Conn {
 }
 
 func (c *pgxmock) CopyFrom(ctx context.Context, tableName pgx.Identifier, columnNames []string, _ pgx.CopyFromSource) (int64, error) {
-	ex, err := findExpectationFunc[*ExpectedCopyFrom](c, "BeginTx()", func(copyExp *ExpectedCopyFrom) error {
+	ex, err := findExpectationFunc[*ExpectedCopyFrom](c, "CopyFrom()", func(copyExp *ExpectedCopyFrom) error {
 		if !reflect.DeepEqual(copyExp.expectedTableName, tableName) {
 			return fmt.Errorf("CopyFrom: table name '%s' was not expected, expected table name is '%s'", tableName, copyExp.expectedTableName)
 		}
