@@ -326,8 +326,8 @@ func (c *pgxmock) Conn() *pgx.Conn {
 	panic("Conn() is not available in pgxmock")
 }
 
-func (c *pgxmock) CopyFrom(ctx context.Context, tableName pgx.Identifier, columnNames []string, _ pgx.CopyFromSource) (int64, error) {
-	ex, err := findExpectationFunc[*ExpectedCopyFrom](c, "CopyFrom()", func(copyExp *ExpectedCopyFrom) error {
+func (c *pgxmock) CopyFrom(ctx context.Context, tableName pgx.Identifier, columnNames []string, rowSrc pgx.CopyFromSource) (int64, error) {
+	ex, err := findExpectationFunc[*ExpectedCopyFrom](c, "BeginTx()", func(copyExp *ExpectedCopyFrom) error {
 		if !reflect.DeepEqual(copyExp.expectedTableName, tableName) {
 			return fmt.Errorf("CopyFrom: table name '%s' was not expected, expected table name is '%s'", tableName, copyExp.expectedTableName)
 		}
@@ -338,6 +338,14 @@ func (c *pgxmock) CopyFrom(ctx context.Context, tableName pgx.Identifier, column
 	})
 	if err != nil {
 		return -1, err
+	}
+	for rowSrc.Next() {
+		if _, err := rowSrc.Values(); err != nil {
+			return ex.rowsAffected, err
+		}
+		if rowSrc.Err() != nil {
+			return ex.rowsAffected, rowSrc.Err()
+		}
 	}
 	return ex.rowsAffected, ex.waitForDelay(ctx)
 }

@@ -126,14 +126,15 @@ func TestMockCopyFrom(t *testing.T) {
 	a.EqualValues(res, -1)
 	a.Error(mock.ExpectationsWereMet(), "there must be unfulfilled expectations")
 
-	res, err = mock.CopyFrom(context.Background(), pgx.Identifier{"fooschema", "baztable"}, []string{"col1"}, nil)
+	cfs := pgx.CopyFromRows([][]any{{"foo"}, {"bar"}})
+	res, err = mock.CopyFrom(context.Background(), pgx.Identifier{"fooschema", "baztable"}, []string{"col1"}, cfs)
 	a.NoError(err)
 	a.EqualValues(res, 2)
 
 	mock.ExpectCopyFrom(pgx.Identifier{"fooschema", "baztable"}, []string{"col1"}).
 		WillReturnError(errors.New("error is here"))
 
-	_, err = mock.CopyFrom(context.Background(), pgx.Identifier{"fooschema", "baztable"}, []string{"col1"}, nil)
+	_, err = mock.CopyFrom(context.Background(), pgx.Identifier{"fooschema", "baztable"}, []string{"col1"}, cfs)
 	a.Error(err)
 
 	a.NoError(mock.ExpectationsWereMet())
