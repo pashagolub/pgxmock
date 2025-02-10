@@ -521,9 +521,6 @@ func (c *pgxmock) Exec(ctx context.Context, query string, args ...interface{}) (
 				return err
 			}
 		}
-		if execExp.result.String() == "" && execExp.err == nil {
-			return fmt.Errorf("Exec must return a result or raise an error: %s", execExp)
-		}
 		return nil
 	})
 	if err != nil {
