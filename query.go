@@ -6,6 +6,13 @@ import (
 	"strings"
 )
 
+// AnyQuery is a constant regular expression pattern that matches any SQL query string.
+// Use this constant when setting up mock queries expectations to match
+// any query, regardless of its content. This is helpful when testing code that
+// constructs dynamic SQL queries or when the focus of the test is on the behavior
+// of the code rather than the specific query being executed.
+const AnyQuery = ".*"
+
 var re = regexp.MustCompile(`\s+`)
 
 // strip out new lines and trim spaces
