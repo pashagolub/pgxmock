@@ -66,3 +66,10 @@ var QueryMatcherEqual QueryMatcher = QueryMatcherFunc(func(expectedSQL, actualSQ
 	}
 	return nil
 })
+
+// QueryMatcherAny is the SQL query matcher
+// which always returns nil, used to disable
+// SQL query matching.
+var QueryMatcherAny QueryMatcher = QueryMatcherFunc(func(_, _ string) error {
+	return nil
+})

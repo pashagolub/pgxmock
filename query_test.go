@@ -42,6 +42,40 @@ func ExampleQueryMatcher() {
 	// scanned id: 2 and title: two
 }
 
+func ExampleQueryMatcherAny() {
+	mock, err := NewConn(QueryMatcherOption(QueryMatcherAny))
+	if err != nil {
+		fmt.Println("failed to open pgxmock database:", err)
+	}
+	// defer db.Close()
+
+	rows := NewRows([]string{"id", "title"}).
+		AddRow(1, "one").
+		AddRow(2, "two")
+
+	mock.ExpectQuery("").WillReturnRows(rows)
+
+	rs, err := mock.Query(context.Background(), "SELECT * FROM users")
+	if err != nil {
+		fmt.Println("failed to match expected query")
+		return
+	}
+	defer rs.Close()
+
+	for rs.Next() {
+		var id int
+		var title string
+		_ = rs.Scan(&id, &title)
+		fmt.Println("scanned id:", id, "and title:", title)
+	}
+
+	if rs.Err() != nil {
+		fmt.Println("got rows error:", rs.Err())
+	}
+	// Output: scanned id: 1 and title: one
+	// scanned id: 2 and title: two
+}
+
 func TestQueryStringStripping(t *testing.T) {
 	assert := func(actual, expected string) {
 		if res := stripQuery(actual); res != expected {
@@ -120,5 +154,12 @@ func TestQueryMatcherEqual(t *testing.T) {
 		if err.Error() != c.err.Error() {
 			t.Errorf(`expected error "%v", but got "%v" at %d case`, c.err, err, i)
 		}
+	}
+}
+
+func TestQueryMatcherAny(t *testing.T) {
+	err := QueryMatcherAny.Match("foo", "SELECT * FROM users")
+	if err != nil {
+		t.Errorf("expected no error, but got %v", err)
 	}
 }
