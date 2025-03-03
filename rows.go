@@ -1,7 +1,6 @@
 package pgxmock
 
 import (
-	"database/sql"
 	"encoding/csv"
 	"encoding/json"
 	"errors"
@@ -134,7 +133,7 @@ func (rs *rowSets) Scan(dest ...interface{}) error {
 			} else {
 				return fmt.Errorf("Cannot set destination value for column %s", r.defs[i].Name)
 			}
-		} else if scanner, ok := destVal.Interface().(sql.Scanner); ok {
+		} else if scanner, ok := destVal.Interface().(interface{ Scan(interface{}) error }); ok {
 			// Try to use Scanner interface
 			if err := scanner.Scan(val.Interface()); err != nil {
 				return fmt.Errorf("Scanning value error for column '%s': %w", string(r.defs[i].Name), err)
