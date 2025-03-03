@@ -495,10 +495,12 @@ func TestRowBuilderAndNilTypes(t *testing.T) {
 	}
 	defer rows.Close()
 
+	type boolAlias bool
+
 	// NullTime and NullInt are used from stubs_test.go
 	var (
 		id      int
-		active  bool
+		active  boolAlias
 		created NullTime
 		status  NullInt
 	)

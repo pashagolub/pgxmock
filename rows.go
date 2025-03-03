@@ -133,18 +133,20 @@ func (rs *rowSets) Scan(dest ...interface{}) error {
 			} else {
 				return fmt.Errorf("Cannot set destination value for column %s", r.defs[i].Name)
 			}
-		} else {
+		} else if scanner, ok := destVal.Interface().(interface{ Scan(interface{}) error }); ok {
 			// Try to use Scanner interface
-			scanner, ok := destVal.Interface().(interface{ Scan(interface{}) error })
-
-			if !ok {
-				return fmt.Errorf("Destination kind '%v' not supported for value kind '%v' of column '%s'",
-					destVal.Elem().Kind(), val.Kind(), string(r.defs[i].Name))
-			}
 			if err := scanner.Scan(val.Interface()); err != nil {
 				return fmt.Errorf("Scanning value error for column '%s': %w", string(r.defs[i].Name), err)
 			}
-
+		} else if val.CanConvert(destVal.Elem().Type()) {
+			if destElem := destVal.Elem(); destElem.CanSet() {
+				destElem.Set(val.Convert(destElem.Type()))
+			} else {
+				return fmt.Errorf("Cannot set destination value for column %s", r.defs[i].Name)
+			}
+		} else {
+			return fmt.Errorf("Destination kind '%v' not supported for value kind '%v' of column '%s'",
+				destVal.Elem().Kind(), val.Kind(), string(r.defs[i].Name))
 		}
 	}
 	return r.nextErr[r.recNo-1]
