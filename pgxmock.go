@@ -556,6 +556,11 @@ func findExpectationFunc[ET expectationType[t], t any](c *pgxmock, method string
 	var fulfilled int
 	var ok bool
 	var err error
+	defer func() {
+		if expected != nil {
+			expected.Unlock()
+		}
+	}()
 	for _, next := range c.expectations {
 		next.Lock()
 		if next.fulfilled() {
@@ -588,7 +593,6 @@ func findExpectationFunc[ET expectationType[t], t any](c *pgxmock, method string
 		}
 		return nil, errors.New(msg)
 	}
-	defer expected.Unlock()
 
 	expected.fulfill()
 	return expected, nil
