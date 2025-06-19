@@ -191,11 +191,11 @@ func TestAnyNamedArgument(t *testing.T) {
 
 type panicArg struct{}
 
-var panicArgErr = errors.New("this is a panic argument")
+var errPanicArg = errors.New("this is a panic argument")
 
 func (p panicArg) Match(_ any) bool {
 	// This will always panic when called
-	panic(panicArgErr)
+	panic(errPanicArg)
 }
 
 var _ Argument = panicArg{}
@@ -216,7 +216,7 @@ func TestCloseAfterArgumentPanic(t *testing.T) {
 		WithArgs(panicArg{}).
 		WillReturnResult(NewResult("INSERT", 1))
 
-	assert.PanicsWithValue(t, panicArgErr, func() {
+	assert.PanicsWithValue(t, errPanicArg, func() {
 		_, _ = mock.Exec(context.Background(), "INSERT INTO users(name) VALUES (@name)",
 			pgx.NamedArgs{"name": "john"},
 		)
@@ -225,7 +225,7 @@ func TestCloseAfterArgumentPanic(t *testing.T) {
 
 func checkFinishedWithin(t *testing.T, timeout time.Duration, fun func(ctx context.Context)) {
 	t.Helper()
-	closeCtx, cancel := context.WithTimeout(t.Context(), timeout)
+	closeCtx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	finishedChan := make(chan bool)
 	go func() {
@@ -234,7 +234,7 @@ func checkFinishedWithin(t *testing.T, timeout time.Duration, fun func(ctx conte
 			close(finishedChan)
 		}()
 		defer func() {
-			recover()
+			_ = recover()
 		}()
 		fun(closeCtx)
 	}()
