@@ -29,7 +29,7 @@ type post struct {
 	Body  string
 }
 
-func (a *api) posts(w http.ResponseWriter, r *http.Request) {
+func (a *api) posts(w http.ResponseWriter, _ *http.Request) {
 	rows, err := a.db.Query(context.Background(), "SELECT id, title, body FROM posts")
 	if err != nil {
 		a.fail(w, "failed to fetch posts: "+err.Error(), 500)
