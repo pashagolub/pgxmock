@@ -28,9 +28,9 @@ jobs:
         go version
 
     - name: GolangCI-Lint
-      uses: golangci/golangci-lint-action@v6
+      uses: golangci/golangci-lint-action@v8
       with:
-        version: latest       
+        version: latest      
 
     - name: Test
       run: go test -v -coverprofile=profile.cov

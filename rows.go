@@ -108,7 +108,7 @@ func (rs *rowSets) Scan(dest ...interface{}) error {
 		}
 	}
 	if len(dest) != len(r.defs) {
-		return fmt.Errorf("Incorrect argument number %d for columns %d", len(dest), len(r.defs))
+		return fmt.Errorf("incorrect argument number %d for columns %d", len(dest), len(r.defs))
 	}
 	if len(r.rows) == 0 {
 		return pgx.ErrNoRows
@@ -120,7 +120,7 @@ func (rs *rowSets) Scan(dest ...interface{}) error {
 		}
 		destVal := reflect.ValueOf(dest[i])
 		if destVal.Kind() != reflect.Ptr {
-			return fmt.Errorf("Destination argument must be a pointer for column %s", r.defs[i].Name)
+			return fmt.Errorf("destination argument must be a pointer for column %s", r.defs[i].Name)
 		}
 		if col == nil {
 			dest[i] = nil
@@ -131,21 +131,21 @@ func (rs *rowSets) Scan(dest ...interface{}) error {
 			if destElem := destVal.Elem(); destElem.CanSet() {
 				destElem.Set(val)
 			} else {
-				return fmt.Errorf("Cannot set destination value for column %s", r.defs[i].Name)
+				return fmt.Errorf("cannot set destination value for column %s", r.defs[i].Name)
 			}
 		} else if scanner, ok := destVal.Interface().(interface{ Scan(interface{}) error }); ok {
 			// Try to use Scanner interface
 			if err := scanner.Scan(val.Interface()); err != nil {
-				return fmt.Errorf("Scanning value error for column '%s': %w", string(r.defs[i].Name), err)
+				return fmt.Errorf("scanning value error for column '%s': %w", string(r.defs[i].Name), err)
 			}
 		} else if val.CanConvert(destVal.Elem().Type()) {
 			if destElem := destVal.Elem(); destElem.CanSet() {
 				destElem.Set(val.Convert(destElem.Type()))
 			} else {
-				return fmt.Errorf("Cannot set destination value for column %s", r.defs[i].Name)
+				return fmt.Errorf("cannot set destination value for column %s", r.defs[i].Name)
 			}
 		} else {
-			return fmt.Errorf("Destination kind '%v' not supported for value kind '%v' of column '%s'",
+			return fmt.Errorf("destination kind '%v' not supported for value kind '%v' of column '%s'",
 				destVal.Elem().Kind(), val.Kind(), string(r.defs[i].Name))
 		}
 	}

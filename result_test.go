@@ -10,7 +10,7 @@ func TestShouldReturnValidSqlDriverResult(t *testing.T) {
 		t.Errorf("expected SELECT operation result, but got: %v", result.String())
 	}
 	affected := result.RowsAffected()
-	if 2 != affected {
+	if affected != 2 {
 		t.Errorf("expected affected rows to be 2, but got: %d", affected)
 	}
 }
