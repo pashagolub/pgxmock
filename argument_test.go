@@ -188,3 +188,60 @@ func TestAnyNamedArgument(t *testing.T) {
 		t.Errorf("there were unfulfilled expectations: %s", err)
 	}
 }
+
+type panicArg struct{}
+
+var errPanicArg = errors.New("this is a panic argument")
+
+func (p panicArg) Match(_ any) bool {
+	// This will always panic when called
+	panic(errPanicArg)
+}
+
+var _ Argument = panicArg{}
+
+func TestCloseAfterArgumentPanic(t *testing.T) {
+	mock, err := NewConn()
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+
+	defer func() {
+		checkFinishedWithin(t, 1*time.Second, func(ctx context.Context) {
+			_ = mock.Close(ctx)
+		})
+	}()
+
+	mock.ExpectExec("INSERT INTO users").
+		WithArgs(panicArg{}).
+		WillReturnResult(NewResult("INSERT", 1))
+
+	assert.PanicsWithValue(t, errPanicArg, func() {
+		_, _ = mock.Exec(context.Background(), "INSERT INTO users(name) VALUES (@name)",
+			pgx.NamedArgs{"name": "john"},
+		)
+	})
+}
+
+func checkFinishedWithin(t *testing.T, timeout time.Duration, fun func(ctx context.Context)) {
+	t.Helper()
+	closeCtx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	finishedChan := make(chan bool)
+	go func() {
+		defer func() {
+			finishedChan <- true
+			close(finishedChan)
+		}()
+		defer func() {
+			_ = recover()
+		}()
+		fun(closeCtx)
+	}()
+	select {
+	case <-finishedChan:
+		return
+	case <-closeCtx.Done():
+		t.Error("timed out waiting for function to finish")
+	}
+}
