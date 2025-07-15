@@ -327,7 +327,7 @@ func (c *pgxmock) Conn() *pgx.Conn {
 }
 
 func (c *pgxmock) CopyFrom(ctx context.Context, tableName pgx.Identifier, columnNames []string, rowSrc pgx.CopyFromSource) (int64, error) {
-	ex, err := findExpectationFunc[*ExpectedCopyFrom](c, "BeginTx()", func(copyExp *ExpectedCopyFrom) error {
+	ex, err := findExpectationFunc(c, "BeginTx()", func(copyExp *ExpectedCopyFrom) error {
 		if !reflect.DeepEqual(copyExp.expectedTableName, tableName) {
 			return fmt.Errorf("CopyFrom: table name '%s' was not expected, expected table name is '%s'", tableName, copyExp.expectedTableName)
 		}
@@ -351,7 +351,7 @@ func (c *pgxmock) CopyFrom(ctx context.Context, tableName pgx.Identifier, column
 }
 
 func (c *pgxmock) SendBatch(ctx context.Context, b *pgx.Batch) pgx.BatchResults {
-	ex, err := findExpectationFunc[*ExpectedBatch](c, "Batch()", func(batchExp *ExpectedBatch) error {
+	ex, err := findExpectationFunc(c, "Batch()", func(batchExp *ExpectedBatch) error {
 		if len(batchExp.expectedQueries) != len(b.QueuedQueries) {
 			return fmt.Errorf("SendBatch: number of queries in batch '%d' was not expected, expected number of queries is '%d'",
 				len(b.QueuedQueries), len(batchExp.expectedQueries))
@@ -390,7 +390,7 @@ func (c *pgxmock) Begin(ctx context.Context) (pgx.Tx, error) {
 }
 
 func (c *pgxmock) BeginTx(ctx context.Context, txOptions pgx.TxOptions) (pgx.Tx, error) {
-	ex, err := findExpectationFunc[*ExpectedBegin](c, "BeginTx()", func(beginExp *ExpectedBegin) error {
+	ex, err := findExpectationFunc(c, "BeginTx()", func(beginExp *ExpectedBegin) error {
 		if beginExp.opts != txOptions {
 			return fmt.Errorf("BeginTx: call with transaction options '%v' was not expected: %s", txOptions, beginExp)
 		}
@@ -406,7 +406,7 @@ func (c *pgxmock) BeginTx(ctx context.Context, txOptions pgx.TxOptions) (pgx.Tx,
 }
 
 func (c *pgxmock) Prepare(ctx context.Context, name, query string) (*pgconn.StatementDescription, error) {
-	ex, err := findExpectationFunc[*ExpectedPrepare](c, "Prepare()", func(prepareExp *ExpectedPrepare) error {
+	ex, err := findExpectationFunc(c, "Prepare()", func(prepareExp *ExpectedPrepare) error {
 		if err := c.queryMatcher.Match(prepareExp.expectSQL, query); err != nil {
 			return err
 		}
@@ -425,7 +425,7 @@ func (c *pgxmock) Prepare(ctx context.Context, name, query string) (*pgconn.Stat
 }
 
 func (c *pgxmock) Deallocate(ctx context.Context, name string) error {
-	ex, err := findExpectationFunc[*ExpectedDeallocate](c, "Deallocate()", func(deallocateExp *ExpectedDeallocate) error {
+	ex, err := findExpectationFunc(c, "Deallocate()", func(deallocateExp *ExpectedDeallocate) error {
 		if deallocateExp.expectAll {
 			return fmt.Errorf("Deallocate: all prepared statements were expected to be deallocated, instead only '%s' specified", name)
 		}
@@ -441,7 +441,7 @@ func (c *pgxmock) Deallocate(ctx context.Context, name string) error {
 }
 
 func (c *pgxmock) DeallocateAll(ctx context.Context) error {
-	ex, err := findExpectationFunc[*ExpectedDeallocate](c, "DeallocateAll()", func(deallocateExp *ExpectedDeallocate) error {
+	ex, err := findExpectationFunc(c, "DeallocateAll()", func(deallocateExp *ExpectedDeallocate) error {
 		if !deallocateExp.expectAll {
 			return fmt.Errorf("Deallocate: deallocate all prepared statements was not expected, expected name is '%s'", deallocateExp.expectStmtName)
 		}
@@ -471,7 +471,7 @@ func (c *pgxmock) Rollback(ctx context.Context) error {
 
 // Implement the "QueryerContext" interface
 func (c *pgxmock) Query(ctx context.Context, sql string, args ...interface{}) (pgx.Rows, error) {
-	ex, err := findExpectationFunc[*ExpectedQuery](c, "Query()", func(queryExp *ExpectedQuery) error {
+	ex, err := findExpectationFunc(c, "Query()", func(queryExp *ExpectedQuery) error {
 		if err := c.queryMatcher.Match(queryExp.expectSQL, sql); err != nil {
 			return err
 		}
@@ -510,7 +510,7 @@ func (c *pgxmock) QueryRow(ctx context.Context, sql string, args ...interface{})
 }
 
 func (c *pgxmock) Exec(ctx context.Context, query string, args ...interface{}) (pgconn.CommandTag, error) {
-	ex, err := findExpectationFunc[*ExpectedExec](c, "Exec()", func(execExp *ExpectedExec) error {
+	ex, err := findExpectationFunc(c, "Exec()", func(execExp *ExpectedExec) error {
 		if err := c.queryMatcher.Match(execExp.expectSQL, query); err != nil {
 			return err
 		}
@@ -599,5 +599,5 @@ func findExpectationFunc[ET expectationType[t], t any](c *pgxmock, method string
 }
 
 func findExpectation[ET expectationType[t], t any](c *pgxmock, method string) (ET, error) {
-	return findExpectationFunc[ET, t](c, method, func(_ ET) error { return nil })
+	return findExpectationFunc(c, method, func(_ ET) error { return nil })
 }
