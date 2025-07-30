@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
@@ -784,4 +786,34 @@ func TestInvalidsQueryRow(t *testing.T) {
 	var d pgtype.DriverBytes
 	err = mock.QueryRow(ctx, "SELECT").Scan(&d)
 	a.Error(err)
+}
+
+type MockedDAO struct {
+	mock.Mock
+}
+
+func (m *MockedDAO) Query() pgx.Row {
+	return m.Called().Get(0).(pgx.Row)
+}
+
+func TestSingleRow(t *testing.T) {
+	const value = 123
+
+	dao := new(MockedDAO)
+
+	dao.On("Query").
+		Return(
+			NewRows([]string{"id"}).
+				AddRow(value).
+				Kind(),
+		)
+
+	row := dao.Query()
+
+	var got int
+
+	err := row.Scan(&got)
+
+	require.NoError(t, err)
+	assert.Equal(t, value, got)
 }
