@@ -316,6 +316,13 @@ func (r *Rows) Kind() pgx.Rows {
 	}
 }
 
+// AsRow returns rows corresponding to the interface pgx.Row.
+func (r *Rows) AsRow() pgx.Row {
+	return &connRow{
+		sets: []*Rows{r},
+	}
+}
+
 // NewRowsWithColumnDefinition return rows with columns metadata
 func NewRowsWithColumnDefinition(columns ...pgconn.FieldDescription) *Rows {
 	return &Rows{

@@ -805,7 +805,7 @@ func TestSingleRow(t *testing.T) {
 		Return(
 			NewRows([]string{"id"}).
 				AddRow(value).
-				Kind(),
+				AsRow(),
 		)
 
 	row := dao.Query()
