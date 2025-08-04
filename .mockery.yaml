@@ -1,7 +1,0 @@
-all: true
-dir: '{{.InterfaceDir}}'
-log-level: warn
-template: testify
-packages:
-  github.com/pashagolub/pgxmock/v4/tmp:
-    config:
