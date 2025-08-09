@@ -312,7 +312,7 @@ func TestAllowsToSetRowsErrors(t *testing.T) {
 	}
 }
 
-func TestRowsCloseError(t *testing.T) {
+func TestNoRowsCloseError(t *testing.T) {
 	t.Parallel()
 	mock, err := NewConn()
 	if err != nil {
@@ -331,6 +331,97 @@ func TestRowsCloseError(t *testing.T) {
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestRowsCloseError(t *testing.T) {
+	t.Parallel()
+	mock, err := NewConn()
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	defer mock.Close(context.Background())
+
+	rows := NewRows([]string{"id"}).AddRow(1).AddRow(2).CloseError(fmt.Errorf("close error"))
+	mock.ExpectQuery("SELECT").WillReturnRows(rows)
+
+	rs, err := mock.Query(context.Background(), "SELECT")
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+	defer rs.Close()
+
+	total := 0
+	for rs.Next() {
+		var id int
+		if err := rs.Scan(&id); err != nil {
+			t.Fatalf("unexpected error: %s", err)
+		}
+		total += id
+	}
+
+	if total != 3 {
+		t.Fatalf("expected id sum of 3, got %d", total)
+	}
+
+	if rs.Err() == nil {
+		t.Fatal("expected an error, but got none")
+	}
+}
+
+func TestRowsCloseEarlyError(t *testing.T) {
+	t.Parallel()
+	mock, err := NewConn()
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	defer mock.Close(context.Background())
+
+	rows := NewRows([]string{"id"}).AddRow(1).AddRow(2).CloseError(fmt.Errorf("close error"))
+	mock.ExpectQuery("SELECT").WillReturnRows(rows)
+
+	rs, err := mock.Query(context.Background(), "SELECT")
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+
+	// Fetch the first row.
+	if !rs.Next() {
+		t.Fatal("unexpected false Next()")
+	}
+	var id int
+	if err := rs.Scan(&id); err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+	if id != 1 {
+		t.Fatalf("expected id to be 1, got %d", id)
+	}
+
+	// Close before fetching the next row.
+	rs.Close()
+
+	// The close error should be set.
+	if rs.Err() == nil {
+		t.Fatal("expected an error, but got none")
+	}
+
+	// Next should be false now.
+	if rs.Next() {
+		t.Fatal("unexpected true Next()")
+	}
+
+	// Scan should return the error.
+	id = -1
+	if err := rs.Scan(&id); err == nil {
+		t.Fatal("expected an error, but got none")
+	}
+	if id != -1 {
+		t.Fatalf("expected no id but got %v", id)
+	}
+
+	// The close error should be set.
+	if rs.Err() == nil {
+		t.Fatal("expected an error, but got none")
 	}
 }
 
