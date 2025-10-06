@@ -14,6 +14,9 @@
 # Visual Studio Code internal folder
 .vscode
 
+# GoLand internal folder
+.idea
+
 # Packages ouput folder
 dist
 

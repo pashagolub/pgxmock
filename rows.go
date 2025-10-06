@@ -97,7 +97,7 @@ func (rs *rowSets) close() {
 // advances to next row
 func (rs *rowSets) Next() bool {
 	r := rs.sets[rs.RowSetNo]
-	if r.recNo == len(r.rows) {
+	if r.lastRow == r.recNo || r.recNo == len(r.rows) {
 		rs.close()
 		return false
 	}
@@ -235,6 +235,7 @@ type Rows struct {
 	rows       [][]interface{}
 	recNo      int
 	nextErr    map[int]error
+	lastRow    int
 	closeErr   error
 	closed     bool
 }
@@ -251,12 +252,14 @@ func NewRows(columns []string) *Rows {
 	return &Rows{
 		defs:    coldefs,
 		nextErr: make(map[int]error),
+		lastRow: -1,
 	}
 }
 
 // CloseError sets an error which will be returned by [Rows.Err] after
 // [Rows.Close] has been called or [Rows.Next] returns false.
-func (r *Rows) CloseError(err error) *Rows {
+func (r *Rows) CloseError(row int, err error) *Rows {
+	r.lastRow = row
 	r.closeErr = err
 	return r
 }

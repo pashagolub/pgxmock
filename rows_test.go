@@ -320,7 +320,7 @@ func TestNoRowsCloseError(t *testing.T) {
 	}
 	defer mock.Close(context.Background())
 
-	rows := NewRows([]string{"id"}).CloseError(fmt.Errorf("close error"))
+	rows := NewRows([]string{"id"}).CloseError(0, fmt.Errorf("close error"))
 	mock.ExpectQuery("SELECT").WillReturnRows(rows)
 
 	rs, err := mock.Query(context.Background(), "SELECT")
@@ -342,7 +342,7 @@ func TestRowsCloseError(t *testing.T) {
 	}
 	defer mock.Close(context.Background())
 
-	rows := NewRows([]string{"id"}).AddRow(1).AddRow(2).CloseError(fmt.Errorf("close error"))
+	rows := NewRows([]string{"id"}).AddRow(1).AddRow(2).CloseError(1, fmt.Errorf("close error"))
 	mock.ExpectQuery("SELECT").WillReturnRows(rows)
 
 	rs, err := mock.Query(context.Background(), "SELECT")
@@ -351,17 +351,14 @@ func TestRowsCloseError(t *testing.T) {
 	}
 	defer rs.Close()
 
-	total := 0
 	for rs.Next() {
 		var id int
 		if err := rs.Scan(&id); err != nil {
 			t.Fatalf("unexpected error: %s", err)
 		}
-		total += id
-	}
-
-	if total != 3 {
-		t.Fatalf("expected id sum of 3, got %d", total)
+		if id != 1 {
+			t.Fatalf("expected id to be 1, got %d", id)
+		}
 	}
 
 	if rs.Err() == nil {
@@ -377,7 +374,7 @@ func TestRowsCloseEarlyError(t *testing.T) {
 	}
 	defer mock.Close(context.Background())
 
-	rows := NewRows([]string{"id"}).AddRow(1).AddRow(2).CloseError(fmt.Errorf("close error"))
+	rows := NewRows([]string{"id"}).AddRow(1).AddRow(2).CloseError(2, fmt.Errorf("close error"))
 	mock.ExpectQuery("SELECT").WillReturnRows(rows)
 
 	rs, err := mock.Query(context.Background(), "SELECT")
