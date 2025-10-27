@@ -312,6 +312,36 @@ func TestAllowsToSetRowsErrors(t *testing.T) {
 	}
 }
 
+func TestOneRowError(t *testing.T) {
+	t.Parallel()
+	mock, err := NewConn()
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	defer mock.Close(context.Background())
+
+	rows := NewRows([]string{"id", "title"}).
+		RowError(0, fmt.Errorf("error"))
+	mock.ExpectQuery("SELECT").WillReturnRows(rows)
+
+	rs, err := mock.Query(context.Background(), "SELECT")
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+	defer rs.Close()
+
+	if rs.Next() {
+		t.Fatal("expected the first row not to be available")
+	}
+	if rs.Err() == nil {
+		t.Fatalf("unexpected success")
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestNoRowsCloseError(t *testing.T) {
 	t.Parallel()
 	mock, err := NewConn()
