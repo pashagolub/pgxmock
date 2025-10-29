@@ -97,7 +97,7 @@ func (rs *rowSets) close() {
 // advances to next row
 func (rs *rowSets) Next() bool {
 	r := rs.sets[rs.RowSetNo]
-	if r.recNo == len(r.rows) {
+	if r.recNo == len(r.rows) && r.nextErr[r.recNo] == nil {
 		rs.close()
 		return false
 	}
