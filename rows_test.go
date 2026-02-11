@@ -2,10 +2,11 @@ package pgxmock
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -543,10 +544,21 @@ func ExampleRows_rawValues() {
 	}
 	defer mock.Close(context.Background())
 
-	rows := NewRows([]string{"raw"}).
-		AddRow([]byte(`one binary value with some text!`)).
-		AddRow([]byte(`two binary value with even more text than the first one`)).
-		AddRow([]byte{})
+	// postgres stores dates and timestamps respectively as days and
+	// microseconds since the postgres epoch (2000-01-01 0:0:0.0)
+
+	epoch := time.Unix(946706400, 12000) // 2000-01-01 00:00:00.12
+	epoch5 := time.Unix(947052000, 0)    // 2000-01-05 00:00:00.00
+
+	rows := NewRowsWithColumnDefinition(
+		pgconn.FieldDescription{Name: "text"},
+		pgconn.FieldDescription{Name: "bytea", DataTypeOID: pgtype.ByteaOID, Format: pgtype.BinaryFormatCode},
+		pgconn.FieldDescription{Name: "date", DataTypeOID: pgtype.DateOID, Format: pgtype.BinaryFormatCode},
+		pgconn.FieldDescription{Name: "timestamp", DataTypeOID: pgtype.TimestampOID, Format: pgtype.BinaryFormatCode},
+	).
+		AddRow("row 1", []byte{0, 1, 2}, epoch, epoch).
+		AddRow("row 2", []byte{3, 4, 5}, epoch5, epoch5)
+
 	mock.ExpectQuery("SELECT").WillReturnRows(rows)
 
 	rs, err := mock.Query(context.Background(), "SELECT")
@@ -557,14 +569,16 @@ func ExampleRows_rawValues() {
 	defer rs.Close()
 
 	for rs.Next() {
-		var rawValue []byte
-		if err := json.Unmarshal(rs.RawValues()[0], &rawValue); err != nil {
-			fmt.Print(err)
-		}
-		fmt.Println(string(rawValue))
+		rawValues := rs.RawValues()
+
+		fmt.Printf("text: %s, bytea: %v, date (days): %d, timestamp (microseconds): %v\n",
+			rawValues[0],
+			rawValues[1],
+			binary.BigEndian.Uint32(rawValues[2]),
+			binary.BigEndian.Uint64(rawValues[3]))
 	}
-	// Output: one binary value with some text!
-	// two binary value with even more text than the first one
+	// Output: text: row 1, bytea: [0 1 2], date (days): 0, timestamp (microseconds): 12
+	// text: row 2, bytea: [3 4 5], date (days): 4, timestamp (microseconds): 345600000000
 	//
 }
 
