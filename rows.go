@@ -175,7 +175,7 @@ func (rs *rowSets) Scan(dest ...interface{}) error {
 //
 // It is expected that if you are testing with RawValues, you know what you're
 // doing in terms of how postgres will marshal certain data types into binary
-// format, such as numarics, dates, and timestamps, ect.
+// format, such as numarics, dates, and timestamps, etc.
 //
 // See https://github.com/jackc/pgx/tree/ac0b46f2f9538baa74aeac931d97884e5b9c924d/pgtype
 func (rs *rowSets) RawValues() [][]byte {
