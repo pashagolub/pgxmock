@@ -547,8 +547,8 @@ func ExampleRows_rawValues() {
 	// postgres stores dates and timestamps respectively as days and
 	// microseconds since the postgres epoch (2000-01-01 0:0:0.0)
 
-	epoch := time.Unix(946706400, 12000) // 2000-01-01 00:00:00.12
-	epoch5 := time.Unix(947052000, 0)    // 2000-01-05 00:00:00.00
+	epoch := time.Unix(946684800, 12000).UTC() // 2000-01-01 00:00:00.12 UTC
+	epoch5 := time.Unix(947030400, 0).UTC()    // 2000-01-05 00:00:00.00 UTC
 
 	rows := NewRowsWithColumnDefinition(
 		pgconn.FieldDescription{Name: "text"},
