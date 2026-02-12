@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"sync"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -169,6 +170,21 @@ func (rs *rowSets) Scan(dest ...interface{}) error {
 	return r.nextErr[r.recNo-1]
 }
 
+var pgtypeMapMutex sync.Mutex
+
+// pgtypeMap is not safe to use concurrently, be sure to use pgtypeMapMutex when
+// accessing it
+var pgtypeMap *pgtype.Map
+
+// getTypeMap returns an existing pgtype.Map or creates a new one if it doesn't
+// exist. pgtypeMapMutex must be locked to call this function.
+func getTypeMap() *pgtype.Map {
+	if pgtypeMap == nil {
+		pgtypeMap = pgtype.NewMap()
+	}
+	return pgtypeMap
+}
+
 // RawValues attempts to return the binary representation of the row values as
 // if postgres had returned them. RawValues will consolidate the column OIDs and
 // FormatCode.
@@ -183,14 +199,12 @@ func (rs *rowSets) RawValues() [][]byte {
 	dest := make([][]byte, len(r.defs))
 	fd := rs.FieldDescriptions()
 
-	// generating a new map for each row is not ideal. But until someone
-	// complains about the performance of this mock library, I think it's ok.
-
-	fmap := pgtype.NewMap()
+	pgtypeMapMutex.Lock()
+	defer pgtypeMapMutex.Unlock()
 
 	for i, col := range r.rows[r.recNo-1] {
 
-		encoded, err := fmap.Encode(fd[i].DataTypeOID, fd[i].Format, col, nil)
+		encoded, err := getTypeMap().Encode(fd[i].DataTypeOID, fd[i].Format, col, nil)
 
 		if err != nil {
 			// fallback to a %v conversion.
