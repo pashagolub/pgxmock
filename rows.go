@@ -2,11 +2,11 @@ package pgxmock
 
 import (
 	"encoding/csv"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
 	"strings"
+	"sync"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -170,16 +170,49 @@ func (rs *rowSets) Scan(dest ...interface{}) error {
 	return r.nextErr[r.recNo-1]
 }
 
+var pgtypeMapMutex sync.Mutex
+
+// pgtypeMap is not safe to use concurrently, be sure to use pgtypeMapMutex when
+// accessing it
+var pgtypeMap *pgtype.Map
+
+// getTypeMap returns an existing pgtype.Map or creates a new one if it doesn't
+// exist. pgtypeMapMutex must be locked to call this function.
+func getTypeMap() *pgtype.Map {
+	if pgtypeMap == nil {
+		pgtypeMap = pgtype.NewMap()
+	}
+	return pgtypeMap
+}
+
+// RawValues attempts to return the binary representation of the row values as
+// if postgres had returned them. RawValues will consolidate the column OIDs and
+// FormatCode.
+//
+// It is expected that if you are testing with RawValues, you know what you're
+// doing in terms of how postgres will marshal certain data types into binary
+// format, such as numarics, dates, and timestamps, etc.
+//
+// See https://github.com/jackc/pgx/tree/ac0b46f2f9538baa74aeac931d97884e5b9c924d/pgtype
 func (rs *rowSets) RawValues() [][]byte {
 	r := rs.sets[rs.RowSetNo]
 	dest := make([][]byte, len(r.defs))
+	fd := rs.FieldDescriptions()
+
+	pgtypeMapMutex.Lock()
+	defer pgtypeMapMutex.Unlock()
 
 	for i, col := range r.rows[r.recNo-1] {
-		if b, ok := rawBytes(col); ok {
-			dest[i] = b
+
+		encoded, err := getTypeMap().Encode(fd[i].DataTypeOID, fd[i].Format, col, nil)
+
+		if err != nil {
+			// fallback to a %v conversion.
+			dest[i] = []byte(fmt.Sprintf("%v", col))
 			continue
 		}
-		dest[i] = []byte(fmt.Sprintf("%v", col))
+
+		dest[i] = encoded
 	}
 
 	return dest
@@ -214,17 +247,6 @@ func (rs *rowSets) empty() bool {
 		}
 	}
 	return true
-}
-
-func rawBytes(col interface{}) (_ []byte, ok bool) {
-	val, err := json.Marshal(col)
-	if err != nil || len(val) == 0 {
-		return nil, false
-	}
-	// Copy the bytes from the mocked row into a shared raw buffer, which we'll replace the content of later
-	b := make([]byte, len(val))
-	copy(b, val)
-	return b, true
 }
 
 // Rows is a mocked collection of rows to
