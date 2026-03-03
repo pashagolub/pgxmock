@@ -1,4 +1,4 @@
-module github.com/pashagolub/pgxmock/v4
+module github.com/pashagolub/pgxmock/v5
 
 go 1.23.0
 

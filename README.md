@@ -1,5 +1,5 @@
-[![Go Reference](https://pkg.go.dev/badge/github.com/pashagolub/pgxmock.svg)](https://pkg.go.dev/github.com/pashagolub/pgxmock/v4)
-[![Go Report Card](https://goreportcard.com/badge/github.com/pashagolub/pgxmock)](https://goreportcard.com/report/github.com/pashagolub/pgxmock/v4)
+[![Go Reference](https://pkg.go.dev/badge/github.com/pashagolub/pgxmock.svg)](https://pkg.go.dev/github.com/pashagolub/pgxmock/v5)
+[![Go Report Card](https://goreportcard.com/badge/github.com/pashagolub/pgxmock)](https://goreportcard.com/report/github.com/pashagolub/pgxmock/v5)
 [![Coverage Status](https://coveralls.io/repos/github/pashagolub/pgxmock/badge.svg?branch=master)](https://coveralls.io/github/pashagolub/pgxmock?branch=master)
 [![Mentioned in Awesome Go](https://awesome.re/mentioned-badge.svg)](https://github.com/avelino/awesome-go)
 
@@ -17,11 +17,11 @@ It's based on the well-known [sqlmock](https://github.com/DATA-DOG/go-sqlmock) l
 
 ## Install
 
-    go get github.com/pashagolub/pgxmock/v4
+    go get github.com/pashagolub/pgxmock/v5
 
 ## Documentation and Examples
 
-Visit [godoc](http://pkg.go.dev/github.com/pashagolub/pgxmock/v4) for general examples and public api reference.
+Visit [godoc](http://pkg.go.dev/github.com/pashagolub/pgxmock/v5) for general examples and public api reference.
 
 See implementation examples:
 
@@ -92,7 +92,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/pashagolub/pgxmock/v4"
+	"github.com/pashagolub/pgxmock/v5"
 )
 
 // a successful case
@@ -175,7 +175,7 @@ provide a standard sql parsing matchers.
 ## Matching arguments like time.Time
 
 There may be arguments which are of `struct` type and cannot be compared easily by value like `time.Time`. In this case
-**pgxmock** provides an [Argument](https://pkg.go.dev/github.com/pashagolub/pgxmock/v4#Argument) interface which
+**pgxmock** provides an [Argument](https://pkg.go.dev/github.com/pashagolub/pgxmock/v5#Argument) interface which
 can be used in more sophisticated matching. Here is a simple example of time argument matching:
 
 ``` go
