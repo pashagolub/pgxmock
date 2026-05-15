@@ -470,7 +470,7 @@ func (c *pgxmock) Rollback(ctx context.Context) error {
 }
 
 // Implement the "QueryerContext" interface
-func (c *pgxmock) Query(ctx context.Context, sql string, args ...interface{}) (pgx.Rows, error) {
+func (c *pgxmock) Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error) {
 	ex, err := findExpectationFunc(c, "Query()", func(queryExp *ExpectedQuery) error {
 		if err := c.queryMatcher.Match(queryExp.expectSQL, sql); err != nil {
 			return err
@@ -497,15 +497,15 @@ type errRows struct {
 	err error
 }
 
-func (er *errRows) Close()                                    {}
-func (er *errRows) Err() error                                { return er.err }
-func (er *errRows) CommandTag() pgconn.CommandTag             { return pgconn.CommandTag{} }
+func (er *errRows) Close()                                       {}
+func (er *errRows) Err() error                                   { return er.err }
+func (er *errRows) CommandTag() pgconn.CommandTag                { return pgconn.CommandTag{} }
 func (er *errRows) FieldDescriptions() []pgconn.FieldDescription { return nil }
-func (er *errRows) Next() bool                                { return false }
-func (er *errRows) Scan(...any) error          { return er.err }
-func (er *errRows) Values() ([]any, error)     { return nil, er.err }
-func (er *errRows) RawValues() [][]byte                       { return nil }
-func (er *errRows) Conn() *pgx.Conn                           { return nil }
+func (er *errRows) Next() bool                                   { return false }
+func (er *errRows) Scan(...any) error                            { return er.err }
+func (er *errRows) Values() ([]any, error)                       { return nil, er.err }
+func (er *errRows) RawValues() [][]byte                          { return nil }
+func (er *errRows) Conn() *pgx.Conn                              { return nil }
 
 type errRow struct {
 	err error
@@ -515,7 +515,7 @@ func (er errRow) Scan(...any) error {
 	return er.err
 }
 
-func (c *pgxmock) QueryRow(ctx context.Context, sql string, args ...interface{}) pgx.Row {
+func (c *pgxmock) QueryRow(ctx context.Context, sql string, args ...any) pgx.Row {
 	rows, err := c.Query(ctx, sql, args...)
 	if err != nil {
 		return errRow{err: err}
@@ -523,7 +523,7 @@ func (c *pgxmock) QueryRow(ctx context.Context, sql string, args ...interface{})
 	return (*connRow)(rows.(*rowSets))
 }
 
-func (c *pgxmock) Exec(ctx context.Context, query string, args ...interface{}) (pgconn.CommandTag, error) {
+func (c *pgxmock) Exec(ctx context.Context, query string, args ...any) (pgconn.CommandTag, error) {
 	ex, err := findExpectationFunc(c, "Exec()", func(execExp *ExpectedExec) error {
 		if err := c.queryMatcher.Match(execExp.expectSQL, query); err != nil {
 			return err

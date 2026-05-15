@@ -487,7 +487,7 @@ type NullInt struct {
 }
 
 // Satisfy sql.Scanner interface
-func (ni *NullInt) Scan(value interface{}) error {
+func (ni *NullInt) Scan(value any) error {
 	switch v := value.(type) {
 	case nil:
 		ni.Integer, ni.Valid = 0, false
@@ -519,7 +519,7 @@ func (ni *NullInt) Scan(value interface{}) error {
 }
 
 // Satisfy sql.Valuer interface.
-func (ni NullInt) Value() (interface{}, error) {
+func (ni NullInt) Value() (any, error) {
 	if !ni.Valid {
 		return nil, nil
 	}
@@ -527,7 +527,7 @@ func (ni NullInt) Value() (interface{}, error) {
 }
 
 // Satisfy sql.Scanner interface
-func (nt *NullTime) Scan(value interface{}) error {
+func (nt *NullTime) Scan(value any) error {
 	switch v := value.(type) {
 	case nil:
 		nt.Time, nt.Valid = time.Time{}, false
@@ -540,7 +540,7 @@ func (nt *NullTime) Scan(value interface{}) error {
 }
 
 // Satisfy sql.Valuer interface.
-func (nt NullTime) Value() (interface{}, error) {
+func (nt NullTime) Value() (any, error) {
 	if !nt.Valid {
 		return nil, nil
 	}
@@ -673,7 +673,7 @@ func TestGoroutineExecutionWithUnorderedExpectationMatching(t *testing.T) {
 	mock.ExpectExec("^UPDATE three").WithArgs("one", "two", "three").WillReturnResult(result)
 
 	var wg sync.WaitGroup
-	queries := map[string][]interface{}{
+	queries := map[string][]any{
 		"one":   {"one"},
 		"two":   {"one", "two"},
 		"three": {"one", "two", "three"},
@@ -681,7 +681,7 @@ func TestGoroutineExecutionWithUnorderedExpectationMatching(t *testing.T) {
 
 	wg.Add(len(queries))
 	for table, args := range queries {
-		go func(tbl string, a []interface{}) {
+		go func(tbl string, a []any) {
 			if _, err := mock.Exec(context.Background(), "UPDATE "+tbl, a...); err != nil {
 				t.Errorf("error was not expected: %s", err)
 			}
@@ -987,7 +987,7 @@ func TestPrepareExec(t *testing.T) {
 	defer mock.Close(context.Background())
 	mock.ExpectBegin()
 	mock.ExpectPrepare("foo", "INSERT INTO ORDERS\\(ID, STATUS\\) VALUES \\(\\?, \\?\\)")
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		mock.ExpectExec("foo").WithArgs(AnyArg(), AnyArg()).WillReturnResult(NewResult("UPDATE", 1))
 	}
 	mock.ExpectCommit()
@@ -996,7 +996,7 @@ func TestPrepareExec(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		_, err := mock.Exec(context.Background(), "foo", i, "Hello"+strconv.Itoa(i))
 		if err != nil {
 			t.Fatal(err)
@@ -1237,7 +1237,7 @@ func TestQueryWithTimeout(t *testing.T) {
 	}
 }
 
-func queryWithTimeout(t time.Duration, db PgxCommonIface, query string, args ...interface{}) (pgx.Rows, error) {
+func queryWithTimeout(t time.Duration, db PgxCommonIface, query string, args ...any) (pgx.Rows, error) {
 	rowsChan := make(chan pgx.Rows, 1)
 	errChan := make(chan error, 1)
 

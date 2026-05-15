@@ -25,7 +25,7 @@ func TestPointerToInterfaceArgument(t *testing.T) {
 			mock.NewRows([]string{"id"}).
 				AddRow(int64(123))) // Value which should be scanned in *interface{}
 
-	var value interface{}
+	var value any
 	err = mock.QueryRow(context.Background(), `SELECT 123`).Scan(&value)
 	if err != nil || value.(int64) != 123 {
 		t.Error(err)
@@ -622,7 +622,7 @@ type testScanner struct {
 	Value int64
 }
 
-func (s *testScanner) Scan(src interface{}) error {
+func (s *testScanner) Scan(src any) error {
 	switch src := src.(type) {
 	case int64:
 		s.Value = src

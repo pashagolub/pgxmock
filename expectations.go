@@ -133,10 +133,10 @@ func (e *commonExpectation) String() string {
 type queryBasedExpectation struct {
 	expectSQL          string
 	expectRewrittenSQL string
-	args               []interface{}
+	args               []any
 }
 
-func (e *queryBasedExpectation) argsMatches(sql string, args []interface{}) (rewrittenSQL string, err error) {
+func (e *queryBasedExpectation) argsMatches(sql string, args []any) (rewrittenSQL string, err error) {
 	eargs := e.args
 	// check for any QueryRewriter arguments: only supported as the first argument
 	if len(args) == 1 {
@@ -222,7 +222,7 @@ type ExpectedExec struct {
 // WithArgs will match given expected args to actual database exec operation arguments.
 // if at least one argument does not match, it will return an error. For specific
 // arguments an pgxmock.Argument interface can be used to match an argument.
-func (e *ExpectedExec) WithArgs(args ...interface{}) *ExpectedExec {
+func (e *ExpectedExec) WithArgs(args ...any) *ExpectedExec {
 	e.args = args
 	return e
 }
@@ -236,22 +236,23 @@ func (e *ExpectedExec) WithRewrittenSQL(sql string) *ExpectedExec {
 
 // String returns string representation
 func (e *ExpectedExec) String() string {
-	msg := "ExpectedExec => expecting call to Exec():\n"
-	msg += fmt.Sprintf("\t- matches sql: '%s'\n", e.expectSQL)
+	var msg strings.Builder
+	msg.WriteString("ExpectedExec => expecting call to Exec():\n")
+	msg.WriteString(fmt.Sprintf("\t- matches sql: '%s'\n", e.expectSQL))
 
 	if len(e.args) == 0 {
-		msg += "\t- is without arguments\n"
+		msg.WriteString("\t- is without arguments\n")
 	} else {
-		msg += "\t- is with arguments:\n"
+		msg.WriteString("\t- is with arguments:\n")
 		for i, arg := range e.args {
-			msg += fmt.Sprintf("\t\t%d - %+v\n", i, arg)
+			msg.WriteString(fmt.Sprintf("\t\t%d - %+v\n", i, arg))
 		}
 	}
 	if e.result.String() != "" {
-		msg += fmt.Sprintf("\t- returns result: %s\n", e.result)
+		msg.WriteString(fmt.Sprintf("\t- returns result: %s\n", e.result))
 	}
 
-	return msg + e.commonExpectation.String()
+	return msg.String() + e.commonExpectation.String()
 }
 
 // WillReturnResult arranges for an expected Exec() to return a particular
@@ -358,7 +359,7 @@ type ExpectedQuery struct {
 // WithArgs will match given expected args to actual database query arguments.
 // if at least one argument does not match, it will return an error. For specific
 // arguments an pgxmock.Argument interface can be used to match an argument.
-func (e *ExpectedQuery) WithArgs(args ...interface{}) *ExpectedQuery {
+func (e *ExpectedQuery) WithArgs(args ...any) *ExpectedQuery {
 	e.args = args
 	return e
 }
@@ -378,21 +379,22 @@ func (e *ExpectedQuery) RowsWillBeClosed() *ExpectedQuery {
 
 // String returns string representation
 func (e *ExpectedQuery) String() string {
-	msg := "ExpectedQuery => expecting call to Query() or to QueryRow():\n"
-	msg += fmt.Sprintf("\t- matches sql: '%s'\n", e.expectSQL)
+	var msg strings.Builder
+	msg.WriteString("ExpectedQuery => expecting call to Query() or to QueryRow():\n")
+	msg.WriteString(fmt.Sprintf("\t- matches sql: '%s'\n", e.expectSQL))
 
 	if len(e.args) == 0 {
-		msg += "\t- is without arguments\n"
+		msg.WriteString("\t- is without arguments\n")
 	} else {
-		msg += "\t- is with arguments:\n"
+		msg.WriteString("\t- is with arguments:\n")
 		for i, arg := range e.args {
-			msg += fmt.Sprintf("\t\t%d - %+v\n", i, arg)
+			msg.WriteString(fmt.Sprintf("\t\t%d - %+v\n", i, arg))
 		}
 	}
 	if e.rows != nil {
-		msg += fmt.Sprintf("%s\n", e.rows)
+		msg.WriteString(fmt.Sprintf("%s\n", e.rows))
 	}
-	return msg + e.commonExpectation.String()
+	return msg.String() + e.commonExpectation.String()
 }
 
 // WillReturnRows specifies the set of resulting rows that will be returned

@@ -12,7 +12,7 @@ import (
 	"github.com/pashagolub/pgxmock/v5"
 )
 
-func (a *api) assertJSON(actual []byte, data interface{}, t *testing.T) {
+func (a *api) assertJSON(actual []byte, data any, t *testing.T) {
 	expected, err := json.Marshal(data)
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when marshaling expected json data", err)

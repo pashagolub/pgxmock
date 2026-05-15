@@ -11,9 +11,9 @@ import (
 
 type PgxIface interface {
 	Begin(context.Context) (pgx.Tx, error)
-	Exec(context.Context, string, ...interface{}) (pgconn.CommandTag, error)
-	QueryRow(context.Context, string, ...interface{}) pgx.Row
-	Query(context.Context, string, ...interface{}) (pgx.Rows, error)
+	Exec(context.Context, string, ...any) (pgconn.CommandTag, error)
+	QueryRow(context.Context, string, ...any) pgx.Row
+	Query(context.Context, string, ...any) (pgx.Rows, error)
 	Ping(context.Context) error
 	Prepare(context.Context, string, string) (*pgconn.StatementDescription, error)
 	Close(context.Context) error
@@ -81,7 +81,7 @@ func (a *api) fail(w http.ResponseWriter, msg string, status int) {
 	_, _ = w.Write(resp)
 }
 
-func (a *api) ok(w http.ResponseWriter, data interface{}) {
+func (a *api) ok(w http.ResponseWriter, data any) {
 	w.Header().Set("Content-Type", "application/json")
 
 	resp, err := json.Marshal(data)
