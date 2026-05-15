@@ -1303,3 +1303,30 @@ func TestDoubleUnlock(t *testing.T) {
 	a.Error(err)
 	a.NotPanics(func() { _ = mock.Ping(ctx) })
 }
+
+// TestIssue258QueryReturnsErrRowsOnFailure verifies that Query returns a non-nil
+// pgx.Rows even on failure, allowing callers to use pgx.CollectOneRow / pgx.CollectRows
+// without nil-checking the rows value first (mirrors pgx pool behaviour).
+func TestIssue258QueryReturnsErrRowsOnFailure(t *testing.T) {
+	mock, err := NewPool()
+	if err != nil {
+		t.Fatalf("unexpected error opening mock pool: %s", err)
+	}
+	defer mock.Close()
+
+	// No expectation registered – Query should fail with an error.
+	rows, queryErr := mock.Query(t.Context(), "SELECT 1")
+
+	if queryErr == nil {
+		t.Fatal("expected an error from Query, got nil")
+	}
+	if rows == nil {
+		t.Fatal("expected non-nil rows even on Query failure")
+	}
+
+	// pgx.CollectOneRow must not panic and must propagate the error.
+	_, collectErr := pgx.CollectOneRow(rows, pgx.RowTo[int])
+	if collectErr == nil {
+		t.Fatal("expected an error from CollectOneRow, got nil")
+	}
+}

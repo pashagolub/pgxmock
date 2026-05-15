@@ -488,16 +488,30 @@ func (c *pgxmock) Query(ctx context.Context, sql string, args ...interface{}) (p
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return &errRows{err: err}, err
 	}
 	return ex.rows, ex.waitForDelay(ctx)
 }
+
+type errRows struct {
+	err error
+}
+
+func (er *errRows) Close()                                    {}
+func (er *errRows) Err() error                                { return er.err }
+func (er *errRows) CommandTag() pgconn.CommandTag             { return pgconn.CommandTag{} }
+func (er *errRows) FieldDescriptions() []pgconn.FieldDescription { return nil }
+func (er *errRows) Next() bool                                { return false }
+func (er *errRows) Scan(...any) error          { return er.err }
+func (er *errRows) Values() ([]any, error)     { return nil, er.err }
+func (er *errRows) RawValues() [][]byte                       { return nil }
+func (er *errRows) Conn() *pgx.Conn                           { return nil }
 
 type errRow struct {
 	err error
 }
 
-func (er errRow) Scan(...interface{}) error {
+func (er errRow) Scan(...any) error {
 	return er.err
 }
 

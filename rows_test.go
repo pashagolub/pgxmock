@@ -795,10 +795,6 @@ func TestMockQueryWithCollect(t *testing.T) {
 	var id = rawMap[0].ID
 	var title = rawMap[0].Title
 
-	if err != nil {
-		t.Fatalf("error '%s' was not expected while trying to scan row", err)
-	}
-
 	if id != 5 {
 		t.Errorf("expected mocked id to be 5, but got %d instead", id)
 	}
