@@ -4,7 +4,7 @@ package pgxmock
 // any argument in specific way when used with
 // ExpectedQuery and ExpectedExec expectations.
 type Argument interface {
-	Match(interface{}) bool
+	Match(any) bool
 }
 
 // AnyArg will return an Argument which can
@@ -17,7 +17,6 @@ func AnyArg() Argument {
 
 type anyArgument struct{}
 
-func (a anyArgument) Match(_ interface{}) bool {
+func (a anyArgument) Match(_ any) bool {
 	return true
 }
-

@@ -13,7 +13,7 @@ import (
 type AnyTime struct{}
 
 // Match satisfies pgxmock.Argument interface
-func (a AnyTime) Match(v interface{}) bool {
+func (a AnyTime) Match(v any) bool {
 	_, ok := v.(time.Time)
 	return ok
 }

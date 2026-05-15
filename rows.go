@@ -16,7 +16,7 @@ import (
 // CSVColumnParser is a function which converts trimmed csv
 // column string to a []byte representation. Currently
 // transforms NULL to nil
-var CSVColumnParser = func(s string) interface{} {
+var CSVColumnParser = func(s string) any {
 	switch {
 	case strings.ToLower(s) == "null":
 		return nil
@@ -108,12 +108,12 @@ func (rs *rowSets) Next() bool {
 // Values returns the decoded row values. As with Scan(), it is an error to
 // call Values without first calling Next() and checking that it returned
 // true.
-func (rs *rowSets) Values() ([]interface{}, error) {
+func (rs *rowSets) Values() ([]any, error) {
 	r := rs.sets[rs.RowSetNo]
 	return r.rows[r.recNo-1], r.nextErr[r.recNo-1]
 }
 
-func (rs *rowSets) Scan(dest ...interface{}) error {
+func (rs *rowSets) Scan(dest ...any) error {
 	r := rs.sets[rs.RowSetNo]
 	if r.closed {
 		// If there is no error, we should return one anyway. Weirdly, pgx returns
@@ -145,13 +145,13 @@ func (rs *rowSets) Scan(dest ...interface{}) error {
 			continue
 		}
 		val := reflect.ValueOf(col)
-		if _, ok := dest[i].(*interface{}); ok || val.Type().AssignableTo(destVal.Elem().Type()) {
+		if _, ok := dest[i].(*any); ok || val.Type().AssignableTo(destVal.Elem().Type()) {
 			if destElem := destVal.Elem(); destElem.CanSet() {
 				destElem.Set(val)
 			} else {
 				return fmt.Errorf("cannot set destination value for column %s", r.defs[i].Name)
 			}
-		} else if scanner, ok := destVal.Interface().(interface{ Scan(interface{}) error }); ok {
+		} else if scanner, ok := destVal.Interface().(interface{ Scan(any) error }); ok {
 			// Try to use Scanner interface
 			if err := scanner.Scan(val.Interface()); err != nil {
 				return fmt.Errorf("scanning value error for column '%s': %w", string(r.defs[i].Name), err)
@@ -208,7 +208,7 @@ func (rs *rowSets) RawValues() [][]byte {
 
 		if err != nil {
 			// fallback to a %v conversion.
-			dest[i] = []byte(fmt.Sprintf("%v", col))
+			dest[i] = fmt.Appendf(nil, "%v", col)
 			continue
 		}
 
@@ -254,7 +254,7 @@ func (rs *rowSets) empty() bool {
 type Rows struct {
 	commandTag pgconn.CommandTag
 	defs       []pgconn.FieldDescription
-	rows       [][]interface{}
+	rows       [][]any
 	recNo      int
 	nextErr    map[int]error
 	closeErr   error
@@ -300,7 +300,7 @@ func (r *Rows) AddRow(values ...any) *Rows {
 		panic("Expected number of values to match number of columns")
 	}
 
-	row := make([]interface{}, len(r.defs))
+	row := make([]any, len(r.defs))
 	copy(row, values)
 	r.rows = append(r.rows, row)
 	return r
@@ -335,7 +335,7 @@ func (r *Rows) FromCSVString(s string) *Rows {
 			break
 		}
 
-		row := make([]interface{}, len(r.defs))
+		row := make([]any, len(r.defs))
 		for i, v := range res {
 			row[i] = CSVColumnParser(strings.TrimSpace(v))
 		}
