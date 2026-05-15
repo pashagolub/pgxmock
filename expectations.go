@@ -238,18 +238,18 @@ func (e *ExpectedExec) WithRewrittenSQL(sql string) *ExpectedExec {
 func (e *ExpectedExec) String() string {
 	var msg strings.Builder
 	msg.WriteString("ExpectedExec => expecting call to Exec():\n")
-	msg.WriteString(fmt.Sprintf("\t- matches sql: '%s'\n", e.expectSQL))
+	fmt.Fprintf(&msg, "\t- matches sql: '%s'\n", e.expectSQL)
 
 	if len(e.args) == 0 {
 		msg.WriteString("\t- is without arguments\n")
 	} else {
 		msg.WriteString("\t- is with arguments:\n")
 		for i, arg := range e.args {
-			msg.WriteString(fmt.Sprintf("\t\t%d - %+v\n", i, arg))
+			fmt.Fprintf(&msg, "\t\t%d - %+v\n", i, arg)
 		}
 	}
 	if e.result.String() != "" {
-		msg.WriteString(fmt.Sprintf("\t- returns result: %s\n", e.result))
+		fmt.Fprintf(&msg, "\t- returns result: %s\n", e.result)
 	}
 
 	return msg.String() + e.commonExpectation.String()
@@ -381,18 +381,18 @@ func (e *ExpectedQuery) RowsWillBeClosed() *ExpectedQuery {
 func (e *ExpectedQuery) String() string {
 	var msg strings.Builder
 	msg.WriteString("ExpectedQuery => expecting call to Query() or to QueryRow():\n")
-	msg.WriteString(fmt.Sprintf("\t- matches sql: '%s'\n", e.expectSQL))
+	fmt.Fprintf(&msg, "\t- matches sql: '%s'\n", e.expectSQL)
 
 	if len(e.args) == 0 {
 		msg.WriteString("\t- is without arguments\n")
 	} else {
 		msg.WriteString("\t- is with arguments:\n")
 		for i, arg := range e.args {
-			msg.WriteString(fmt.Sprintf("\t\t%d - %+v\n", i, arg))
+			fmt.Fprintf(&msg, "\t\t%d - %+v\n", i, arg)
 		}
 	}
 	if e.rows != nil {
-		msg.WriteString(fmt.Sprintf("%s\n", e.rows))
+		fmt.Fprintf(&msg, "%s\n", e.rows)
 	}
 	return msg.String() + e.commonExpectation.String()
 }
