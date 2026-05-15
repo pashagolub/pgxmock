@@ -10,6 +10,7 @@ import (
 	"time"
 
 	pgx "github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/assert"
 )
@@ -1329,4 +1330,24 @@ func TestIssue258QueryReturnsErrRowsOnFailure(t *testing.T) {
 	if collectErr == nil {
 		t.Fatal("expected an error from CollectOneRow, got nil")
 	}
+}
+
+// TestIssue258ErrRowsAllMethods exercises every method on errRows to ensure
+// full coverage of the sentinel rows type returned on Query failure.
+func TestIssue258ErrRowsAllMethods(t *testing.T) {
+	a := assert.New(t)
+	origErr := errors.New("sentinel query error")
+	er := &errRows{err: origErr}
+
+	a.NotPanics(er.Close)
+	a.Equal(origErr, er.Err())
+	a.Equal(pgconn.CommandTag{}, er.CommandTag())
+	a.Nil(er.FieldDescriptions())
+	a.False(er.Next())
+	a.Equal(origErr, er.Scan())
+	vals, valErr := er.Values()
+	a.Nil(vals)
+	a.Equal(origErr, valErr)
+	a.Nil(er.RawValues())
+	a.Nil(er.Conn())
 }
