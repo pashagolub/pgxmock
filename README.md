@@ -231,5 +231,5 @@ The [three clause BSD license](http://en.wikipedia.org/wiki/BSD_licenses)
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=pashagolub/pgxmock&type=Date)](https://star-history.com/#pashagolub/pgxmock&Date)
+[![Star History Chart](https://star-history.dera.page/svg?repos=pashagolub/pgxmock&type=Date)](https://star-history.dera.page/#pashagolub/pgxmock&Date)
 
