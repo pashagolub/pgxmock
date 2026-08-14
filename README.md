@@ -156,8 +156,8 @@ func TestShouldRollbackStatUpdatesOnFailure(t *testing.T) {
 ## Customize SQL query matching
 
 There were plenty of requests from users regarding SQL query string validation or different matching option.
-We have now implemented the `QueryMatcher` interface, which can be passed through an option when calling
-`pgxmock.New` or `pgxmock.NewWithDSN`.
+We have implemented the `QueryMatcher` interface, which can be passed through an option when creating a mock
+with `pgxmock.NewPool` or `pgxmock.NewConn`.
 
 This now allows to include some library, which would allow for example to parse and validate SQL AST.
 And create a custom QueryMatcher in order to validate SQL in sophisticated ways.
@@ -169,7 +169,7 @@ which uses expected SQL string as a regular expression to match incoming query s
 In order to customize the QueryMatcher, use the following:
 
 ``` go
-	mock, err := pgxmock.New(context.Background(), pgxmock.QueryMatcherOption(pgxmock.QueryMatcherEqual))
+	mock, err := pgxmock.NewPool(pgxmock.QueryMatcherOption(pgxmock.QueryMatcherEqual))
 ```
 
 The query matcher can be fully customized based on user needs. **pgxmock** will not
@@ -182,27 +182,36 @@ There may be arguments which are of `struct` type and cannot be compared easily 
 can be used in more sophisticated matching. Here is a simple example of time argument matching:
 
 ``` go
+import (
+	"context"
+	"testing"
+	"time"
+
+	"github.com/pashagolub/pgxmock/v5"
+)
+
 type AnyTime struct{}
 
-// Match satisfies sqlmock.Argument interface
-func (a AnyTime) Match(v interface{}) bool {
+// Match satisfies pgxmock.Argument interface
+func (a AnyTime) Match(v any) bool {
 	_, ok := v.(time.Time)
 	return ok
 }
 
 func TestAnyTimeArgument(t *testing.T) {
 	t.Parallel()
-	db, mock, err := New()
+	mock, err := pgxmock.NewPool()
 	if err != nil {
-		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
+		t.Errorf("an error '%s' was not expected when creating a mock pool", err)
 	}
-	defer db.Close()
+	defer mock.Close()
 
 	mock.ExpectExec("INSERT INTO users").
 		WithArgs("john", AnyTime{}).
-		WillReturnResult(NewResult(1, 1))
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
 
-	_, err = db.Exec("INSERT INTO users(name, created_at) VALUES (?, ?)", "john", time.Now())
+	_, err = mock.Exec(context.Background(),
+		"INSERT INTO users(name, created_at) VALUES ($1, $2)", "john", time.Now())
 	if err != nil {
 		t.Errorf("error '%s' was not expected, while inserting a row", err)
 	}
@@ -213,7 +222,9 @@ func TestAnyTimeArgument(t *testing.T) {
 }
 ```
 
-It only asserts that argument is of `time.Time` type.
+It only asserts that the argument is of `time.Time` type. For cases where any value
+is acceptable, the built-in `pgxmock.AnyArg()` matcher can be used instead of
+implementing a custom `Argument`.
 
 ## Run tests
 
