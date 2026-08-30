@@ -148,7 +148,15 @@ func (rs *rowSets) Scan(dest ...any) error {
 			continue
 		}
 		val := reflect.ValueOf(col)
-		if _, ok := dest[i].(*any); ok || val.Type().AssignableTo(destVal.Elem().Type()) {
+		if scanner, ok := destVal.Interface().(pgtype.BytesScanner); ok && val.Type() == byteSliceType {
+			// pgtype.PreallocBytes and friends copy into memory the caller
+			// already owns, so the slice header must not simply be replaced.
+			// This has to be checked before plain assignability, since []byte
+			// is assignable to any named type built on it.
+			if err := scanner.ScanBytes(col.([]byte)); err != nil {
+				return fmt.Errorf("scanning value error for column '%s': %w", string(r.defs[i].Name), err)
+			}
+		} else if _, ok := dest[i].(*any); ok || val.Type().AssignableTo(destVal.Elem().Type()) {
 			if destElem := destVal.Elem(); destElem.CanSet() {
 				destElem.Set(val)
 			} else {
@@ -194,6 +202,8 @@ func scanNull(destVal reflect.Value, column string) error {
 		return fmt.Errorf("cannot scan NULL into %s for column '%s'", destVal.Type(), column)
 	}
 }
+
+var byteSliceType = reflect.TypeOf([]byte(nil))
 
 var pgtypeMapMutex sync.Mutex
 

@@ -387,8 +387,46 @@ func (c *pgxmock) SendBatch(ctx context.Context, b *pgx.Batch) pgx.BatchResults 
 	return br
 }
 
+// largeObjectsTxIndex is the index of the pgx.Tx field inside
+// pgx.LargeObjects, or -1 if pgx no longer has one.
+var largeObjectsTxIndex = func() int {
+	txType := reflect.TypeOf((*pgx.Tx)(nil)).Elem()
+	loType := reflect.TypeOf(pgx.LargeObjects{})
+	for i := range loType.NumField() {
+		if loType.Field(i).Type == txType {
+			return i
+		}
+	}
+	return -1
+}()
+
+// LargeObjects returns a pgx.LargeObjects bound to this mock.
+//
+// Every large object operation - Create, Open, Unlink, and the Read, Write,
+// Seek, Truncate and Close methods of the returned pgx.LargeObject - is issued
+// by pgx as ordinary SQL against the transaction the pgx.LargeObjects was
+// created from ("select lo_create($1)" and friends). Binding that transaction
+// to the mock therefore makes large objects testable with plain ExpectQuery
+// expectations:
+//
+//	mock.ExpectBegin()
+//	mock.ExpectQuery(`select lo_create\(\$1\)`).
+//		WithArgs(uint32(0)).
+//		WillReturnRows(pgxmock.NewRows([]string{"lo_create"}).AddRow(uint32(42)))
+//
+// pgx keeps that field unexported and offers no constructor for
+// pgx.LargeObjects, so it is assigned reflectively. The layout is resolved
+// once at package initialisation, and a pgx release that changes it produces
+// the explicit panic below rather than a nil pointer dereference from inside
+// pgx.
 func (c *pgxmock) LargeObjects() pgx.LargeObjects {
-	return pgx.LargeObjects{}
+	var lo pgx.LargeObjects
+	if largeObjectsTxIndex < 0 {
+		panic("pgxmock: pgx.LargeObjects no longer holds a pgx.Tx, large object support needs updating for this version of pgx")
+	}
+	field := reflect.ValueOf(&lo).Elem().Field(largeObjectsTxIndex)
+	reflect.NewAt(field.Type(), field.Addr().UnsafePointer()).Elem().Set(reflect.ValueOf(c))
+	return lo
 }
 
 func (c *pgxmock) Begin(ctx context.Context) (pgx.Tx, error) {
