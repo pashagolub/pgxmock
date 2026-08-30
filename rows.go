@@ -219,7 +219,12 @@ func (rs *rowSets) Scan(dest ...any) error {
 func (rs *rowSets) scanValue(fd pgconn.FieldDescription, col any, destVal reflect.Value) error {
 	val := reflect.ValueOf(col)
 	destVal = allocPointerChain(destVal, val)
-	if _, ok := destVal.Interface().(*any); ok || val.Type().AssignableTo(destVal.Elem().Type()) {
+	if scanner, ok := destVal.Interface().(pgtype.BytesScanner); ok && val.Type() == byteSliceType {
+		// fill the caller's buffer; checked first, as []byte is assignable to PreallocBytes
+		if err := scanner.ScanBytes(col.([]byte)); err != nil {
+			return fmt.Errorf("scanning value error for column '%s': %w", string(fd.Name), err)
+		}
+	} else if _, ok := destVal.Interface().(*any); ok || val.Type().AssignableTo(destVal.Elem().Type()) {
 		if destElem := destVal.Elem(); destElem.CanSet() {
 			destElem.Set(val)
 		} else {
@@ -343,6 +348,8 @@ func scanNull(destVal reflect.Value, column string) error {
 // errNoTypeMapping reports that a column carries no OID to decode it with, so
 // the caller should fall back to its own error.
 var errNoTypeMapping = errors.New("no pgtype mapping for column")
+
+var byteSliceType = reflect.TypeOf([]byte(nil))
 
 // lockedTypeMap pairs a pgtype.Map with the lock it needs, since a
 // pgtype.Map is not safe for concurrent use. Every mock owns one, so

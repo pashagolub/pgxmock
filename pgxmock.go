@@ -513,8 +513,31 @@ func (c *pgxmock) SendBatch(ctx context.Context, b *pgx.Batch) pgx.BatchResults 
 	return br
 }
 
+// largeObjectsTxIndex is the index of the pgx.Tx field in pgx.LargeObjects, or -1.
+var largeObjectsTxIndex = func() int {
+	txType := reflect.TypeOf((*pgx.Tx)(nil)).Elem()
+	loType := reflect.TypeOf(pgx.LargeObjects{})
+	for i := range loType.NumField() {
+		if loType.Field(i).Type == txType {
+			return i
+		}
+	}
+	return -1
+}()
+
+// LargeObjects returns a pgx.LargeObjects whose SQL goes to the mock:
+//
+//	mock.ExpectQuery(`select lo_create\(\$1\)`).
+//		WithArgs(uint32(0)).
+//		WillReturnRows(pgxmock.NewRows([]string{"lo_create"}).AddRow(uint32(42)))
 func (c *pgxmock) LargeObjects() pgx.LargeObjects {
-	return pgx.LargeObjects{}
+	var lo pgx.LargeObjects
+	if largeObjectsTxIndex < 0 {
+		panic("pgxmock: pgx.LargeObjects no longer holds a pgx.Tx, large object support needs updating for this version of pgx")
+	}
+	field := reflect.ValueOf(&lo).Elem().Field(largeObjectsTxIndex)
+	reflect.NewAt(field.Type(), field.Addr().UnsafePointer()).Elem().Set(reflect.ValueOf(c))
+	return lo
 }
 
 func (c *pgxmock) Begin(ctx context.Context) (pgx.Tx, error) {
