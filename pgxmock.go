@@ -145,14 +145,6 @@ type pgxmock struct {
 	expectations []expectation
 }
 
-func (c *pgxmock) AcquireAllIdle(_ context.Context) []*pgxpool.Conn {
-	return []*pgxpool.Conn{}
-}
-
-func (c *pgxmock) AcquireFunc(_ context.Context, _ func(*pgxpool.Conn) error) error {
-	return nil
-}
-
 // region Expectations
 func (c *pgxmock) ExpectBatch() *ExpectedBatch {
 	e := &ExpectedBatch{mock: c}
