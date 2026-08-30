@@ -28,6 +28,7 @@ import (
 	"fmt"
 	"reflect"
 	"sync"
+	"sync/atomic"
 
 	pgx "github.com/jackc/pgx/v5"
 	pgconn "github.com/jackc/pgx/v5/pgconn"
@@ -157,10 +158,22 @@ type pgxmock struct {
 	// mu guards ordered and the expectations slice, so that expectations may
 	// be declared and matched from several goroutines at once. Individual
 	// expectations carry their own lock for their mutable state.
-	mu           sync.RWMutex
-	ordered      bool
-	queryMatcher QueryMatcher
-	expectations []expectation
+	mu                sync.RWMutex
+	ordered           bool
+	queryMatcher      QueryMatcher
+	expectations      []expectation
+	errorOnClosedConn bool
+	closed            atomic.Bool
+}
+
+// checkClosed reports pgconn.ErrConnClosed once the mocked connection has been
+// closed, provided the mock was created with ErrorOnClosedConnOption. pgx
+// rejects every operation on a closed connection this way.
+func (c *pgxmock) checkClosed() error {
+	if c.errorOnClosedConn && c.closed.Load() {
+		return pgconn.ErrConnClosed
+	}
+	return nil
 }
 
 // addExpectation appends e to the expectation list and returns it.
@@ -321,6 +334,8 @@ func (c *pgxmock) open(options []func(*pgxmock) error) error {
 // be called depending on the circumstances, but if it is called
 // there must be an *ExpectedClose expectation satisfied.
 func (c *pgxmock) Close(ctx context.Context) error {
+	// the caller has given up the handle whether or not the call was expected
+	defer c.closed.Store(true)
 	ex, err := findExpectation[*ExpectedClose](c, "Close()")
 	if err != nil {
 		return err
@@ -333,6 +348,10 @@ func (c *pgxmock) Conn() *pgx.Conn {
 }
 
 func (c *pgxmock) CopyFrom(ctx context.Context, tableName pgx.Identifier, columnNames []string, rowSrc pgx.CopyFromSource) (int64, error) {
+	if err := c.checkClosed(); err != nil {
+		return -1, err
+	}
+
 	ex, err := findExpectationFunc(c, "CopyFrom()", func(copyExp *ExpectedCopyFrom) error {
 		if !reflect.DeepEqual(copyExp.expectedTableName, tableName) {
 			return fmt.Errorf("CopyFrom: table name '%s' was not expected, expected table name is '%s'", tableName, copyExp.expectedTableName)
@@ -357,6 +376,10 @@ func (c *pgxmock) CopyFrom(ctx context.Context, tableName pgx.Identifier, column
 }
 
 func (c *pgxmock) SendBatch(ctx context.Context, b *pgx.Batch) pgx.BatchResults {
+	if err := c.checkClosed(); err != nil {
+		return &batchResults{mock: c, batch: b, err: err}
+	}
+
 	ex, err := findExpectationFunc(c, "Batch()", func(batchExp *ExpectedBatch) error {
 		if len(batchExp.expectedQueries) != len(b.QueuedQueries) {
 			return fmt.Errorf("SendBatch: number of queries in batch '%d' was not expected, expected number of queries is '%d'",
@@ -396,6 +419,10 @@ func (c *pgxmock) Begin(ctx context.Context) (pgx.Tx, error) {
 }
 
 func (c *pgxmock) BeginTx(ctx context.Context, txOptions pgx.TxOptions) (pgx.Tx, error) {
+	if err := c.checkClosed(); err != nil {
+		return nil, err
+	}
+
 	ex, err := findExpectationFunc(c, "BeginTx()", func(beginExp *ExpectedBegin) error {
 		if beginExp.opts != txOptions {
 			return fmt.Errorf("BeginTx: call with transaction options '%v' was not expected: %s", txOptions, beginExp)
@@ -412,6 +439,10 @@ func (c *pgxmock) BeginTx(ctx context.Context, txOptions pgx.TxOptions) (pgx.Tx,
 }
 
 func (c *pgxmock) Prepare(ctx context.Context, name, query string) (*pgconn.StatementDescription, error) {
+	if err := c.checkClosed(); err != nil {
+		return nil, err
+	}
+
 	ex, err := findExpectationFunc(c, "Prepare()", func(prepareExp *ExpectedPrepare) error {
 		if err := c.queryMatcher.Match(prepareExp.expectSQL, query); err != nil {
 			return err
@@ -431,6 +462,10 @@ func (c *pgxmock) Prepare(ctx context.Context, name, query string) (*pgconn.Stat
 }
 
 func (c *pgxmock) Deallocate(ctx context.Context, name string) error {
+	if err := c.checkClosed(); err != nil {
+		return err
+	}
+
 	ex, err := findExpectationFunc(c, "Deallocate()", func(deallocateExp *ExpectedDeallocate) error {
 		if deallocateExp.expectAll {
 			return fmt.Errorf("Deallocate: all prepared statements were expected to be deallocated, instead only '%s' specified", name)
@@ -447,6 +482,10 @@ func (c *pgxmock) Deallocate(ctx context.Context, name string) error {
 }
 
 func (c *pgxmock) DeallocateAll(ctx context.Context) error {
+	if err := c.checkClosed(); err != nil {
+		return err
+	}
+
 	ex, err := findExpectationFunc(c, "DeallocateAll()", func(deallocateExp *ExpectedDeallocate) error {
 		if !deallocateExp.expectAll {
 			return fmt.Errorf("Deallocate: deallocate all prepared statements was not expected, expected name is '%s'", deallocateExp.expectStmtName)
@@ -460,6 +499,10 @@ func (c *pgxmock) DeallocateAll(ctx context.Context) error {
 }
 
 func (c *pgxmock) Commit(ctx context.Context) error {
+	if err := c.checkClosed(); err != nil {
+		return err
+	}
+
 	ex, err := findExpectation[*ExpectedCommit](c, "Commit()")
 	if err != nil {
 		return err
@@ -468,6 +511,10 @@ func (c *pgxmock) Commit(ctx context.Context) error {
 }
 
 func (c *pgxmock) Rollback(ctx context.Context) error {
+	if err := c.checkClosed(); err != nil {
+		return err
+	}
+
 	ex, err := findExpectation[*ExpectedRollback](c, "Rollback()")
 	if err != nil {
 		return err
@@ -477,6 +524,10 @@ func (c *pgxmock) Rollback(ctx context.Context) error {
 
 // Implement the "QueryerContext" interface
 func (c *pgxmock) Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error) {
+	if err := c.checkClosed(); err != nil {
+		return &errRows{err: err}, err
+	}
+
 	ex, err := findExpectationFunc(c, "Query()", func(queryExp *ExpectedQuery) error {
 		if err := c.queryMatcher.Match(queryExp.expectSQL, sql); err != nil {
 			return err
@@ -536,6 +587,10 @@ func (c *pgxmock) QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 }
 
 func (c *pgxmock) Exec(ctx context.Context, query string, args ...any) (pgconn.CommandTag, error) {
+	if err := c.checkClosed(); err != nil {
+		return pgconn.NewCommandTag(""), err
+	}
+
 	ex, err := findExpectationFunc(c, "Exec()", func(execExp *ExpectedExec) error {
 		if err := c.queryMatcher.Match(execExp.expectSQL, query); err != nil {
 			return err
@@ -559,6 +614,10 @@ func (c *pgxmock) Exec(ctx context.Context, query string, args ...any) (pgconn.C
 }
 
 func (c *pgxmock) Ping(ctx context.Context) (err error) {
+	if err := c.checkClosed(); err != nil {
+		return err
+	}
+
 	ex, err := findExpectation[*ExpectedPing](c, "Ping()")
 	if err != nil {
 		return err
