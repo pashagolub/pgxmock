@@ -14,9 +14,9 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-// CSVColumnParser is a function which converts trimmed csv
-// column string to a []byte representation. Currently
-// transforms NULL to nil
+// CSVColumnParser converts a trimmed csv column string to the value stored in
+// the row. It maps the literal NULL, in any case, to nil and passes anything
+// else through as a string. Replace it to parse CSV columns differently.
 var CSVColumnParser = func(s string) any {
 	switch {
 	case strings.ToLower(s) == "null":
@@ -216,7 +216,7 @@ func getTypeMap() *pgtype.Map {
 //
 // It is expected that if you are testing with RawValues, you know what you're
 // doing in terms of how postgres will marshal certain data types into binary
-// format, such as numarics, dates, and timestamps, etc.
+// format, such as numerics, dates, and timestamps, etc.
 //
 // See https://github.com/jackc/pgx/tree/ac0b46f2f9538baa74aeac931d97884e5b9c924d/pgtype
 func (rs *rowSets) RawValues() [][]byte {
@@ -286,10 +286,9 @@ type Rows struct {
 	closed     bool
 }
 
-// NewRows allows Rows to be created from a
-// sql interface{} slice or from the CSV string and
-// to be used as sql driver.Rows.
-// Use pgxmock.NewRows instead if using a custom converter
+// NewRows allows Rows to be created from a slice of column names. Values are
+// then added with Rows.AddRow, Rows.AddRows or Rows.FromCSVString. Use
+// NewRowsWithColumnDefinition when the columns need metadata beyond a name.
 func NewRows(columns []string) *Rows {
 	var coldefs []pgconn.FieldDescription
 	for _, column := range columns {

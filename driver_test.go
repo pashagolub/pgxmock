@@ -35,7 +35,7 @@ func TestPools(t *testing.T) {
 	}
 	conn := mock.AsConn()
 	if conn == nil {
-		t.Error("expected connection strruct, but got nil")
+		t.Error("expected connection struct, but got nil")
 	}
 	mock.Close()
 	mock2.Close()

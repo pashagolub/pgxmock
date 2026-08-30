@@ -212,7 +212,7 @@ func (e *ExpectedCommit) String() string {
 	return "ExpectedCommit => expecting call to Tx.Commit()\n" + e.commonExpectation.String()
 }
 
-// ExpectedExec is used to manage pgx.Exec, pgx.Tx.Exec or pgx.Stmt.Exec expectations.
+// ExpectedExec is used to manage pgx.Conn.Exec and pgx.Tx.Exec expectations.
 // Returned by pgxmock.ExpectExec.
 type ExpectedExec struct {
 	commonExpectation
@@ -345,8 +345,8 @@ func (e *ExpectedPing) String() string {
 	return msg + e.commonExpectation.String()
 }
 
-// ExpectedQuery is used to manage *pgx.Conn.Query, *pgx.Conn.QueryRow, *pgx.Tx.Query,
-// *pgx.Tx.QueryRow, *pgx.Stmt.Query or *pgx.Stmt.QueryRow expectations
+// ExpectedQuery is used to manage pgx.Conn.Query, pgx.Conn.QueryRow,
+// pgx.Tx.Query and pgx.Tx.QueryRow expectations
 type ExpectedQuery struct {
 	commonExpectation
 	queryBasedExpectation
@@ -420,7 +420,7 @@ func (e *ExpectedQuery) freshRows() pgx.Rows {
 }
 
 // ExpectedCopyFrom is used to manage *pgx.Conn.CopyFrom expectations.
-// Returned by *Pgxmock.ExpectCopyFrom.
+// Returned by *pgxmock.ExpectCopyFrom.
 type ExpectedCopyFrom struct {
 	commonExpectation
 	expectedTableName pgx.Identifier
