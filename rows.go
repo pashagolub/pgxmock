@@ -1,6 +1,7 @@
 package pgxmock
 
 import (
+	"bytes"
 	"encoding/csv"
 	"errors"
 	"fmt"
@@ -247,6 +248,48 @@ func (t *lockedTypeMap) scan(oid uint32, format int16, src []byte, dest any) err
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	return t.m.Scan(oid, format, src, dest)
+}
+
+// equalValues reports whether expected and actual stand for the same value in
+// a column of type oid, by encoding both and comparing the wire form. That is
+// what makes an int compare equal to the int32 a CopyFromSource yielded, and a
+// time.Time equal to the same instant carrying a monotonic reading or a
+// different location: the server never sees a Go type, only the encoded value.
+//
+// Pass 0 for oid when the column declares no type, and the codec registered for
+// the expected value is used instead. Anything pgtype cannot encode falls back
+// to reflect.DeepEqual, which keeps the comparison working for types the type
+// map knows nothing about.
+func (t *lockedTypeMap) equalValues(oid uint32, expected, actual any) bool {
+	if expected == nil || actual == nil {
+		return expected == nil && actual == nil
+	}
+	if oid == 0 {
+		var ok bool
+		if oid, ok = t.oidForValue(expected); !ok {
+			return reflect.DeepEqual(expected, actual)
+		}
+	}
+	encodedExpected, err := t.encode(oid, pgtype.BinaryFormatCode, expected)
+	if err != nil {
+		return reflect.DeepEqual(expected, actual)
+	}
+	encodedActual, err := t.encode(oid, pgtype.BinaryFormatCode, actual)
+	if err != nil {
+		return reflect.DeepEqual(expected, actual)
+	}
+	return bytes.Equal(encodedExpected, encodedActual)
+}
+
+// oidForValue returns the OID pgtype would encode value as.
+func (t *lockedTypeMap) oidForValue(value any) (uint32, bool) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	typ, ok := t.m.TypeForValue(value)
+	if !ok {
+		return 0, false
+	}
+	return typ.OID, true
 }
 
 // scanViaTypeMap decodes value into dest through the pgtype codec registered

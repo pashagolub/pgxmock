@@ -236,7 +236,15 @@ func (c *pgxmock) ExpectationsWereMet() error {
 	for _, e := range c.expectations {
 		e.Lock()
 		fulfilled := e.fulfilled() || !e.required()
+		var copyRowsErr error
+		if copyFrom, ok := e.(*ExpectedCopyFrom); ok {
+			copyRowsErr = copyFrom.rowsErr
+		}
 		e.Unlock()
+
+		if copyRowsErr != nil {
+			return copyRowsErr
+		}
 
 		if !fulfilled {
 			return fmt.Errorf("there is a remaining expectation which was not matched: %s", e)
@@ -392,15 +400,30 @@ func (c *pgxmock) CopyFrom(ctx context.Context, tableName pgx.Identifier, column
 	if err != nil {
 		return -1, err
 	}
+	// a failed copy reports no rows: pgx returns the RowsAffected of a command
+	// tag it never received, and a COPY the server rejects commits nothing
+	var copied [][]any
 	for rowSrc.Next() {
-		if _, err := rowSrc.Values(); err != nil {
-			return ex.rowsAffected, err
+		values, err := rowSrc.Values()
+		if err != nil {
+			return 0, err
 		}
 		if rowSrc.Err() != nil {
-			return ex.rowsAffected, rowSrc.Err()
+			return 0, rowSrc.Err()
 		}
+		copied = append(copied, values)
 	}
-	return ex.rowsAffected, ex.waitForDelay(ctx)
+	if err := ex.rowsMatch(c.typeMap, copied); err != nil {
+		// the expectation was matched on table and columns and is already
+		// fulfilled by now, so the mismatch is kept for ExpectationsWereMet
+		// as well: a test that only checks the copied count still fails
+		ex.recordRowsError(err)
+		return 0, err
+	}
+	if err := ex.waitForDelay(ctx); err != nil {
+		return 0, err
+	}
+	return ex.rowsAffected, nil
 }
 
 func (c *pgxmock) SendBatch(ctx context.Context, b *pgx.Batch) pgx.BatchResults {
