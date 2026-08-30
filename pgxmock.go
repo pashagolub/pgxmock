@@ -490,7 +490,7 @@ func (c *pgxmock) Query(ctx context.Context, sql string, args ...any) (pgx.Rows,
 	if err != nil {
 		return &errRows{err: err}, err
 	}
-	return ex.rows, ex.waitForDelay(ctx)
+	return ex.freshRows(), ex.waitForDelay(ctx)
 }
 
 type errRows struct {
