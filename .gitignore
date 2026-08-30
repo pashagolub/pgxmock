@@ -8,13 +8,15 @@
 # Test binary, build with `go test -c`
 *.test
 
-# Output of the go coverage tool, specifically when used with LiteIDE
+# Coverage profiles: *.out covers `go test -coverprofile=coverage.out`,
+# *.cov matches profile.cov, the name the CI workflow writes.
 *.out
+*.cov
 
 # Visual Studio Code internal folder
 .vscode
 
-# Packages ouput folder
+# Packages output folder
 dist
 
 # delve debugger file
