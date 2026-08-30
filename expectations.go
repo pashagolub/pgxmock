@@ -24,7 +24,12 @@ type expectation interface {
 	fmt.Stringer
 }
 
-// CallModifier interface represents common interface for all expectations supported
+// CallModifier interface represents common interface for all expectations supported.
+//
+// Every expectation type also declares these methods returning its own
+// concrete type, so they can be chained with the type-specific builders in any
+// order; see modifiers.go. The interface remains for code that wants to treat
+// the modifiers uniformly.
 type CallModifier interface {
 	// Maybe allows the expected method call to be optional.
 	// Not calling an optional method will not cause an error while asserting expectations
