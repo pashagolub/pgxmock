@@ -81,7 +81,7 @@ func (rs *rowSets) FieldDescriptions() []pgconn.FieldDescription {
 
 func (rs *rowSets) Close() {
 	if rs.ex != nil {
-		rs.ex.rowsWereClosed = true
+		rs.ex.rowsWereClosed.Store(true)
 	}
 	rs.close()
 }

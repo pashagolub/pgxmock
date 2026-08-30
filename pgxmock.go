@@ -6,6 +6,18 @@ database connection. It helps to maintain correct **TDD** workflow.
 It does not require (almost) any modifications to your source code in order to test
 and mock database operations. Supports concurrency and multiple database mocking.
 
+# Concurrency
+
+A mock may be driven from several goroutines at once, and an expectation
+matched by more than one of them (see MatchExpectationsInOrder and
+CallModifier.Times). Every call receives its own cursor over the mocked rows,
+so concurrent readers do not disturb each other.
+
+Each expectation must be fully configured before the code under test can reach
+it, though: the builder methods (WillReturnRows, WillReturnError, ...) mutate
+the expectation after ExpectQuery and friends have already published it. Set an
+expectation up completely, then start the goroutines that will match it.
+
 The driver allows to mock any pgx driver method behavior.
 */
 package pgxmock
@@ -15,6 +27,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"sync"
 
 	pgx "github.com/jackc/pgx/v5"
 	pgconn "github.com/jackc/pgx/v5/pgconn"
@@ -140,9 +153,21 @@ type PgxPoolIface interface {
 }
 
 type pgxmock struct {
+	// mu guards ordered and the expectations slice, so that expectations may
+	// be declared and matched from several goroutines at once. Individual
+	// expectations carry their own lock for their mutable state.
+	mu           sync.RWMutex
 	ordered      bool
 	queryMatcher QueryMatcher
 	expectations []expectation
+}
+
+// addExpectation appends e to the expectation list and returns it.
+func addExpectation[E expectation](c *pgxmock, e E) E {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.expectations = append(c.expectations, e)
+	return e
 }
 
 func (c *pgxmock) AcquireAllIdle(_ context.Context) []*pgxpool.Conn {
@@ -155,22 +180,22 @@ func (c *pgxmock) AcquireFunc(_ context.Context, _ func(*pgxpool.Conn) error) er
 
 // region Expectations
 func (c *pgxmock) ExpectBatch() *ExpectedBatch {
-	e := &ExpectedBatch{mock: c}
-	c.expectations = append(c.expectations, e)
-	return e
+	return addExpectation(c, &ExpectedBatch{mock: c})
 }
 
 func (c *pgxmock) ExpectClose() *ExpectedClose {
-	e := &ExpectedClose{}
-	c.expectations = append(c.expectations, e)
-	return e
+	return addExpectation(c, &ExpectedClose{})
 }
 
 func (c *pgxmock) MatchExpectationsInOrder(b bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.ordered = b
 }
 
 func (c *pgxmock) ExpectationsWereMet() error {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	for _, e := range c.expectations {
 		e.Lock()
 		fulfilled := e.fulfilled() || !e.required()
@@ -182,7 +207,7 @@ func (c *pgxmock) ExpectationsWereMet() error {
 
 		// must check whether all expected queried rows are closed
 		if query, ok := e.(*ExpectedQuery); ok {
-			if query.rowsMustBeClosed && !query.rowsWereClosed {
+			if query.rowsMustBeClosed && !query.rowsWereClosed.Load() {
 				return fmt.Errorf("expected query rows to be closed, but it was not: %s", query)
 			}
 		}
@@ -193,76 +218,54 @@ func (c *pgxmock) ExpectationsWereMet() error {
 func (c *pgxmock) ExpectQuery(expectedSQL string) *ExpectedQuery {
 	e := &ExpectedQuery{}
 	e.expectSQL = expectedSQL
-	c.expectations = append(c.expectations, e)
-	return e
+	return addExpectation(c, e)
 }
 
 func (c *pgxmock) ExpectCommit() *ExpectedCommit {
-	e := &ExpectedCommit{}
-	c.expectations = append(c.expectations, e)
-	return e
+	return addExpectation(c, &ExpectedCommit{})
 }
 
 func (c *pgxmock) ExpectRollback() *ExpectedRollback {
-	e := &ExpectedRollback{}
-	c.expectations = append(c.expectations, e)
-	return e
+	return addExpectation(c, &ExpectedRollback{})
 }
 
 func (c *pgxmock) ExpectBegin() *ExpectedBegin {
-	e := &ExpectedBegin{}
-	c.expectations = append(c.expectations, e)
-	return e
+	return addExpectation(c, &ExpectedBegin{})
 }
 
 func (c *pgxmock) ExpectBeginTx(txOptions pgx.TxOptions) *ExpectedBegin {
-	e := &ExpectedBegin{opts: txOptions}
-	c.expectations = append(c.expectations, e)
-	return e
+	return addExpectation(c, &ExpectedBegin{opts: txOptions})
 }
 
 func (c *pgxmock) ExpectExec(expectedSQL string) *ExpectedExec {
 	e := &ExpectedExec{}
 	e.expectSQL = expectedSQL
-	c.expectations = append(c.expectations, e)
-	return e
+	return addExpectation(c, e)
 }
 
 func (c *pgxmock) ExpectCopyFrom(expectedTableName pgx.Identifier, expectedColumns []string) *ExpectedCopyFrom {
-	e := &ExpectedCopyFrom{expectedTableName: expectedTableName, expectedColumns: expectedColumns}
-	c.expectations = append(c.expectations, e)
-	return e
+	return addExpectation(c, &ExpectedCopyFrom{expectedTableName: expectedTableName, expectedColumns: expectedColumns})
 }
 
 // ExpectReset expects Reset to be called.
 func (c *pgxmock) ExpectReset() *ExpectedReset {
-	e := &ExpectedReset{}
-	c.expectations = append(c.expectations, e)
-	return e
+	return addExpectation(c, &ExpectedReset{})
 }
 
 func (c *pgxmock) ExpectPing() *ExpectedPing {
-	e := &ExpectedPing{}
-	c.expectations = append(c.expectations, e)
-	return e
+	return addExpectation(c, &ExpectedPing{})
 }
 
 func (c *pgxmock) ExpectPrepare(expectedStmtName, expectedSQL string) *ExpectedPrepare {
-	e := &ExpectedPrepare{expectSQL: expectedSQL, expectStmtName: expectedStmtName}
-	c.expectations = append(c.expectations, e)
-	return e
+	return addExpectation(c, &ExpectedPrepare{expectSQL: expectedSQL, expectStmtName: expectedStmtName})
 }
 
 func (c *pgxmock) ExpectDeallocate(expectedStmtName string) *ExpectedDeallocate {
-	e := &ExpectedDeallocate{expectStmtName: expectedStmtName}
-	c.expectations = append(c.expectations, e)
-	return e
+	return addExpectation(c, &ExpectedDeallocate{expectStmtName: expectedStmtName})
 }
 
 func (c *pgxmock) ExpectDeallocateAll() *ExpectedDeallocate {
-	e := &ExpectedDeallocate{expectAll: true}
-	c.expectations = append(c.expectations, e)
-	return e
+	return addExpectation(c, &ExpectedDeallocate{expectAll: true})
 }
 
 //endregion Expectations
@@ -566,6 +569,9 @@ type expectationType[t any] interface {
 }
 
 func findExpectationFunc[ET expectationType[t], t any](c *pgxmock, method string, cmp func(ET) error) (ET, error) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
 	var expected ET
 	var fulfilled int
 	var ok bool

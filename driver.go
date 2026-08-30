@@ -9,14 +9,13 @@ import (
 )
 
 type pgxmockConn struct {
-	pgxmock
+	*pgxmock
 }
 
 // NewConn creates PgxConnIface database connection and a mock to manage expectations.
 // Accepts options, like QueryMatcherOption, to match SQL query strings in more sophisticated ways.
 func NewConn(options ...func(*pgxmock) error) (PgxConnIface, error) {
-	smock := &pgxmockConn{}
-	smock.ordered = true
+	smock := &pgxmockConn{pgxmock: &pgxmock{ordered: true}}
 	return smock, smock.open(options)
 }
 
@@ -25,14 +24,13 @@ func (c *pgxmockConn) Config() *pgx.ConnConfig {
 }
 
 type pgxmockPool struct {
-	pgxmock
+	*pgxmock
 }
 
 // NewPool creates PgxPoolIface pool of database connections and a mock to manage expectations.
 // Accepts options, like QueryMatcherOption, to match SQL query strings in more sophisticated ways.
 func NewPool(options ...func(*pgxmock) error) (PgxPoolIface, error) {
-	smock := &pgxmockPool{}
-	smock.ordered = true
+	smock := &pgxmockPool{pgxmock: &pgxmock{ordered: true}}
 	return smock, smock.open(options)
 }
 
@@ -48,7 +46,9 @@ func (p *pgxmockPool) Config() *pgxpool.Config {
 	return &pgxpool.Config{ConnConfig: &pgx.ConnConfig{}}
 }
 
-// AsConn is similar to Acquire but returns proper mocking interface
+// AsConn is similar to Acquire but returns proper mocking interface.
+// The returned connection shares the expectations of the pool it came from,
+// so expectations may be set on either one.
 func (p *pgxmockPool) AsConn() PgxConnIface {
 	return &pgxmockConn{pgxmock: p.pgxmock}
 }
