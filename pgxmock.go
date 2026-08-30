@@ -493,7 +493,13 @@ func (c *pgxmock) Query(ctx context.Context, sql string, args ...any) (pgx.Rows,
 	if err != nil {
 		return &errRows{err: err}, err
 	}
-	return ex.freshRows(), ex.waitForDelay(ctx)
+	err = ex.waitForDelay(ctx)
+	if ex.rows == nil {
+		// pgx never hands back a nil Rows, not even on error, so that
+		// `rows, err := conn.Query(...); defer rows.Close()` is safe.
+		return &errRows{err: err}, err
+	}
+	return ex.freshRows(), err
 }
 
 type errRows struct {
