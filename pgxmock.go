@@ -345,13 +345,19 @@ func (c *pgxmock) CopyFrom(ctx context.Context, tableName pgx.Identifier, column
 	if err != nil {
 		return -1, err
 	}
+	var copied [][]any
 	for rowSrc.Next() {
-		if _, err := rowSrc.Values(); err != nil {
+		values, err := rowSrc.Values()
+		if err != nil {
 			return ex.rowsAffected, err
 		}
 		if rowSrc.Err() != nil {
 			return ex.rowsAffected, rowSrc.Err()
 		}
+		copied = append(copied, values)
+	}
+	if err := ex.rowsMatch(copied); err != nil {
+		return ex.rowsAffected, err
 	}
 	return ex.rowsAffected, ex.waitForDelay(ctx)
 }

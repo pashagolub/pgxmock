@@ -425,7 +425,66 @@ type ExpectedCopyFrom struct {
 	commonExpectation
 	expectedTableName pgx.Identifier
 	expectedColumns   []string
+	expectedRows      [][]any
+	matchRows         bool
 	rowsAffected      int64
+}
+
+// WithRows will match the rows the pgx.CopyFromSource yields against the
+// expected ones. Without it the copied data is drained and discarded, so a
+// test cannot tell what its code actually sent.
+//
+// Values are compared the way query arguments are, so an Argument matcher such
+// as AnyArg may stand in for a value that is not predictable:
+//
+//	mock.ExpectCopyFrom(pgx.Identifier{"users"}, []string{"name", "created"}).
+//		WithRows(
+//			[]any{"alice", pgxmock.AnyArg()},
+//			[]any{"bob", pgxmock.AnyArg()},
+//		).
+//		WillReturnResult(2)
+//
+// The rows are checked after the expectation has been matched on table name
+// and columns, since the source has to be consumed to see them. The number of
+// rows reported as copied still comes from WillReturnResult.
+func (e *ExpectedCopyFrom) WithRows(rows ...[]any) *ExpectedCopyFrom {
+	e.expectedRows = rows
+	// recorded separately, so that WithRows() with no rows asserts that
+	// nothing was copied rather than reading as "no expectation set"
+	e.matchRows = true
+	return e
+}
+
+// rowsMatch compares the rows a CopyFromSource produced against WithRows.
+func (e *ExpectedCopyFrom) rowsMatch(copied [][]any) error {
+	if !e.matchRows {
+		return nil
+	}
+	if len(copied) != len(e.expectedRows) {
+		return fmt.Errorf("CopyFrom: expected %d row(s) to be copied, but got %d",
+			len(e.expectedRows), len(copied))
+	}
+	for i, row := range copied {
+		expected := e.expectedRows[i]
+		if len(row) != len(expected) {
+			return fmt.Errorf("CopyFrom: row %d expected %d value(s), but got %d",
+				i, len(expected), len(row))
+		}
+		for j, v := range row {
+			if matcher, ok := expected[j].(Argument); ok {
+				if !matcher.Match(v) {
+					return fmt.Errorf("CopyFrom: matcher %T could not match value %d of row %d [%T - %+v]",
+						matcher, j, i, v, v)
+				}
+				continue
+			}
+			if !reflect.DeepEqual(expected[j], v) {
+				return fmt.Errorf("CopyFrom: value %d of row %d expected [%T - %+v] does not match actual [%T - %+v]",
+					j, i, expected[j], expected[j], v, v)
+			}
+		}
+	}
+	return nil
 }
 
 // String returns string representation
@@ -433,6 +492,12 @@ func (e *ExpectedCopyFrom) String() string {
 	msg := "ExpectedCopyFrom => expecting CopyFrom which:"
 	msg += "\n  - matches table name: '" + e.expectedTableName.Sanitize() + "'"
 	msg += fmt.Sprintf("\n  - matches column names: '%+v'", e.expectedColumns)
+	if e.matchRows {
+		msg += fmt.Sprintf("\n  - matches %d row(s):", len(e.expectedRows))
+		for i, row := range e.expectedRows {
+			msg += fmt.Sprintf("\n      row %d - %+v", i, row)
+		}
+	}
 
 	if e.err != nil {
 		msg += fmt.Sprintf("\n  - should returns error: %s", e.err)
