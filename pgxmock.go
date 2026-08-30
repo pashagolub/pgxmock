@@ -92,6 +92,11 @@ type Expecter interface {
 	// The *ExpectedPing allows to mock database response
 	ExpectPing() *ExpectedPing
 
+	// ExpectWaitForNotification expects WaitForNotification() to be called.
+	// The *ExpectedWaitForNotification allows to mock the LISTEN/NOTIFY
+	// message the connection receives.
+	ExpectWaitForNotification() *ExpectedWaitForNotification
+
 	// ExpectCopyFrom expects pgx.CopyFrom to be called.
 	// The *ExpectCopyFrom allows to mock database response
 	ExpectCopyFrom(expectedTableName pgx.Identifier, expectedColumns []string) *ExpectedCopyFrom
@@ -134,6 +139,7 @@ type PgxCommonIface interface {
 type PgxConnIface interface {
 	PgxCommonIface
 	Close(ctx context.Context) error
+	WaitForNotification(ctx context.Context) (*pgconn.Notification, error)
 	Deallocate(ctx context.Context, name string) error
 	DeallocateAll(ctx context.Context) error
 	Config() *pgx.ConnConfig
@@ -255,6 +261,10 @@ func (c *pgxmock) ExpectReset() *ExpectedReset {
 
 func (c *pgxmock) ExpectPing() *ExpectedPing {
 	return addExpectation(c, &ExpectedPing{})
+}
+
+func (c *pgxmock) ExpectWaitForNotification() *ExpectedWaitForNotification {
+	return addExpectation(c, &ExpectedWaitForNotification{})
 }
 
 func (c *pgxmock) ExpectPrepare(expectedStmtName, expectedSQL string) *ExpectedPrepare {
@@ -556,6 +566,22 @@ func (c *pgxmock) Exec(ctx context.Context, query string, args ...any) (pgconn.C
 		return pgconn.NewCommandTag(""), err
 	}
 	return ex.result, ex.waitForDelay(ctx)
+}
+
+// WaitForNotification waits for a LISTEN/NOTIFY message from the server.
+//
+// A cancelled or expired context is honoured while waiting, so a test can
+// combine WillDelayFor with a context deadline to exercise the timeout path
+// that pgx code normally takes around this call.
+func (c *pgxmock) WaitForNotification(ctx context.Context) (*pgconn.Notification, error) {
+	ex, err := findExpectation[*ExpectedWaitForNotification](c, "WaitForNotification()")
+	if err != nil {
+		return nil, err
+	}
+	if err := ex.waitForDelay(ctx); err != nil {
+		return nil, err
+	}
+	return ex.notification, nil
 }
 
 func (c *pgxmock) Ping(ctx context.Context) (err error) {
