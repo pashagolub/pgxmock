@@ -137,25 +137,80 @@ type queryBasedExpectation struct {
 	args               []any
 }
 
-func (e *queryBasedExpectation) argsMatches(sql string, args []any) (rewrittenSQL string, err error) {
-	eargs := e.args
-	// check for any QueryRewriter arguments: only supported as the first argument
-	if len(args) == 1 {
-		if qrw, ok := args[0].(pgx.QueryRewriter); ok {
-			// note: pgx.Conn is not currently used by the query rewriter
-			if rewrittenSQL, args, err = qrw.RewriteQuery(context.Background(), nil, sql, args); err != nil {
-				return rewrittenSQL, fmt.Errorf("error rewriting query: %w", err)
+// queryOption identifies a kind of pgx option value that may be passed ahead of
+// the real query arguments.
+type queryOption uint8
+
+const (
+	optRewriter queryOption = 1 << iota
+	optExecMode
+	optResultFormats
+
+	// optsQuery, optsExec and optsBatch mirror the option loops in pgx's
+	// Conn.Query, Conn.exec and Conn.SendBatch respectively. The sets differ,
+	// and an option a method does not consume stays a plain query argument.
+	optsQuery = optRewriter | optExecMode | optResultFormats
+	optsExec  = optRewriter | optExecMode
+	optsBatch = optRewriter
+)
+
+// splitQueryOptions consumes the leading pgx option values that a query method
+// accepts before its real arguments and returns the query rewriter among them,
+// if any, together with the remaining arguments. It mirrors the option loop
+// pgx runs, so that an expectation only has to describe the actual query
+// parameters and never the options.
+func splitQueryOptions(args []any, allowed queryOption) (rewriter pgx.QueryRewriter, rest []any) {
+	rest = args
+optionLoop:
+	for len(rest) > 0 {
+		switch arg := rest[0].(type) {
+		case pgx.QueryResultFormats:
+			if allowed&optResultFormats == 0 {
+				break optionLoop
 			}
-		}
-		// also do rewriting on the expected args if a QueryRewriter is present
-		if len(eargs) == 1 {
-			if qrw, ok := eargs[0].(pgx.QueryRewriter); ok {
-				if _, eargs, err = qrw.RewriteQuery(context.Background(), nil, sql, eargs); err != nil {
-					return "", fmt.Errorf("error rewriting query expectation: %w", err)
-				}
+		case pgx.QueryResultFormatsByOID:
+			if allowed&optResultFormats == 0 {
+				break optionLoop
 			}
+		case pgx.QueryExecMode:
+			if allowed&optExecMode == 0 {
+				break optionLoop
+			}
+		case pgx.QueryRewriter:
+			if allowed&optRewriter == 0 {
+				break optionLoop
+			}
+			rewriter = arg
+		default:
+			break optionLoop
 		}
+		rest = rest[1:]
 	}
+	return rewriter, rest
+}
+
+// rewrite applies rewriter, if there is one, the way pgx would.
+func rewrite(rewriter pgx.QueryRewriter, sql string, args []any) (string, []any, error) {
+	if rewriter == nil {
+		return "", args, nil
+	}
+	// note: pgx.Conn is not currently used by the query rewriter
+	return rewriter.RewriteQuery(context.Background(), nil, sql, args)
+}
+
+func (e *queryBasedExpectation) argsMatches(sql string, args []any, allowed queryOption) (rewrittenSQL string, err error) {
+	rewriter, args := splitQueryOptions(args, allowed)
+	if rewrittenSQL, args, err = rewrite(rewriter, sql, args); err != nil {
+		return rewrittenSQL, fmt.Errorf("error rewriting query: %w", err)
+	}
+
+	// the expectation may be written with a rewriter too, e.g.
+	// WithArgs(pgx.NamedArgs{...}), in which case it is expanded the same way
+	eRewriter, eargs := splitQueryOptions(e.args, allowed)
+	if _, eargs, err = rewrite(eRewriter, sql, eargs); err != nil {
+		return rewrittenSQL, fmt.Errorf("error rewriting query expectation: %w", err)
+	}
+
 	if len(args) != len(eargs) {
 		return rewrittenSQL, fmt.Errorf("expected %d, but got %d arguments", len(eargs), len(args))
 	}

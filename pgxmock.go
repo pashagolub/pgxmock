@@ -369,7 +369,7 @@ func (c *pgxmock) SendBatch(ctx context.Context, b *pgx.Batch) pgx.BatchResults 
 			if err := c.queryMatcher.Match(batchExp.expectedQueries[i].expectSQL, query.SQL); err != nil {
 				return err
 			}
-			if rewrittenSQL, err := batchExp.expectedQueries[i].argsMatches(query.SQL, query.Arguments); err != nil {
+			if rewrittenSQL, err := batchExp.expectedQueries[i].argsMatches(query.SQL, query.Arguments, optsBatch); err != nil {
 				return err
 			} else if rewrittenSQL != "" && batchExp.expectedQueries[i].expectRewrittenSQL != "" {
 				if err := c.queryMatcher.Match(batchExp.expectedQueries[i].expectRewrittenSQL, rewrittenSQL); err != nil {
@@ -481,7 +481,7 @@ func (c *pgxmock) Query(ctx context.Context, sql string, args ...any) (pgx.Rows,
 		if err := c.queryMatcher.Match(queryExp.expectSQL, sql); err != nil {
 			return err
 		}
-		if rewrittenSQL, err := queryExp.argsMatches(sql, args); err != nil {
+		if rewrittenSQL, err := queryExp.argsMatches(sql, args, optsQuery); err != nil {
 			return err
 		} else if rewrittenSQL != "" && queryExp.expectRewrittenSQL != "" {
 			if err := c.queryMatcher.Match(queryExp.expectRewrittenSQL, rewrittenSQL); err != nil {
@@ -540,7 +540,7 @@ func (c *pgxmock) Exec(ctx context.Context, query string, args ...any) (pgconn.C
 		if err := c.queryMatcher.Match(execExp.expectSQL, query); err != nil {
 			return err
 		}
-		if rewrittenSQL, err := execExp.argsMatches(query, args); err != nil {
+		if rewrittenSQL, err := execExp.argsMatches(query, args, optsExec); err != nil {
 			return err
 		} else if rewrittenSQL != "" && execExp.expectRewrittenSQL != "" {
 			if err := c.queryMatcher.Match(execExp.expectRewrittenSQL, rewrittenSQL); err != nil {
