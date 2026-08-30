@@ -31,6 +31,7 @@ import (
 
 	pgx "github.com/jackc/pgx/v5"
 	pgconn "github.com/jackc/pgx/v5/pgconn"
+	pgtype "github.com/jackc/pgx/v5/pgtype"
 	pgxpool "github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -138,6 +139,7 @@ type PgxConnIface interface {
 	DeallocateAll(ctx context.Context) error
 	Config() *pgx.ConnConfig
 	PgConn() *pgconn.PgConn
+	TypeMap() *pgtype.Map
 }
 
 // PgxPoolIface represents pgxpool.Pool specific interface
@@ -161,6 +163,21 @@ type pgxmock struct {
 	ordered      bool
 	queryMatcher QueryMatcher
 	expectations []expectation
+	typeMap      *lockedTypeMap
+}
+
+// TypeMap returns the pgtype.Map this mock decodes values with, the way
+// pgx.Conn.TypeMap does. Register custom types on it and the mock will honour
+// them when scanning columns whose FieldDescription carries a DataTypeOID:
+//
+//	col := mock.NewColumn("status")
+//	col.DataTypeOID = statusOID
+//	mock.TypeMap().RegisterType(&pgtype.Type{Name: "status", OID: statusOID, Codec: ...})
+//
+// A pgtype.Map is not safe for concurrent use, so register everything before
+// the code under test starts running.
+func (c *pgxmock) TypeMap() *pgtype.Map {
+	return c.typeMap.m
 }
 
 // addExpectation appends e to the expectation list and returns it.
@@ -303,6 +320,7 @@ func (c *pgxmock) NewColumn(name string) *pgconn.FieldDescription {
 
 // open a mock database driver connection
 func (c *pgxmock) open(options []func(*pgxmock) error) error {
+	c.typeMap = newLockedTypeMap()
 	for _, option := range options {
 		err := option(c)
 		if err != nil {
@@ -502,7 +520,12 @@ func (c *pgxmock) Query(ctx context.Context, sql string, args ...any) (pgx.Rows,
 		// `rows, err := conn.Query(...); defer rows.Close()` is safe.
 		return &errRows{err: err}, err
 	}
-	return ex.freshRows(), err
+	rows := ex.freshRows()
+	if rs, ok := rows.(*rowSets); ok {
+		// each call gets its own rowSets, so this is not shared state
+		rs.typeMap = c.typeMap
+	}
+	return rows, err
 }
 
 type errRows struct {

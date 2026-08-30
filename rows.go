@@ -56,6 +56,18 @@ type rowSets struct {
 	sets     []*Rows
 	RowSetNo int
 	ex       *ExpectedQuery
+	// typeMap is the type map of the mock these rows were returned by. It is
+	// nil for rows built outside a query, e.g. through Rows.Kind().
+	typeMap *lockedTypeMap
+}
+
+// getTypeMap returns the mock's type map, falling back to a shared default for
+// rows that were not produced by a query.
+func (rs *rowSets) getTypeMap() *lockedTypeMap {
+	if rs.typeMap != nil {
+		return rs.typeMap
+	}
+	return defaultTypeMap
 }
 
 func (rs *rowSets) Conn() *pgx.Conn {
@@ -165,6 +177,10 @@ func (rs *rowSets) Scan(dest ...any) error {
 			} else {
 				return fmt.Errorf("cannot set destination value for column %s", r.defs[i].Name)
 			}
+		} else if err := rs.scanViaTypeMap(r.defs[i], col, dest[i]); err == nil {
+			// a pgtype codec registered for the column's OID took it
+		} else if !errors.Is(err, errNoTypeMapping) {
+			return fmt.Errorf("scanning value error for column '%s': %w", string(r.defs[i].Name), err)
 		} else {
 			return fmt.Errorf("destination kind '%v' not supported for value kind '%v' of column '%s'",
 				destVal.Elem().Kind(), val.Kind(), string(r.defs[i].Name))
@@ -195,20 +211,60 @@ func scanNull(destVal reflect.Value, column string) error {
 	}
 }
 
-var pgtypeMapMutex sync.Mutex
+// errNoTypeMapping reports that a column carries no OID to decode it with, so
+// the caller should fall back to its own error.
+var errNoTypeMapping = errors.New("no pgtype mapping for column")
 
-// pgtypeMap is not safe to use concurrently, be sure to use pgtypeMapMutex when
-// accessing it
-var pgtypeMap *pgtype.Map
-
-// getTypeMap returns an existing pgtype.Map or creates a new one if it doesn't
-// exist. pgtypeMapMutex must be locked to call this function.
-func getTypeMap() *pgtype.Map {
-	if pgtypeMap == nil {
-		pgtypeMap = pgtype.NewMap()
-	}
-	return pgtypeMap
+// lockedTypeMap pairs a pgtype.Map with the lock it needs, since a
+// pgtype.Map is not safe for concurrent use. Every mock owns one, so
+// registering a type in one test cannot leak into another and parallel tests
+// do not serialise against each other.
+type lockedTypeMap struct {
+	mu sync.Mutex
+	m  *pgtype.Map
 }
+
+func newLockedTypeMap() *lockedTypeMap {
+	return &lockedTypeMap{m: pgtype.NewMap()}
+}
+
+// encode serialises value as the wire representation of oid.
+func (t *lockedTypeMap) encode(oid uint32, format int16, value any) ([]byte, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.m.Encode(oid, format, value, nil)
+}
+
+// scan decodes src into dest using the codec registered for oid.
+func (t *lockedTypeMap) scan(oid uint32, format int16, src []byte, dest any) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.m.Scan(oid, format, src, dest)
+}
+
+// scanViaTypeMap decodes value into dest through the pgtype codec registered
+// for the column's OID. The mocked rows hold Go values rather than wire bytes,
+// so the value is encoded and decoded again - the same round trip a real
+// connection performs, which is what makes a registered custom type behave
+// here as it does against a server.
+//
+// Columns without a DataTypeOID cannot be routed through pgtype at all and
+// report errNoTypeMapping.
+func (rs *rowSets) scanViaTypeMap(fd pgconn.FieldDescription, value, dest any) error {
+	if fd.DataTypeOID == 0 {
+		return errNoTypeMapping
+	}
+	m := rs.getTypeMap()
+	encoded, err := m.encode(fd.DataTypeOID, fd.Format, value)
+	if err != nil {
+		return err
+	}
+	return m.scan(fd.DataTypeOID, fd.Format, encoded, dest)
+}
+
+// defaultTypeMap serves rows that were not produced by a query and therefore
+// have no mock to borrow a type map from.
+var defaultTypeMap = newLockedTypeMap()
 
 // RawValues attempts to return the binary representation of the row values as
 // if postgres had returned them. RawValues will consolidate the column OIDs and
@@ -224,13 +280,9 @@ func (rs *rowSets) RawValues() [][]byte {
 	dest := make([][]byte, len(r.defs))
 	fd := rs.FieldDescriptions()
 
-	pgtypeMapMutex.Lock()
-	defer pgtypeMapMutex.Unlock()
-
+	m := rs.getTypeMap()
 	for i, col := range r.rows[r.recNo-1] {
-
-		encoded, err := getTypeMap().Encode(fd[i].DataTypeOID, fd[i].Format, col, nil)
-
+		encoded, err := m.encode(fd[i].DataTypeOID, fd[i].Format, col)
 		if err != nil {
 			// fallback to a %v conversion.
 			dest[i] = fmt.Appendf(nil, "%v", col)
