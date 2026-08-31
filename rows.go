@@ -4,6 +4,7 @@ import (
 	"encoding/csv"
 	"errors"
 	"fmt"
+	"maps"
 	"reflect"
 	"strings"
 	"sync"
@@ -80,7 +81,7 @@ func (rs *rowSets) FieldDescriptions() []pgconn.FieldDescription {
 
 func (rs *rowSets) Close() {
 	if rs.ex != nil {
-		rs.ex.rowsWereClosed = true
+		rs.ex.rowsWereClosed.Store(true)
 	}
 	rs.close()
 }
@@ -141,7 +142,9 @@ func (rs *rowSets) Scan(dest ...any) error {
 			return fmt.Errorf("destination argument must be a pointer for column %s", r.defs[i].Name)
 		}
 		if col == nil {
-			dest[i] = nil
+			if err := scanNull(destVal, string(r.defs[i].Name)); err != nil {
+				return err
+			}
 			continue
 		}
 		val := reflect.ValueOf(col)
@@ -168,6 +171,28 @@ func (rs *rowSets) Scan(dest ...any) error {
 		}
 	}
 	return r.nextErr[r.recNo-1]
+}
+
+// scanNull assigns a SQL NULL to dest, mirroring how pgx treats NULL values:
+// an sql.Scanner is handed a nil, destinations that can represent nil are set
+// to their zero value, and anything else is rejected rather than left holding
+// whatever it happened to contain before the scan.
+func scanNull(destVal reflect.Value, column string) error {
+	if scanner, ok := destVal.Interface().(interface{ Scan(any) error }); ok {
+		return scanner.Scan(nil)
+	}
+	elem := destVal.Elem()
+	switch elem.Kind() {
+	case reflect.Pointer, reflect.Interface, reflect.Map, reflect.Slice,
+		reflect.Func, reflect.Chan, reflect.UnsafePointer:
+		if !elem.CanSet() {
+			return fmt.Errorf("cannot set destination value for column %s", column)
+		}
+		elem.Set(reflect.Zero(elem.Type()))
+		return nil
+	default:
+		return fmt.Errorf("cannot scan NULL into %s for column '%s'", destVal.Type(), column)
+	}
 }
 
 var pgtypeMapMutex sync.Mutex
@@ -358,4 +383,15 @@ func NewRowsWithColumnDefinition(columns ...pgconn.FieldDescription) *Rows {
 		defs:    columns,
 		nextErr: make(map[int]error),
 	}
+}
+
+// clone returns a copy of r that can be iterated independently of the
+// original. Column definitions and row values are immutable once the
+// expectation is set up, so they are shared; the per-iteration cursor state
+// is not.
+func (r *Rows) clone() *Rows {
+	c := *r
+	c.nextErr = make(map[int]error, len(r.nextErr))
+	maps.Copy(c.nextErr, r.nextErr)
+	return &c
 }
