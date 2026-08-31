@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	pgx "github.com/jackc/pgx/v5"
@@ -278,8 +279,7 @@ func (e *ExpectedBatch) ExpectExec(query string) *ExpectedExec {
 	ee := &ExpectedExec{}
 	ee.expectSQL = query
 	e.expectedQueries = append(e.expectedQueries, &ee.queryBasedExpectation)
-	e.mock.expectations = append(e.mock.expectations, ee)
-	return ee
+	return addExpectation(e.mock, ee)
 }
 
 // ExpectQuery allows to expect Queue().Query() or Queue().QueryRow() on this batch.
@@ -287,8 +287,7 @@ func (e *ExpectedBatch) ExpectQuery(query string) *ExpectedQuery {
 	eq := &ExpectedQuery{}
 	eq.expectSQL = query
 	e.expectedQueries = append(e.expectedQueries, &eq.queryBasedExpectation)
-	e.mock.expectations = append(e.mock.expectations, eq)
-	return eq
+	return addExpectation(e.mock, eq)
 }
 
 // String returns string representation
@@ -353,7 +352,7 @@ type ExpectedQuery struct {
 	queryBasedExpectation
 	rows             pgx.Rows
 	rowsMustBeClosed bool
-	rowsWereClosed   bool
+	rowsWereClosed   atomic.Bool
 }
 
 // WithArgs will match given expected args to actual database query arguments.
