@@ -1266,7 +1266,7 @@ func TestUnmockedMethods(t *testing.T) {
 	a.NotNil(mock.Config())
 	a.NotNil(mock.AsConn().Config())
 	a.NotNil(mock.AcquireAllIdle(ctx))
-	a.Nil(mock.AcquireFunc(ctx, func(*pgxpool.Conn) error { return nil }))
+	a.ErrorIs(mock.AcquireFunc(ctx, func(*pgxpool.Conn) error { return nil }), ErrAcquireNotSupported)
 	a.Zero(mock.LargeObjects())
 	a.Panics(func() { _ = mock.Conn() })
 }

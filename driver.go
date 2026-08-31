@@ -38,8 +38,27 @@ func (p *pgxmockPool) Close() {
 	p.pgxmock.Close(context.Background())
 }
 
+// ErrAcquireNotSupported is returned by the pool methods that would have to
+// hand out a *pgxpool.Conn. That is a concrete type whose internals cannot be
+// constructed outside of pgxpool, so it cannot be mocked. Use
+// PgxPoolIface.AsConn to get a mock connection instead.
+var ErrAcquireNotSupported = errors.New("pgxmock: handing out a *pgxpool.Conn is not supported, use PgxPoolIface.AsConn() instead")
+
+// Acquire is not supported, see ErrAcquireNotSupported.
 func (p *pgxmockPool) Acquire(context.Context) (*pgxpool.Conn, error) {
-	return nil, errors.New("pgpool.Acquire() method is not implemented")
+	return nil, ErrAcquireNotSupported
+}
+
+// AcquireFunc is not supported, see ErrAcquireNotSupported. It reports the
+// error instead of invoking f, so that a test cannot pass while the callback
+// it was meant to exercise never ran.
+func (p *pgxmockPool) AcquireFunc(context.Context, func(*pgxpool.Conn) error) error {
+	return ErrAcquireNotSupported
+}
+
+// AcquireAllIdle always reports that the pool holds no idle connections.
+func (p *pgxmockPool) AcquireAllIdle(context.Context) []*pgxpool.Conn {
+	return []*pgxpool.Conn{}
 }
 
 func (p *pgxmockPool) Config() *pgxpool.Config {
