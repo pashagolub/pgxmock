@@ -33,7 +33,10 @@ jobs:
         version: latest      
 
     - name: Test
-      run: go test -v -coverprofile=profile.cov
+      # -race guards the concurrency the mock documents; ./... keeps the
+      # examples compiling and running; -coverpkg keeps the profile scoped to
+      # the library while still crediting the coverage the examples provide.
+      run: go test -race -v ./... -coverprofile=profile.cov -coverpkg=github.com/pashagolub/pgxmock/v5
 
     - name: Coveralls
       uses: shogo82148/actions-goveralls@v1
