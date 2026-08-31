@@ -142,7 +142,9 @@ func (rs *rowSets) Scan(dest ...any) error {
 			return fmt.Errorf("destination argument must be a pointer for column %s", r.defs[i].Name)
 		}
 		if col == nil {
-			dest[i] = nil
+			if err := scanNull(destVal, string(r.defs[i].Name)); err != nil {
+				return err
+			}
 			continue
 		}
 		val := reflect.ValueOf(col)
@@ -169,6 +171,28 @@ func (rs *rowSets) Scan(dest ...any) error {
 		}
 	}
 	return r.nextErr[r.recNo-1]
+}
+
+// scanNull assigns a SQL NULL to dest, mirroring how pgx treats NULL values:
+// an sql.Scanner is handed a nil, destinations that can represent nil are set
+// to their zero value, and anything else is rejected rather than left holding
+// whatever it happened to contain before the scan.
+func scanNull(destVal reflect.Value, column string) error {
+	if scanner, ok := destVal.Interface().(interface{ Scan(any) error }); ok {
+		return scanner.Scan(nil)
+	}
+	elem := destVal.Elem()
+	switch elem.Kind() {
+	case reflect.Pointer, reflect.Interface, reflect.Map, reflect.Slice,
+		reflect.Func, reflect.Chan, reflect.UnsafePointer:
+		if !elem.CanSet() {
+			return fmt.Errorf("cannot set destination value for column %s", column)
+		}
+		elem.Set(reflect.Zero(elem.Type()))
+		return nil
+	default:
+		return fmt.Errorf("cannot scan NULL into %s for column '%s'", destVal.Type(), column)
+	}
 }
 
 var pgtypeMapMutex sync.Mutex
