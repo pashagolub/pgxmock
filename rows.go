@@ -4,6 +4,7 @@ import (
 	"encoding/csv"
 	"errors"
 	"fmt"
+	"maps"
 	"reflect"
 	"strings"
 	"sync"
@@ -358,4 +359,15 @@ func NewRowsWithColumnDefinition(columns ...pgconn.FieldDescription) *Rows {
 		defs:    columns,
 		nextErr: make(map[int]error),
 	}
+}
+
+// clone returns a copy of r that can be iterated independently of the
+// original. Column definitions and row values are immutable once the
+// expectation is set up, so they are shared; the per-iteration cursor state
+// is not.
+func (r *Rows) clone() *Rows {
+	c := *r
+	c.nextErr = make(map[int]error, len(r.nextErr))
+	maps.Copy(c.nextErr, r.nextErr)
+	return &c
 }

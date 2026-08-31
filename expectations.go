@@ -404,6 +404,22 @@ func (e *ExpectedQuery) WillReturnRows(rows ...*Rows) *ExpectedQuery {
 	return e
 }
 
+// freshRows returns an independent view over the expected rows. Every call to
+// the mocked Query() gets its own cursor, so an expectation reused via Times()
+// (or matched repeatedly out of order) returns the full result set each time
+// instead of an already exhausted one.
+func (e *ExpectedQuery) freshRows() pgx.Rows {
+	src, ok := e.rows.(*rowSets)
+	if !ok {
+		return e.rows
+	}
+	sets := make([]*Rows, len(src.sets))
+	for i, s := range src.sets {
+		sets[i] = s.clone()
+	}
+	return &rowSets{sets: sets, RowSetNo: src.RowSetNo, ex: e}
+}
+
 // ExpectedCopyFrom is used to manage *pgx.Conn.CopyFrom expectations.
 // Returned by *Pgxmock.ExpectCopyFrom.
 type ExpectedCopyFrom struct {
