@@ -72,8 +72,8 @@ type Expecter interface {
 	// the *ExpectedBegin allows to mock database response
 	ExpectBegin() *ExpectedBegin
 
-	// ExpectBeginTx expects expects BeginTx() to be called with expectedSQL
-	// query. The *ExpectedBegin allows to mock database response.
+	// ExpectBeginTx expects BeginTx() to be called with the given transaction
+	// options. The *ExpectedBegin allows to mock database response.
 	ExpectBeginTx(txOptions pgx.TxOptions) *ExpectedBegin
 
 	// ExpectCommit expects pgx.Tx.Commit to be called.
@@ -100,7 +100,7 @@ type Expecter interface {
 	// expectations in the order they were set or not.
 	//
 	// By default it is set to - true. But if you use goroutines
-	// to parallelize your query executation, that option may
+	// to parallelize your query execution, that option may
 	// be handy.
 	//
 	// This option may be turned on anytime during tests. As soon
@@ -113,10 +113,11 @@ type Expecter interface {
 	NewRows(columns []string) *Rows
 
 	// NewRowsWithColumnDefinition allows Rows to be created from a
-	// pgconn.FieldDescription slice with a definition of sql metadata
+	// pgconn.FieldDescription slice, so that column metadata such as the
+	// data type OID is described as well as the column name.
 	NewRowsWithColumnDefinition(columns ...pgconn.FieldDescription) *Rows
 
-	// New Column allows to create a Column
+	// NewColumn allows to create a column definition
 	NewColumn(name string) *pgconn.FieldDescription
 }
 
@@ -270,30 +271,32 @@ func (c *pgxmock) ExpectDeallocateAll() *ExpectedDeallocate {
 
 //endregion Expectations
 
-// NewRows allows Rows to be created from a
-// atring slice or from the CSV string and
-// to be used as sql driver.Rows.
+// NewRows allows Rows to be created from a slice of column names. Values are
+// then added with Rows.AddRow, Rows.AddRows or Rows.FromCSVString.
 func (c *pgxmock) NewRows(columns []string) *Rows {
 	r := NewRows(columns)
 	return r
 }
 
-// PgConn exposes the underlying low level postgres connection
-// This is just here to support interfaces that use it. Here is just returns an empty PgConn
+// PgConn exposes the underlying low level postgres connection. It only exists
+// to satisfy the interfaces that mention it and returns an empty pgconn.PgConn,
+// which reports itself as closed; its methods are not mocked.
 func (c *pgxmock) PgConn() *pgconn.PgConn {
 	p := pgconn.PgConn{}
 	return &p
 }
 
-// NewRowsWithColumnDefinition allows Rows to be created from a
-// sql driver.Value slice with a definition of sql metadata
+// NewRowsWithColumnDefinition allows Rows to be created from a slice of
+// column definitions, so that column metadata such as the data type OID is
+// described as well as the column name.
 func (c *pgxmock) NewRowsWithColumnDefinition(columns ...pgconn.FieldDescription) *Rows {
 	r := NewRowsWithColumnDefinition(columns...)
 	return r
 }
 
-// NewColumn allows to create a Column that can be enhanced with metadata
-// using OfType/Nullable/WithLength/WithPrecisionAndScale methods.
+// NewColumn allows to create a column definition carrying just a name. The
+// returned pgconn.FieldDescription is a plain struct, so any further metadata
+// - DataTypeOID, Format, TypeModifier - can be set on it directly.
 func (c *pgxmock) NewColumn(name string) *pgconn.FieldDescription {
 	return &pgconn.FieldDescription{Name: name}
 }

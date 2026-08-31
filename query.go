@@ -19,7 +19,7 @@ func stripQuery(q string) (s string) {
 // and validate SQL ast, columns selected.
 //
 // pgxmock can be customized to implement a different QueryMatcher
-// configured through an option when pgxmock.New or pgxmock.NewWithDSN
+// configured through an option when pgxmock.NewConn or pgxmock.NewPool
 // is called, default QueryMatcher is QueryMatcherRegexp.
 type QueryMatcher interface {
 
