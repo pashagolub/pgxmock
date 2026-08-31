@@ -389,6 +389,32 @@ func (e *ExpectedDeallocate) String() string {
 	return msg + e.commonExpectation.String()
 }
 
+// ExpectedWaitForNotification is used to manage pgx.Conn.WaitForNotification
+// expectations. Returned by pgxmock.ExpectWaitForNotification.
+type ExpectedWaitForNotification struct {
+	commonExpectation
+	notification *pgconn.Notification
+}
+
+// WillReturnNotification arranges for the expected WaitForNotification() to
+// deliver n. Use WillReturnError to simulate a connection that fails while
+// waiting, or WillDelayFor together with a cancellable context to simulate a
+// wait that times out.
+func (e *ExpectedWaitForNotification) WillReturnNotification(n *pgconn.Notification) *ExpectedWaitForNotification {
+	e.notification = n
+	return e
+}
+
+// String returns string representation
+func (e *ExpectedWaitForNotification) String() string {
+	msg := "ExpectedWaitForNotification => expecting call to WaitForNotification()\n"
+	if e.notification != nil {
+		msg += fmt.Sprintf("\t- returns notification on channel '%s' with payload '%s'\n",
+			e.notification.Channel, e.notification.Payload)
+	}
+	return msg + e.commonExpectation.String()
+}
+
 // ExpectedPing is used to manage Ping() expectations
 type ExpectedPing struct {
 	commonExpectation
