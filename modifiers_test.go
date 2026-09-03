@@ -40,7 +40,7 @@ func TestModifiersChainInAnyOrder(t *testing.T) {
 }
 
 // assertType is a compile-time check that v's static type is exactly T.
-func assertType[T any](v T) {}
+func assertType[T any](_ T) {}
 
 // Every expectation type keeps its concrete type through a modifier chain.
 func TestModifiersPreserveConcreteType(t *testing.T) {
