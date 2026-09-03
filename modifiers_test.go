@@ -39,26 +39,29 @@ func TestModifiersChainInAnyOrder(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
+// assertType is a compile-time check that v's static type is exactly T.
+func assertType[T any](v T) {}
+
 // Every expectation type keeps its concrete type through a modifier chain.
 func TestModifiersPreserveConcreteType(t *testing.T) {
 	mock, err := NewConn(QueryMatcherOption(QueryMatcherAny))
 	assert.NoError(t, err)
 
-	// each assignment only compiles if the modifier returned the concrete type
-	var (
-		_ *ExpectedQuery      = mock.ExpectQuery("q").Maybe().Times(1)
-		_ *ExpectedExec       = mock.ExpectExec("e").Maybe().WillDelayFor(0)
-		_ *ExpectedBegin      = mock.ExpectBegin().Maybe()
-		_ *ExpectedCommit     = mock.ExpectCommit().Maybe()
-		_ *ExpectedRollback   = mock.ExpectRollback().Maybe()
-		_ *ExpectedClose      = mock.ExpectClose().Maybe()
-		_ *ExpectedPing       = mock.ExpectPing().Maybe()
-		_ *ExpectedReset      = mock.ExpectReset().Maybe()
-		_ *ExpectedPrepare    = mock.ExpectPrepare("s", "q").Maybe()
-		_ *ExpectedDeallocate = mock.ExpectDeallocate("s").Maybe()
-		_ *ExpectedBatch      = mock.ExpectBatch().Maybe()
-		_ *ExpectedCopyFrom   = mock.ExpectCopyFrom(pgx.Identifier{"t"}, []string{"a"}).Maybe()
-	)
+	// assertType only compiles if the modifier chain's static type is exactly
+	// the type argument - an interface return type (the pre-fix behavior)
+	// would not be assignable and would fail to build.
+	assertType[*ExpectedQuery](mock.ExpectQuery("q").Maybe().Times(1))
+	assertType[*ExpectedExec](mock.ExpectExec("e").Maybe().WillDelayFor(0))
+	assertType[*ExpectedBegin](mock.ExpectBegin().Maybe())
+	assertType[*ExpectedCommit](mock.ExpectCommit().Maybe())
+	assertType[*ExpectedRollback](mock.ExpectRollback().Maybe())
+	assertType[*ExpectedClose](mock.ExpectClose().Maybe())
+	assertType[*ExpectedPing](mock.ExpectPing().Maybe())
+	assertType[*ExpectedReset](mock.ExpectReset().Maybe())
+	assertType[*ExpectedPrepare](mock.ExpectPrepare("s", "q").Maybe())
+	assertType[*ExpectedDeallocate](mock.ExpectDeallocate("s").Maybe())
+	assertType[*ExpectedBatch](mock.ExpectBatch().Maybe())
+	assertType[*ExpectedCopyFrom](mock.ExpectCopyFrom(pgx.Identifier{"t"}, []string{"a"}).Maybe())
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
