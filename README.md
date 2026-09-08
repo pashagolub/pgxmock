@@ -176,6 +176,34 @@ In order to customize the QueryMatcher, use the following:
 The query matcher can be fully customized based on user needs. **pgxmock** will not
 provide a standard sql parsing matchers.
 
+## Reporting a connection configuration
+
+By default `Config()` reports a zero configuration. To test code that reads its
+own settings back off the pool, hand the mock the configuration production uses:
+
+``` go
+// the code under test
+type configured interface {
+	Config() *pgxpool.Config
+}
+
+func workers(db configured) int {
+	return int(db.Config().MaxConns) / 2
+}
+
+// the test
+func TestWorkers(t *testing.T) {
+	cfg, err := pgxpool.ParseConfig("postgres://bob@localhost:5432/orders?pool_max_conns=8")
+	require.NoError(t, err)
+	mock, err := pgxmock.NewPool(pgxmock.PoolConfigOption(cfg))
+	require.NoError(t, err)
+
+	assert.Equal(t, 4, workers(mock))
+}
+```
+
+For a connection mock use `pgxmock.ConnConfigOption` with a `*pgx.ConnConfig`.
+
 ## Matching arguments like time.Time
 
 There may be arguments which are of `struct` type and cannot be compared easily by value like `time.Time`. In this case
