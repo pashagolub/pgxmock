@@ -603,6 +603,10 @@ func (er *errRows) Values() ([]any, error)                       { return nil, e
 func (er *errRows) RawValues() [][]byte                          { return nil }
 func (er *errRows) Conn() *pgx.Conn                              { return nil }
 
+// TypeMap returns nil: pgx allows rows that carry no values, such as ones
+// representing only an error, to have no type map at all.
+func (er *errRows) TypeMap() *pgtype.Map { return nil }
+
 type errRow struct {
 	err error
 }

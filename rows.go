@@ -70,6 +70,13 @@ func (rs *rowSets) getTypeMap() *lockedTypeMap {
 	return defaultTypeMap
 }
 
+// TypeMap returns the pgtype.Map these rows are decoded with, which is the one
+// of the mock that produced them, see pgxmock.TypeMap. Rows built outside a
+// query, e.g. through Rows.Kind(), fall back to a shared default map.
+func (rs *rowSets) TypeMap() *pgtype.Map {
+	return rs.getTypeMap().m
+}
+
 func (rs *rowSets) Conn() *pgx.Conn {
 	return nil
 }

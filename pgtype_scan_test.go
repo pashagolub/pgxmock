@@ -126,3 +126,44 @@ func TestTypeMapIsPerMock(t *testing.T) {
 	assert.NotSame(t, first.TypeMap(), second.TypeMap(),
 		"each mock must own its type map so registrations do not leak between tests")
 }
+
+// pgx v5.11 added Rows.TypeMap. The rows a query hands back must expose the
+// very map their values were decoded with, so that a pgx.RowScanner can reach
+// for it the way it does against a real connection.
+func TestRowsTypeMap(t *testing.T) {
+	mock, err := NewConn(QueryMatcherOption(QueryMatcherAny))
+	assert.NoError(t, err)
+
+	rows := NewRowsWithColumnDefinition(columnOfType("id", pgtype.Int4OID)).AddRow(int32(42))
+	mock.ExpectQuery("SELECT").WillReturnRows(rows)
+
+	rs, err := mock.Query(context.Background(), "SELECT id FROM t")
+	assert.NoError(t, err)
+	defer rs.Close()
+
+	assert.Same(t, mock.TypeMap(), rs.TypeMap(),
+		"rows must decode with the type map of the mock that produced them")
+
+	assert.True(t, rs.Next())
+	var decoded int32
+	assert.NoError(t, rs.TypeMap().Scan(pgtype.Int4OID, rs.FieldDescriptions()[0].Format, rs.RawValues()[0], &decoded))
+	assert.EqualValues(t, 42, decoded)
+}
+
+// Rows built outside a query have no mock to borrow a map from, but still must
+// hand out a usable one.
+func TestRowsTypeMapWithoutQuery(t *testing.T) {
+	rs := NewRowsWithColumnDefinition(columnOfType("id", pgtype.Int4OID)).AddRow(int32(1)).Kind()
+	assert.NotNil(t, rs.TypeMap())
+}
+
+// pgx permits rows carrying only an error to report no type map at all.
+func TestErrRowsTypeMap(t *testing.T) {
+	mock, err := NewConn()
+	assert.NoError(t, err)
+
+	rs, err := mock.Query(context.Background(), "SELECT")
+	assert.Error(t, err)
+	assert.NotNil(t, rs, "Query must never return a nil pgx.Rows")
+	assert.Nil(t, rs.TypeMap())
+}
