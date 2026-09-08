@@ -32,6 +32,7 @@ import (
 
 	pgx "github.com/jackc/pgx/v5"
 	pgconn "github.com/jackc/pgx/v5/pgconn"
+	pgtype "github.com/jackc/pgx/v5/pgtype"
 	pgxpool "github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -145,6 +146,7 @@ type PgxConnIface interface {
 	DeallocateAll(ctx context.Context) error
 	Config() *pgx.ConnConfig
 	PgConn() *pgconn.PgConn
+	TypeMap() *pgtype.Map
 }
 
 // PgxPoolIface represents pgxpool.Pool specific interface
@@ -170,6 +172,21 @@ type pgxmock struct {
 	expectations      []expectation
 	errorOnClosedConn bool
 	closed            atomic.Bool
+	typeMap           *lockedTypeMap
+}
+
+// TypeMap returns the pgtype.Map this mock decodes values with, the way
+// pgx.Conn.TypeMap does. Register custom types on it and the mock will honour
+// them when scanning columns whose FieldDescription carries a DataTypeOID:
+//
+//	col := mock.NewColumn("status")
+//	col.DataTypeOID = statusOID
+//	mock.TypeMap().RegisterType(&pgtype.Type{Name: "status", OID: statusOID, Codec: ...})
+//
+// A pgtype.Map is not safe for concurrent use, so register everything before
+// the code under test starts running.
+func (c *pgxmock) TypeMap() *pgtype.Map {
+	return c.typeMap.m
 }
 
 // checkClosed reports pgconn.ErrConnClosed once the mocked connection has been
@@ -326,6 +343,7 @@ func (c *pgxmock) NewColumn(name string) *pgconn.FieldDescription {
 
 // open a mock database driver connection
 func (c *pgxmock) open(options []func(*pgxmock) error) error {
+	c.typeMap = newLockedTypeMap()
 	for _, option := range options {
 		err := option(c)
 		if err != nil {
@@ -563,7 +581,12 @@ func (c *pgxmock) Query(ctx context.Context, sql string, args ...any) (pgx.Rows,
 		// `rows, err := conn.Query(...); defer rows.Close()` is safe.
 		return &errRows{err: err}, err
 	}
-	return ex.freshRows(), err
+	rows := ex.freshRows()
+	if rs, ok := rows.(*rowSets); ok {
+		// each call gets its own rowSets, so this is not shared state
+		rs.typeMap = c.typeMap
+	}
+	return rows, err
 }
 
 type errRows struct {
@@ -579,6 +602,10 @@ func (er *errRows) Scan(...any) error                            { return er.err
 func (er *errRows) Values() ([]any, error)                       { return nil, er.err }
 func (er *errRows) RawValues() [][]byte                          { return nil }
 func (er *errRows) Conn() *pgx.Conn                              { return nil }
+
+// TypeMap returns nil: pgx allows rows that carry no values, such as ones
+// representing only an error, to have no type map at all.
+func (er *errRows) TypeMap() *pgtype.Map { return nil }
 
 type errRow struct {
 	err error
