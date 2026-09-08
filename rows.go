@@ -199,6 +199,7 @@ func (rs *rowSets) Scan(dest ...any) error {
 // conversion, then the column's pgtype codec as the last resort.
 func (rs *rowSets) scanValue(fd pgconn.FieldDescription, col any, destVal reflect.Value) error {
 	val := reflect.ValueOf(col)
+	destVal = allocPointerChain(destVal, val)
 	if _, ok := destVal.Interface().(*any); ok || val.Type().AssignableTo(destVal.Elem().Type()) {
 		if destElem := destVal.Elem(); destElem.CanSet() {
 			destElem.Set(val)
@@ -275,6 +276,27 @@ func isUnsignedKind(k reflect.Kind) bool {
 
 func isFloatKind(k reflect.Kind) bool {
 	return k == reflect.Float32 || k == reflect.Float64
+}
+
+// allocPointerChain walks down a destination that sits behind more than one
+// pointer, such as the **string a pgx.RowToStructByName field may be, and
+// allocates the intermediate pointers on the way. It returns the innermost
+// pointer the value should be scanned into, which is destVal itself for the
+// ordinary single pointer destination.
+//
+// pgtype does the same through its pointer-to-pointer scan plan, so a column
+// that declares an OID already worked; this keeps the plain reflection path,
+// the one a column without an OID takes, in step with it.
+func allocPointerChain(destVal, val reflect.Value) reflect.Value {
+	for destVal.Elem().Kind() == reflect.Pointer &&
+		!val.Type().AssignableTo(destVal.Elem().Type()) &&
+		destVal.Elem().CanSet() {
+		if destVal.Elem().IsNil() {
+			destVal.Elem().Set(reflect.New(destVal.Elem().Type().Elem()))
+		}
+		destVal = destVal.Elem()
+	}
+	return destVal
 }
 
 // scanNull assigns a SQL NULL to dest, mirroring how pgx treats NULL values:
