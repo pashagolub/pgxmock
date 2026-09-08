@@ -225,6 +225,37 @@ It only asserts that the argument is of `time.Time` type. For cases where any va
 is acceptable, the built-in `pgxmock.AnyArg()` matcher can be used instead of
 implementing a custom `Argument`.
 
+## Simulating server and routing errors
+
+Any expectation can be told to fail with `WillReturnError`, and the error worth
+returning is usually the one production code branches on.
+
+For a server-side failure, `pgxmock.NewPgError` builds a `*pgconn.PgError` with
+a SQLSTATE code, so the code under test takes the branch it takes in production:
+
+``` go
+	mock.ExpectExec("INSERT INTO users").
+		WithArgs("john").
+		WillReturnError(pgxmock.NewPgError("23505",
+			`duplicate key value violates unique constraint "users_email_key"`))
+
+	// in the code under test
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23505" { ... }
+```
+
+For code that routes reads and writes across a primary and its replicas with
+`target_session_attrs`, pgx v5.11 added sentinel errors that say why a
+connection was rejected. They are plain errors, so they are returned the same
+way and matched with `errors.Is`:
+
+``` go
+	mock.ExpectPing().WillReturnError(pgconn.ErrReadOnlyConnection)
+```
+
+The full set is `pgconn.ErrReadOnlyConnection`, `pgconn.ErrReadWriteConnection`,
+`pgconn.ErrPrimaryConnection` and `pgconn.ErrStandbyConnection`.
+
 ## Run tests
 
     go test -race
