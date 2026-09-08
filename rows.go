@@ -184,13 +184,13 @@ func (rs *rowSets) Scan(dest ...any) error {
 			} else {
 				return fmt.Errorf("cannot set destination value for column %s", r.defs[i].Name)
 			}
-		} else if err := rs.scanViaTypeMap(r.defs[i], col, dest[i]); err == nil {
-			// a pgtype codec registered for the column's OID took it
-		} else if !errors.Is(err, errNoTypeMapping) {
+		} else if err := rs.scanViaTypeMap(r.defs[i], col, dest[i]); err != nil {
+			// a pgtype codec registered for the column's OID gets the last word
+			if errors.Is(err, errNoTypeMapping) {
+				return fmt.Errorf("destination kind '%v' not supported for value kind '%v' of column '%s'",
+					destVal.Elem().Kind(), val.Kind(), string(r.defs[i].Name))
+			}
 			return fmt.Errorf("scanning value error for column '%s': %w", string(r.defs[i].Name), err)
-		} else {
-			return fmt.Errorf("destination kind '%v' not supported for value kind '%v' of column '%s'",
-				destVal.Elem().Kind(), val.Kind(), string(r.defs[i].Name))
 		}
 	}
 	return r.nextErr[r.recNo-1]
