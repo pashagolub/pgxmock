@@ -67,6 +67,14 @@ type Expecter interface {
 	// The *ExpectedDeallocate allows to mock database response
 	ExpectDeallocateAll() *ExpectedDeallocate
 
+	// ExpectLoadType expects LoadType() to be called with expectedTypeName.
+	// The *ExpectedLoadTypes allows to mock the type the connection reports.
+	ExpectLoadType(expectedTypeName string) *ExpectedLoadTypes
+
+	// ExpectLoadTypes expects LoadTypes() to be called with exactly these type names, in order.
+	// The *ExpectedLoadTypes allows to mock the types the connection reports.
+	ExpectLoadTypes(expectedTypeNames ...string) *ExpectedLoadTypes
+
 	// ExpectQuery expects Query() or QueryRow() to be called with expectedSQL query.
 	// the *ExpectedQuery allows to mock database response.
 	ExpectQuery(expectedSQL string) *ExpectedQuery
@@ -166,6 +174,10 @@ type PgxConnIface interface {
 	TypeMap() *pgtype.Map
 	// IsClosed reports whether Close has been called.
 	IsClosed() bool
+	// LoadType describes a named type, see ExpectLoadType.
+	LoadType(ctx context.Context, typeName string) (*pgtype.Type, error)
+	// LoadTypes describes named types, see ExpectLoadTypes.
+	LoadTypes(ctx context.Context, typeNames []string) ([]*pgtype.Type, error)
 }
 
 // PgxPoolIface represents pgxpool.Pool specific interface
@@ -366,6 +378,14 @@ func (c *pgxmock) ExpectDeallocate(expectedStmtName string) *ExpectedDeallocate 
 
 func (c *pgxmock) ExpectDeallocateAll() *ExpectedDeallocate {
 	return addExpectation(c, &ExpectedDeallocate{expectAll: true})
+}
+
+func (c *pgxmock) ExpectLoadType(expectedTypeName string) *ExpectedLoadTypes {
+	return addExpectation(c, &ExpectedLoadTypes{expectTypeNames: []string{expectedTypeName}, single: true})
+}
+
+func (c *pgxmock) ExpectLoadTypes(expectedTypeNames ...string) *ExpectedLoadTypes {
+	return addExpectation(c, &ExpectedLoadTypes{expectTypeNames: expectedTypeNames})
 }
 
 //endregion Expectations
@@ -600,6 +620,50 @@ func (c *pgxmock) DeallocateAll(ctx context.Context) error {
 		return err
 	}
 	return ex.waitForDelay(ctx)
+}
+
+// LoadType returns the type set by ExpectLoadType without registering it, as pgx does.
+func (c *pgxmock) LoadType(ctx context.Context, typeName string) (*pgtype.Type, error) {
+	types, err := c.loadTypes(ctx, "LoadType()", []string{typeName}, true)
+	if err != nil {
+		return nil, err
+	}
+	return types[0], nil
+}
+
+// LoadTypes returns the types set by ExpectLoadTypes without registering them, as pgx does.
+func (c *pgxmock) LoadTypes(ctx context.Context, typeNames []string) ([]*pgtype.Type, error) {
+	if len(typeNames) == 0 {
+		return nil, errors.New("No type names were supplied.") //nolint:revive,staticcheck // the text pgx returns
+	}
+	return c.loadTypes(ctx, "LoadTypes()", typeNames, false)
+}
+
+func (c *pgxmock) loadTypes(ctx context.Context, method string, typeNames []string, single bool) ([]*pgtype.Type, error) {
+	if err := c.checkClosed(); err != nil {
+		return nil, err
+	}
+
+	ex, err := findExpectationFunc(c, method, func(loadExp *ExpectedLoadTypes) error {
+		if loadExp.single != single {
+			return fmt.Errorf("%s: call was not expected, next expectation is: %s", method, loadExp)
+		}
+		if !reflect.DeepEqual(loadExp.expectTypeNames, typeNames) {
+			return fmt.Errorf("%s: type names %v were not expected, expected type names are %v",
+				method, typeNames, loadExp.expectTypeNames)
+		}
+		if loadExp.err == nil && len(loadExp.types) == 0 {
+			return fmt.Errorf("%s must return types or raise an error: %s", method, loadExp)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	if err = ex.waitForDelay(ctx); err != nil {
+		return nil, err
+	}
+	return ex.types, nil
 }
 
 func (c *pgxmock) Commit(ctx context.Context) error {

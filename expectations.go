@@ -12,6 +12,7 @@ import (
 
 	pgx "github.com/jackc/pgx/v5"
 	pgconn "github.com/jackc/pgx/v5/pgconn"
+	pgtype "github.com/jackc/pgx/v5/pgtype"
 )
 
 // an expectation interface
@@ -392,6 +393,41 @@ func (e *ExpectedDeallocate) String() string {
 		msg += "\t- matches all statements\n"
 	} else {
 		msg += fmt.Sprintf("\t- matches statement name: '%s'\n", e.expectStmtName)
+	}
+	return msg + e.commonExpectation.String()
+}
+
+// ExpectedLoadTypes is used to manage pgx.Conn.LoadType and
+// pgx.Conn.LoadTypes expectations. Returned by pgxmock.ExpectLoadType and
+// pgxmock.ExpectLoadTypes.
+type ExpectedLoadTypes struct {
+	commonExpectation
+	expectTypeNames []string
+	single          bool // expects LoadType rather than LoadTypes
+	types           []*pgtype.Type
+}
+
+// WillReturnTypes sets the types LoadTypes returns; LoadType returns the first:
+//
+//	mock.ExpectLoadTypes("status").
+//		WillReturnTypes(&pgtype.Type{Name: "status", OID: statusOID, Codec: &pgtype.EnumCodec{}})
+func (e *ExpectedLoadTypes) WillReturnTypes(types ...*pgtype.Type) *ExpectedLoadTypes {
+	e.types = types
+	return e
+}
+
+// String returns string representation
+func (e *ExpectedLoadTypes) String() string {
+	method := "LoadTypes()"
+	if e.single {
+		method = "LoadType()"
+	}
+	msg := fmt.Sprintf("ExpectedLoadTypes => expecting call to %s:\n", method)
+	msg += fmt.Sprintf("\t- matches type names: %v\n", e.expectTypeNames)
+	for _, t := range e.types {
+		if t != nil {
+			msg += fmt.Sprintf("\t- returns type '%s' with OID %d\n", t.Name, t.OID)
+		}
 	}
 	return msg + e.commonExpectation.String()
 }

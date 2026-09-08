@@ -258,6 +258,41 @@ func (e *ExpectedExec) WillPanic(v any) *ExpectedExec {
 	return e
 }
 
+// --- ExpectedLoadTypes ---
+
+// Maybe allows the expected method call to be optional.
+// Not calling an optional method will not cause an error while asserting expectations.
+func (e *ExpectedLoadTypes) Maybe() *ExpectedLoadTypes {
+	e.commonExpectation.Maybe()
+	return e
+}
+
+// Times indicates that the expected method should only fire the indicated number of times.
+// Zero value is ignored and means the same as one.
+func (e *ExpectedLoadTypes) Times(n uint) *ExpectedLoadTypes {
+	e.commonExpectation.Times(n)
+	return e
+}
+
+// WillDelayFor allows to specify duration for which it will delay result.
+// May be used together with Context.
+func (e *ExpectedLoadTypes) WillDelayFor(duration time.Duration) *ExpectedLoadTypes {
+	e.commonExpectation.WillDelayFor(duration)
+	return e
+}
+
+// WillReturnError allows to set an error for the expected method.
+func (e *ExpectedLoadTypes) WillReturnError(err error) *ExpectedLoadTypes {
+	e.commonExpectation.WillReturnError(err)
+	return e
+}
+
+// WillPanic allows to force the expected method to panic.
+func (e *ExpectedLoadTypes) WillPanic(v any) *ExpectedLoadTypes {
+	e.commonExpectation.WillPanic(v)
+	return e
+}
+
 // --- ExpectedPing ---
 
 // Maybe allows the expected method call to be optional.

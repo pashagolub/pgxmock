@@ -125,11 +125,13 @@ func TestEveryModifierReturnsItsReceiver(t *testing.T) {
 	assertModifiersReturnReceiver(t, mock.ExpectCopyFrom(pgx.Identifier{"t"}, nil))
 	assertModifiersReturnReceiver(t, mock.ExpectDeallocateAll())
 	assertModifiersReturnReceiver(t, mock.ExpectExec("q"))
+	assertModifiersReturnReceiver(t, mock.ExpectLoadTypes("t"))
 	assertModifiersReturnReceiver(t, mock.ExpectPing())
 	assertModifiersReturnReceiver(t, mock.ExpectPrepare("s", "q"))
 	assertModifiersReturnReceiver(t, mock.ExpectQuery("q"))
 	assertModifiersReturnReceiver(t, mock.ExpectReset())
 	assertModifiersReturnReceiver(t, mock.ExpectRollback())
+	assertModifiersReturnReceiver(t, mock.ExpectWaitForNotification())
 }
 
 // The modifiers still behave the way they did, only the return type changed.
