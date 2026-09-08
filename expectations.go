@@ -511,7 +511,120 @@ type ExpectedCopyFrom struct {
 	commonExpectation
 	expectedTableName pgx.Identifier
 	expectedColumns   []string
+	expectedRows      *CopyRows
+	rowsErr           error
 	rowsAffected      int64
+}
+
+// WithRows will match the rows the pgx.CopyFromSource yields against the
+// expected ones. Without it the copied data is drained and discarded, so a test
+// cannot tell what its code actually sent.
+//
+// A value may be an Argument matcher, such as AnyArg, to stand in for anything
+// the test cannot predict:
+//
+//	mock.ExpectCopyFrom(pgx.Identifier{"users"}, []string{"name", "created"}).
+//		WithRows(pgxmock.NewCopyRows("name", "created").
+//			AddRow("alice", pgxmock.AnyArg()).
+//			AddRow("bob", pgxmock.AnyArg())).
+//		WillReturnResult(2)
+//
+// Rows with no AddRow assert that nothing was copied, which is a different
+// statement from omitting WithRows altogether.
+//
+// The rows are checked once the source has been drained, since that is the only
+// way to see them, and so they take no part in choosing which expectation a call
+// matches. A mismatch is reported by CopyFrom and again by ExpectationsWereMet,
+// so a test that only inspects the copied count still fails.
+//
+// It panics when the columns disagree with the ones given to ExpectCopyFrom, the
+// way AddRow panics on a row of the wrong width: both are mistakes in the test
+// itself, worth reporting at the line that made them.
+func (e *ExpectedCopyFrom) WithRows(rows *CopyRows) *ExpectedCopyFrom {
+	if names := rows.columnNames(); !reflect.DeepEqual(names, e.expectedColumns) {
+		panic(fmt.Sprintf("CopyFrom: expected rows have columns %v, but the expected columns are %v",
+			names, e.expectedColumns))
+	}
+	e.expectedRows = rows
+	return e
+}
+
+// rowsMatch compares the rows a CopyFromSource produced against WithRows,
+// through the type map the mock decodes with, so that a registered custom type
+// is compared by its codec.
+func (e *ExpectedCopyFrom) rowsMatch(typeMap *lockedTypeMap, copied [][]any) error {
+	if e.expectedRows == nil {
+		return nil
+	}
+	expected := e.expectedRows.rows.rows
+	if len(copied) != len(expected) {
+		return fmt.Errorf("CopyFrom: expected %d row(s) to be copied, but got %d",
+			len(expected), len(copied))
+	}
+	if e.expectedRows.unordered {
+		return e.rowsMatchUnordered(typeMap, copied)
+	}
+	for i, row := range copied {
+		if err := e.rowMatch(typeMap, i, expected[i], row); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// rowsMatchUnordered pairs every copied row with an expected one it has not used
+// yet, greedily and in the order the rows were copied.
+func (e *ExpectedCopyFrom) rowsMatchUnordered(typeMap *lockedTypeMap, copied [][]any) error {
+	expected := e.expectedRows.rows.rows
+	paired := make([]bool, len(expected))
+	for i, row := range copied {
+		matched := false
+		for k := range expected {
+			if paired[k] {
+				continue
+			}
+			if e.rowMatch(typeMap, i, expected[k], row) == nil {
+				paired[k], matched = true, true
+				break
+			}
+		}
+		if !matched {
+			return fmt.Errorf("CopyFrom: copied row %d [%+v] matches none of the expected rows left to pair",
+				i, row)
+		}
+	}
+	return nil
+}
+
+// rowMatch compares one copied row against the one expected in its place.
+func (e *ExpectedCopyFrom) rowMatch(typeMap *lockedTypeMap, i int, expected, actual []any) error {
+	if len(actual) != len(expected) {
+		return fmt.Errorf("CopyFrom: row %d expected %d value(s), but got %d",
+			i, len(expected), len(actual))
+	}
+	for j, v := range actual {
+		if matcher, ok := expected[j].(Argument); ok {
+			if !matcher.Match(v) {
+				return fmt.Errorf("CopyFrom: matcher %T could not match value %d of row %d [%T - %+v]",
+					matcher, j, i, v, v)
+			}
+			continue
+		}
+		if !typeMap.equalValues(e.expectedRows.oidOf(j), expected[j], v) {
+			return fmt.Errorf("CopyFrom: value %d of row %d expected [%T - %+v] does not match actual [%T - %+v]",
+				j, i, expected[j], expected[j], v, v)
+		}
+	}
+	return nil
+}
+
+// recordRowsError keeps a row mismatch on the expectation, so that
+// ExpectationsWereMet reports it even when the test ignored the error CopyFrom
+// returned.
+func (e *ExpectedCopyFrom) recordRowsError(err error) {
+	e.Lock()
+	defer e.Unlock()
+	e.rowsErr = err
 }
 
 // String returns string representation
@@ -519,6 +632,16 @@ func (e *ExpectedCopyFrom) String() string {
 	msg := "ExpectedCopyFrom => expecting CopyFrom which:"
 	msg += "\n  - matches table name: '" + e.expectedTableName.Sanitize() + "'"
 	msg += fmt.Sprintf("\n  - matches column names: '%+v'", e.expectedColumns)
+	if e.expectedRows != nil {
+		order := ""
+		if e.expectedRows.unordered {
+			order = " in any order"
+		}
+		msg += fmt.Sprintf("\n  - matches %d row(s)%s:", len(e.expectedRows.rows.rows), order)
+		for i, row := range e.expectedRows.rows.rows {
+			msg += fmt.Sprintf("\n      row %d - %+v", i, row)
+		}
+	}
 
 	if e.err != nil {
 		msg += fmt.Sprintf("\n  - should returns error: %s", e.err)
