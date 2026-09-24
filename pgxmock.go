@@ -540,7 +540,7 @@ func (c *pgxmock) DeallocateAll(ctx context.Context) error {
 
 	ex, err := findExpectationFunc(c, "DeallocateAll()", func(deallocateExp *ExpectedDeallocate) error {
 		if !deallocateExp.expectAll {
-			return fmt.Errorf("Deallocate: deallocate all prepared statements was not expected, expected name is '%s'", deallocateExp.expectStmtName)
+			return fmt.Errorf("DeallocateAll: deallocate all prepared statements was not expected, expected name is '%s'", deallocateExp.expectStmtName)
 		}
 		return nil
 	})
