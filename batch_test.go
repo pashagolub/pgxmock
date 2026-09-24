@@ -3,12 +3,35 @@ package pgxmock
 import (
 	"errors"
 	"testing"
+	"time"
 
 	pgx "github.com/jackc/pgx/v5"
 	pgconn "github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestBatchCloseAdvancesPastUnreadQueries(t *testing.T) {
+	for name, qq := range map[string]*pgx.QueuedQuery{
+		"nil query":         nil,
+		"callback not read": {SQL: "UPDATE", Fn: func(pgx.BatchResults) error { return nil }},
+	} {
+		t.Run(name, func(t *testing.T) {
+			mock, _ := NewConn()
+			mock.MatchExpectationsInOrder(false) // in order SendBatch would check the queued query up front
+			mock.ExpectBatch().ExpectExec("UPDATE").Maybe()
+
+			done := make(chan error)
+			go func() { done <- mock.SendBatch(ctx, &pgx.Batch{QueuedQueries: []*pgx.QueuedQuery{qq}}).Close() }()
+			select {
+			case err := <-done:
+				assert.NoError(t, err)
+			case <-time.After(time.Second):
+				t.Fatal("Close must not loop forever on a query it cannot advance past")
+			}
+		})
+	}
+}
 
 func TestBatch(t *testing.T) {
 	t.Parallel()
