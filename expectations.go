@@ -75,11 +75,14 @@ func (e *commonExpectation) required() bool {
 }
 
 func (e *commonExpectation) waitForDelay(ctx context.Context) (err error) {
-	select {
-	case <-time.After(e.plannedDelay):
-		err = e.error()
-	case <-ctx.Done():
-		err = ctx.Err()
+	// a done context fails the call rather than racing a zero delay
+	if err = ctx.Err(); err == nil {
+		select {
+		case <-time.After(e.plannedDelay):
+			err = e.error()
+		case <-ctx.Done():
+			err = ctx.Err()
+		}
 	}
 	if e.panicArgument != nil {
 		panic(e.panicArgument)

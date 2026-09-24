@@ -85,6 +85,16 @@ func TestPanic(t *testing.T) {
 	a.NoError(mock.Ping(ctx))
 }
 
+func TestCancelledContextAlwaysFails(t *testing.T) {
+	cancelled, cancel := context.WithCancel(ctx)
+	cancel()
+	for range 50 {
+		mock, _ := NewConn()
+		mock.ExpectPing()
+		assert.ErrorIs(t, mock.Ping(cancelled), context.Canceled)
+	}
+}
+
 func TestCallModifier(t *testing.T) {
 	t.Parallel()
 	mock, _ := NewConn()
