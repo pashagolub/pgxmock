@@ -298,7 +298,7 @@ It only asserts that the argument is of `time.Time` type. The same is built in a
 | Matcher | Matches |
 |---|---|
 | `pgxmock.AnyArg()` | any value |
-| `pgxmock.NotNil()` | any value that is not nil, including typed nil pointers, slices and maps |
+| `pgxmock.NotNil()` | any value that is not nil; a typed nil pointer, slice or map counts as nil |
 | `pgxmock.OfType[T]()` | any value of type `T` |
 | `pgxmock.AnyOf(values...)` | any of the values, which may themselves be matchers |
 | `pgxmock.ArgumentFunc(f)` | whatever the function `f(any) bool` accepts |
@@ -341,6 +341,101 @@ way and matched with `errors.Is`:
 
 The full set is `pgconn.ErrReadOnlyConnection`, `pgconn.ErrReadWriteConnection`,
 `pgconn.ErrPrimaryConnection` and `pgconn.ErrStandbyConnection`.
+
+## Returning rows and errors
+
+``` go
+	rows := mock.NewRows([]string{"id", "title"}).
+		AddRow(1, "one").
+		AddRow(2, "two").
+		RowError(1, errors.New("row error")). // returned when reading the second row
+		CloseError(errors.New("close error")) // returned by Rows.Err after the rows are read
+	mock.ExpectQuery("SELECT id, title FROM articles").
+		WillReturnRows(rows).
+		RowsWillBeClosed() // fail ExpectationsWereMet if the code under test does not close them
+```
+
+Values assignable to the destination are stored as they are, `sql.Scanner` destinations and
+conversions are supported, and anything else goes through the pgtype codec of the column's
+`DataTypeOID`, see [custom types](#custom-types).
+
+## Modifiers
+
+Every expectation can be made optional, repeated, delayed, or made to fail or panic. The modifiers
+may be chained in any order with the builders specific to each expectation:
+
+``` go
+	mock.ExpectQuery("SELECT").
+		Times(2).                         // must be called twice
+		WillReturnRows(rows).
+		WillDelayFor(100 * time.Millisecond) // honours the context deadline
+	mock.ExpectPing().Maybe()               // may not be called at all
+```
+
+By default expectations must be met in the order they were declared. Call
+`mock.MatchExpectationsInOrder(false)` when the code under test runs queries concurrently.
+
+## Transactions
+
+`Begin` and `BeginTx` return the mock itself as the `pgx.Tx`, so expectations for the transaction are
+set on the mock.
+
+## Batches
+
+``` go
+	eb := mock.ExpectBatch()
+	eb.ExpectQuery("SELECT balance").WithArgs(1).WillReturnRows(mock.NewRows([]string{"balance"}).AddRow(100))
+	eb.ExpectExec("UPDATE accounts").WithArgs(1).WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+```
+
+Results are read in the order they were queued, through `BatchResults` or the `QueuedQuery` callbacks.
+
+## CopyFrom
+
+`ExpectCopyFrom` matches the table and columns. Add `WithRows` to assert the rows that were copied too:
+
+``` go
+	mock.ExpectCopyFrom(pgx.Identifier{"users"}, []string{"name", "age"}).
+		WithRows(pgxmock.NewCopyRows("name", "age").
+			AddRow("alice", 30).
+			AddRow("bob", 40).
+			Unordered()). // the rows may arrive in any order
+		WillReturnResult(2)
+```
+
+Values are compared by their encoded form, so an `int` matches the `int32` a `pgx.CopyFromSource` yields.
+
+## Custom types
+
+Every mock owns a `pgtype.Map`, returned by `TypeMap()` of a mocked connection just like
+`pgx.Conn.TypeMap` (for a mocked pool use `mock.AsConn().TypeMap()`). Register custom types on it and
+give the column a `DataTypeOID`, and scanning goes through their codec:
+
+``` go
+	mock.TypeMap().RegisterType(&pgtype.Type{Name: "status", OID: statusOID, Codec: &pgtype.EnumCodec{}})
+	col := mock.NewColumn("status")
+	col.DataTypeOID = statusOID
+	mock.ExpectQuery("SELECT status").WillReturnRows(mock.NewRowsWithColumnDefinition(*col).AddRow("active"))
+```
+
+## LISTEN/NOTIFY
+
+``` go
+	mock.ExpectExec("LISTEN chat").WillReturnResult(pgxmock.NewResult("LISTEN", 0))
+	mock.ExpectWaitForNotification().
+		WillReturnNotification(&pgconn.Notification{Channel: "chat", Payload: "hello"})
+```
+
+## Closed connections
+
+By default a closed mock keeps serving expectations. Create it with `pgxmock.ErrorOnClosedConnOption()`
+to have every operation after `Close` fail with `pgconn.ErrConnClosed`, as pgx does.
+
+## What cannot be mocked
+
+`Conn()`, `PgConn()`, `LargeObjects()` and the pool's `Acquire`, `AcquireFunc` and `AcquireAllIdle`
+hand out concrete pgx types that cannot be built outside of pgx. Have the code under test accept an
+interface of its own instead, or use `PgxPoolIface.AsConn()` to get a mocked connection from a mocked pool.
 
 ## Run tests
 
