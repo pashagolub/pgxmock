@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	pgconn "github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -62,6 +63,7 @@ func TestModifiersPreserveConcreteType(t *testing.T) {
 	assertType[*ExpectedDeallocate](mock.ExpectDeallocate("s").Maybe())
 	assertType[*ExpectedBatch](mock.ExpectBatch().Maybe())
 	assertType[*ExpectedCopyFrom](mock.ExpectCopyFrom(pgx.Identifier{"t"}, []string{"a"}).Maybe())
+	assertType[*ExpectedWaitForNotification](mock.ExpectWaitForNotification().Maybe())
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
@@ -105,6 +107,22 @@ func TestModifierSemanticsUnchanged(t *testing.T) {
 	cancel()
 	assert.Error(t, mock.Ping(ctx), "a cancelled context must be honoured")
 	assert.NoError(t, mock.ExpectationsWereMet(), "the call is optional")
+}
+
+// ExpectWaitForNotification returned the CallModifier interface from Times
+// and friends, so this chain did not compile.
+func TestWaitForNotificationModifiersChain(t *testing.T) {
+	mock, err := NewConn()
+	assert.NoError(t, err)
+
+	n := &pgconn.Notification{Channel: "c", Payload: "p"}
+	mock.ExpectWaitForNotification().Times(2).WillReturnNotification(n)
+	for range 2 {
+		got, err := mock.WaitForNotification(context.Background())
+		assert.NoError(t, err)
+		assert.Same(t, n, got)
+	}
+	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
 // commonExpectation still satisfies the exported CallModifier interface.
