@@ -135,6 +135,61 @@ func TestExplicitBatch(t *testing.T) {
 	a.NoError(mock.ExpectationsWereMet())
 }
 
+// SendBatch checks every queued query up front and fails the batch on a mismatch.
+func TestSendBatchChecksQueuedQueries(t *testing.T) {
+	for name, tc := range map[string]struct {
+		arrange func(*ExpectedBatch)
+		queue   func(*pgx.Batch)
+		want    string
+	}{
+		"sql": {
+			arrange: func(eb *ExpectedBatch) { eb.ExpectExec("UPDATE") },
+			queue:   func(b *pgx.Batch) { b.Queue("DELETE") },
+			want:    "could not match actual sql",
+		},
+		"args": {
+			arrange: func(eb *ExpectedBatch) { eb.ExpectExec("UPDATE").WithArgs(1) },
+			queue:   func(b *pgx.Batch) { b.Queue("UPDATE", 2) },
+			want:    "does not match actual",
+		},
+		"rewritten sql": {
+			arrange: func(eb *ExpectedBatch) {
+				eb.ExpectExec("UPDATE").WithArgs(pgx.NamedArgs{"id": 1}).WithRewrittenSQL("DELETE")
+			},
+			queue: func(b *pgx.Batch) { b.Queue("UPDATE t SET a = @id", pgx.NamedArgs{"id": 1}) },
+			want:  "could not match actual sql",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			mock, err := NewConn()
+			require.NoError(t, err)
+			tc.arrange(mock.ExpectBatch())
+
+			b := &pgx.Batch{}
+			tc.queue(b)
+			br := mock.SendBatch(ctx, b)
+			_, err = br.Exec()
+			assert.ErrorContains(t, err, tc.want)
+			assert.ErrorContains(t, br.Close(), tc.want)
+		})
+	}
+}
+
+func TestBatchResultsPastTheLastQuery(t *testing.T) {
+	mock, err := NewConn()
+	require.NoError(t, err)
+	mock.ExpectBatch().ExpectExec("UPDATE").WillReturnResult(NewResult("UPDATE", 1))
+
+	b := &pgx.Batch{}
+	b.Queue("UPDATE")
+	br := mock.SendBatch(ctx, b)
+	_, err = br.Exec()
+	require.NoError(t, err)
+	_, err = br.Exec()
+	assert.ErrorContains(t, err, "no more queries in batch")
+	assert.NoError(t, br.Close())
+}
+
 func processBatch(db PgxPoolIface) error {
 	batch := &pgx.Batch{}
 	// Random order
