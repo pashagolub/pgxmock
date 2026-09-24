@@ -7,6 +7,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // Every database operation must report pgconn.ErrConnClosed once the mocked
@@ -108,6 +109,15 @@ func TestClosedConnStaysClosed(t *testing.T) {
 	assert.NoError(t, mock.Close(context.Background()))
 	assert.ErrorIs(t, mock.Ping(context.Background()), pgconn.ErrConnClosed)
 	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestIsClosed(t *testing.T) {
+	mock, err := NewConn()
+	require.NoError(t, err)
+	assert.False(t, mock.IsClosed())
+	mock.ExpectClose()
+	require.NoError(t, mock.Close(ctx))
+	assert.True(t, mock.IsClosed())
 }
 
 // A connection view taken from a pool observes the pool being closed.

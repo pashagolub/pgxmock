@@ -147,6 +147,8 @@ type PgxConnIface interface {
 	Config() *pgx.ConnConfig
 	PgConn() *pgconn.PgConn
 	TypeMap() *pgtype.Map
+	// IsClosed reports whether Close has been called.
+	IsClosed() bool
 }
 
 // PgxPoolIface represents pgxpool.Pool specific interface
@@ -197,6 +199,11 @@ func (c *pgxmock) checkClosed() error {
 		return pgconn.ErrConnClosed
 	}
 	return nil
+}
+
+// IsClosed reports whether Close has been called on the mocked connection.
+func (c *pgxmock) IsClosed() bool {
+	return c.closed.Load()
 }
 
 // addExpectation appends e to the expectation list and returns it.
