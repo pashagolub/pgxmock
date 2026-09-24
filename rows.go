@@ -205,8 +205,9 @@ func (rs *rowSets) scanValue(fd pgconn.FieldDescription, col any, destVal reflec
 			return fmt.Errorf("cannot set destination value for column %s", fd.Name)
 		}
 	} else if scanner, ok := destVal.Interface().(interface{ Scan(any) error }); ok {
-		// Try to use Scanner interface
-		if err := scanner.Scan(val.Interface()); err != nil {
+		// a Scanner rejecting the value, e.g. an int32 into a pgtype.Int4, falls
+		// back to the codec registered for the column's OID
+		if err := scanner.Scan(val.Interface()); err != nil && rs.scanViaTypeMap(fd, col, destVal.Interface()) != nil {
 			return fmt.Errorf("scanning value error for column '%s': %w", string(fd.Name), err)
 		}
 	} else if val.CanConvert(destVal.Elem().Type()) {
