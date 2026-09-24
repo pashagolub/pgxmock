@@ -240,6 +240,9 @@ func (c *pgxmock) ExpectationsWereMet() error {
 		if copyFrom, ok := e.(*ExpectedCopyFrom); ok {
 			copyRowsErr = copyFrom.rowsErr
 		}
+		// rows of a query that was never called cannot have been closed
+		query, isQuery := e.(*ExpectedQuery)
+		rowsMustBeClosed := isQuery && query.rowsMustBeClosed && query.triggered > 0
 		e.Unlock()
 
 		if copyRowsErr != nil {
@@ -251,10 +254,8 @@ func (c *pgxmock) ExpectationsWereMet() error {
 		}
 
 		// must check whether all expected queried rows are closed
-		if query, ok := e.(*ExpectedQuery); ok {
-			if query.rowsMustBeClosed && !query.rowsWereClosed.Load() {
-				return fmt.Errorf("expected query rows to be closed, but it was not: %s", query)
-			}
+		if rowsMustBeClosed && !query.rowsWereClosed.Load() {
+			return fmt.Errorf("expected query rows to be closed, but it was not: %s", query)
 		}
 	}
 	return nil
