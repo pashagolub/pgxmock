@@ -215,14 +215,6 @@ func addExpectation[E expectation](c *pgxmock, e E) E {
 	return e
 }
 
-func (c *pgxmock) AcquireAllIdle(_ context.Context) []*pgxpool.Conn {
-	return []*pgxpool.Conn{}
-}
-
-func (c *pgxmock) AcquireFunc(_ context.Context, _ func(*pgxpool.Conn) error) error {
-	return nil
-}
-
 // region Expectations
 func (c *pgxmock) ExpectBatch() *ExpectedBatch {
 	return addExpectation(c, &ExpectedBatch{mock: c})
