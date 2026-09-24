@@ -161,6 +161,9 @@ func (rs *rowSets) Scan(dest ...any) error {
 		if destVal.Kind() != reflect.Pointer {
 			return fmt.Errorf("destination argument must be a pointer for column %s", r.defs[i].Name)
 		}
+		if destVal.IsNil() {
+			return fmt.Errorf("destination argument must be a non-nil pointer for column %s", r.defs[i].Name)
+		}
 		if col == nil {
 			if err := scanNull(destVal, string(r.defs[i].Name)); err != nil {
 				return err
