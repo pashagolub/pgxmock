@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var copyTable = pgx.Identifier{"users"}
@@ -187,6 +188,20 @@ func TestCopyRowsAddRowPanicsOnWrongWidth(t *testing.T) {
 	assert.Panics(t, func() {
 		NewCopyRows(copyColumns...).AddRow("alice")
 	})
+}
+
+func TestCopyRowsAddRows(t *testing.T) {
+	mock, err := NewConn()
+	require.NoError(t, err)
+	mock.ExpectCopyFrom(pgx.Identifier{"t"}, []string{"id", "name"}).
+		WithRows(NewCopyRows("id", "name").AddRows([]any{1, "a"}, []any{2, "b"})).
+		WillReturnResult(2)
+
+	n, err := mock.CopyFrom(ctx, pgx.Identifier{"t"}, []string{"id", "name"},
+		pgx.CopyFromRows([][]any{{1, "a"}, {2, "b"}}))
+	assert.NoError(t, err)
+	assert.EqualValues(t, 2, n)
+	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
 // So are rows assembled over columns the expectation does not have.
