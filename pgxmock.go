@@ -622,7 +622,7 @@ func (c *pgxmock) Query(ctx context.Context, sql string, args ...any) (pgx.Rows,
 	if ex.rows == nil {
 		// pgx never hands back a nil Rows, not even on error, so that
 		// `rows, err := conn.Query(...); defer rows.Close()` is safe.
-		return &errRows{err: err}, err
+		return &errRows{err: err, ex: ex}, err
 	}
 	rows := ex.freshRows()
 	if rs, ok := rows.(*rowSets); ok {
@@ -636,9 +636,15 @@ func (c *pgxmock) Query(ctx context.Context, sql string, args ...any) (pgx.Rows,
 
 type errRows struct {
 	err error
+	ex  *ExpectedQuery // matched expectation, if any, so Close satisfies RowsWillBeClosed
 }
 
-func (er *errRows) Close()                                       {}
+func (er *errRows) Close() {
+	if er.ex != nil {
+		er.ex.rowsWereClosed.Store(true)
+	}
+}
+
 func (er *errRows) Err() error                                   { return er.err }
 func (er *errRows) CommandTag() pgconn.CommandTag                { return pgconn.CommandTag{} }
 func (er *errRows) FieldDescriptions() []pgconn.FieldDescription { return nil }
@@ -663,6 +669,7 @@ func (er errRow) Scan(...any) error {
 func (c *pgxmock) QueryRow(ctx context.Context, sql string, args ...any) pgx.Row {
 	rows, err := c.Query(ctx, sql, args...)
 	if err != nil {
+		rows.Close() // pgx closes the rows behind QueryRow even when the query fails
 		return errRow{err: err}
 	}
 	return (*connRow)(rows.(*rowSets))
