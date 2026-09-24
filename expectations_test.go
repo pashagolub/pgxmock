@@ -127,6 +127,14 @@ func TestCopyFromBug(t *testing.T) {
 	a.NoError(mock.ExpectationsWereMet())
 }
 
+func TestBatchStringCountsQueuedQueries(t *testing.T) {
+	mock, _ := NewConn()
+	batch := mock.ExpectBatch()
+	batch.ExpectExec("UPDATE")
+	batch.ExpectQuery("SELECT")
+	assert.Contains(t, batch.String(), "with 2 queued queries")
+}
+
 func ExampleExpectedExec() {
 	mock, _ := NewConn()
 	ex := mock.ExpectExec("^INSERT (.+)").WillReturnResult(NewResult("INSERT", 15))

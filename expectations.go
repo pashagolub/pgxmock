@@ -354,6 +354,7 @@ func (e *ExpectedBatch) ExpectQuery(query string) *ExpectedQuery {
 // String returns string representation
 func (e *ExpectedBatch) String() string {
 	msg := "ExpectedBatch => expecting call to SendBatch()\n"
+	msg += fmt.Sprintf("\t- with %d queued queries\n", len(e.expectedQueries))
 	return msg + e.commonExpectation.String()
 }
 
