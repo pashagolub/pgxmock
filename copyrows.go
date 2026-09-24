@@ -27,7 +27,7 @@ func NewCopyRows(columns ...string) *CopyRows {
 
 // NewCopyRowsWithColumnDefinition creates expected copy rows whose columns carry
 // pgtype metadata. A column with a DataTypeOID is compared through the codec
-// registered for it in pgxmock.TypeMap, which is what makes a custom type
+// registered for it in the TypeMap() of the mock, which is what makes a custom type
 // compare here the way it would against a server.
 func NewCopyRowsWithColumnDefinition(columns ...pgconn.FieldDescription) *CopyRows {
 	return &CopyRows{rows: *NewRowsWithColumnDefinition(columns...)}
