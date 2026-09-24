@@ -74,8 +74,14 @@ func (br *batchResults) Close() error {
 	}
 	// Read and run fn for all remaining items
 	for br.err == nil && br.batch != nil && br.qqIdx < len(br.batch.QueuedQueries) {
-		if qq := br.batch.QueuedQueries[br.qqIdx]; qq != nil {
+		idx := br.qqIdx
+		if qq := br.batch.QueuedQueries[idx]; qq != nil {
 			br.err = errors.Join(br.err, br.callQuedQueryFn(qq))
+		}
+		if br.qqIdx == idx {
+			// a nil query, or a callback that did not read its result, must
+			// not keep the loop spinning on the same query forever
+			br.qqIdx++
 		}
 	}
 	br.closed = true
