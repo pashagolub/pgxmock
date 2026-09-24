@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestPointerToInterfaceArgument(t *testing.T) {
@@ -476,6 +477,24 @@ func TestRowsClosed(t *testing.T) {
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestReadingWithoutCurrentRow(t *testing.T) {
+	mock, _ := NewConn()
+	mock.ExpectQuery("SELECT").WillReturnRows(NewRows([]string{"id"}).AddRow(1))
+
+	rows, err := mock.Query(ctx, "SELECT")
+	require.NoError(t, err)
+	assert.NotPanics(t, func() {
+		var id int
+		assert.Error(t, rows.Scan(&id), "Scan before Next")
+		_, err := rows.Values()
+		assert.Error(t, err, "Values before Next")
+		assert.Nil(t, rows.RawValues(), "RawValues before Next")
+	})
+	rows.Close()
+	var id int
+	assert.Error(t, rows.Scan(&id), "Scan after Close")
 }
 
 func TestQuerySingleRow(t *testing.T) {
