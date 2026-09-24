@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"math"
 	"reflect"
 	"strings"
 	"sync"
@@ -209,7 +210,7 @@ func (rs *rowSets) scanValue(fd pgconn.FieldDescription, col any, destVal reflec
 		if err := scanner.Scan(val.Interface()); err != nil {
 			return fmt.Errorf("scanning value error for column '%s': %w", string(fd.Name), err)
 		}
-	} else if val.CanConvert(destVal.Elem().Type()) {
+	} else if convertible(val, destVal.Elem().Type()) {
 		if destElem := destVal.Elem(); destElem.CanSet() {
 			destElem.Set(val.Convert(destElem.Type()))
 		} else {
@@ -224,6 +225,55 @@ func (rs *rowSets) scanValue(fd pgconn.FieldDescription, col any, destVal reflec
 		return fmt.Errorf("scanning value error for column '%s': %w", string(fd.Name), err)
 	}
 	return nil
+}
+
+// convertible is reflect's CanConvert minus the lossy cases pgx rejects:
+// int to string (a rune) and numbers that truncate or overflow.
+func convertible(val reflect.Value, to reflect.Type) bool {
+	if !val.CanConvert(to) {
+		return false
+	}
+	from := val.Kind()
+	target := reflect.Zero(to)
+	switch {
+	case to.Kind() == reflect.String:
+		return !isSignedKind(from) && !isUnsignedKind(from)
+	case isSignedKind(to.Kind()):
+		switch {
+		case isSignedKind(from):
+			return !target.OverflowInt(val.Int())
+		case isUnsignedKind(from):
+			u := val.Uint()
+			return u <= math.MaxInt64 && !target.OverflowInt(int64(u))
+		case isFloatKind(from):
+			f := val.Float()
+			return f == math.Trunc(f) && f >= math.MinInt64 && f < math.MaxInt64 && !target.OverflowInt(int64(f))
+		}
+	case isUnsignedKind(to.Kind()):
+		switch {
+		case isSignedKind(from):
+			i := val.Int()
+			return i >= 0 && !target.OverflowUint(uint64(i))
+		case isUnsignedKind(from):
+			return !target.OverflowUint(val.Uint())
+		case isFloatKind(from):
+			f := val.Float()
+			return f == math.Trunc(f) && f >= 0 && f < math.MaxUint64 && !target.OverflowUint(uint64(f))
+		}
+	}
+	return true
+}
+
+func isSignedKind(k reflect.Kind) bool {
+	return k >= reflect.Int && k <= reflect.Int64
+}
+
+func isUnsignedKind(k reflect.Kind) bool {
+	return k >= reflect.Uint && k <= reflect.Uintptr
+}
+
+func isFloatKind(k reflect.Kind) bool {
+	return k == reflect.Float32 || k == reflect.Float64
 }
 
 // scanNull assigns a SQL NULL to dest, mirroring how pgx treats NULL values:

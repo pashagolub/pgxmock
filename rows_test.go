@@ -56,6 +56,33 @@ func TestExplicitTypeCasting(t *testing.T) {
 	}
 }
 
+func TestScanRejectsLossyConversions(t *testing.T) {
+	scan := func(value, dest any) error {
+		mock, _ := NewConn()
+		mock.ExpectQuery("SELECT").WillReturnRows(NewRows([]string{"v"}).AddRow(value))
+		return mock.QueryRow(ctx, "SELECT").Scan(dest)
+	}
+
+	assert.Error(t, scan(65, new(string)), "an integer must not become the rune it encodes")
+	assert.Error(t, scan(1.5, new(int)), "a fraction must not be truncated")
+	assert.Error(t, scan(int64(300), new(int8)), "an integer must not wrap around")
+	assert.Error(t, scan(-1, new(uint)), "a negative integer must not become unsigned")
+	assert.Error(t, scan(uint64(1<<63), new(int64)), "a large unsigned integer must not turn negative")
+
+	var i32 int32
+	assert.NoError(t, scan(int64(5), &i32))
+	assert.Equal(t, int32(5), i32)
+	var u uint16
+	assert.NoError(t, scan(7, &u))
+	assert.Equal(t, uint16(7), u)
+	var i int
+	assert.NoError(t, scan(2.0, &i))
+	assert.Equal(t, 2, i)
+	var f32 float32
+	assert.NoError(t, scan(0.1, &f32))
+	assert.InDelta(t, 0.1, f32, 1e-6)
+}
+
 func TestAddRows(t *testing.T) {
 	t.Parallel()
 	mock, err := NewConn()
