@@ -131,15 +131,28 @@ func (rs *rowSets) Next() bool {
 // true.
 func (rs *rowSets) Values() ([]any, error) {
 	r := rs.sets[rs.RowSetNo]
-	return r.rows[r.recNo-1], r.nextErr[r.recNo-1]
+	if err := r.nextErr[r.recNo-1]; err != nil {
+		return nil, err
+	}
+	return r.currentRow()
+}
+
+// currentRow returns the row the cursor is on, or an error when Next has not
+// been called yet or has already run past the last row.
+func (r *Rows) currentRow() ([]any, error) {
+	if r.recNo < 1 || r.recNo > len(r.rows) {
+		return nil, errors.New("no current row, Next must be called and return true first")
+	}
+	return r.rows[r.recNo-1], nil
 }
 
 func (rs *rowSets) Scan(dest ...any) error {
 	r := rs.sets[rs.RowSetNo]
 	if r.closed {
-		// If there is no error, we should return one anyway. Weirdly, pgx returns
-		// `number of field descriptions must equal number of values, got %d and %d`.
-		return r.nextErr[r.recNo-1]
+		if err := r.nextErr[r.recNo-1]; err != nil {
+			return err
+		}
+		return errors.New("rows are closed")
 	}
 	if len(dest) == 1 {
 		if rc, ok := dest[0].(pgx.RowScanner); ok {
@@ -152,7 +165,11 @@ func (rs *rowSets) Scan(dest ...any) error {
 	if len(r.rows) == 0 {
 		return pgx.ErrNoRows
 	}
-	for i, col := range r.rows[r.recNo-1] {
+	row, err := r.currentRow()
+	if err != nil {
+		return err
+	}
+	for i, col := range row {
 		if dest[i] == nil {
 			//behave compatible with pgx
 			continue
@@ -342,8 +359,12 @@ func (rs *rowSets) RawValues() [][]byte {
 	dest := make([][]byte, len(r.defs))
 	fd := rs.FieldDescriptions()
 
+	row, err := r.currentRow()
+	if err != nil {
+		return nil
+	}
 	m := rs.getTypeMap()
-	for i, col := range r.rows[r.recNo-1] {
+	for i, col := range row {
 		encoded, err := m.encode(fd[i].DataTypeOID, fd[i].Format, col)
 		if err != nil {
 			// fallback to a %v conversion.
