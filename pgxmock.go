@@ -719,7 +719,6 @@ func findExpectationFunc[ET expectationType[t], t any](c *pgxmock, method string
 	var expected ET
 	var fulfilled int
 	var ok bool
-	var err error
 	defer func() {
 		if expected != nil {
 			expected.Unlock()
@@ -732,6 +731,7 @@ func findExpectationFunc[ET expectationType[t], t any](c *pgxmock, method string
 			fulfilled++
 			continue
 		}
+		var err error
 		if expected, ok = next.(ET); ok {
 			if err = cmp(expected); err == nil {
 				break
