@@ -5,7 +5,9 @@ import (
 	"errors"
 	"testing"
 
+	pgx "github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // pgx.Conn.Query always returns a usable pgx.Rows, even when it also returns
@@ -40,6 +42,17 @@ func TestQueryReturnsUsableRowsOnError(t *testing.T) {
 			rows.Close()
 		})
 	}
+}
+
+func TestBatchQueryErrorReturnsRows(t *testing.T) {
+	mock, _ := NewConn()
+	mock.ExpectBatch()
+
+	br := mock.SendBatch(ctx, &pgx.Batch{})
+	rows, err := br.Query()
+	assert.ErrorContains(t, err, "no more queries in batch")
+	require.NotNil(t, rows, "pgx never returns nil rows")
+	rows.Close()
 }
 
 // Rows explicitly attached to an expectation are still returned alongside the

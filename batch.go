@@ -51,7 +51,7 @@ func (br *batchResults) Exec() (pgconn.CommandTag, error) {
 func (br *batchResults) Query() (pgx.Rows, error) {
 	query, arguments, err := br.nextQueryAndArgs()
 	if err != nil {
-		return nil, err
+		return &errRows{err: err}, err // pgx never returns nil rows, so a deferred Close is safe
 	}
 	return br.mock.Query(context.Background(), query, arguments...)
 }
