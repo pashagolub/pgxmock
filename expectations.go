@@ -330,7 +330,6 @@ type ExpectedBatch struct {
 	commonExpectation
 	mock            *pgxmock
 	expectedQueries []*queryBasedExpectation
-	closed          bool
 	mustBeClosed    bool
 }
 

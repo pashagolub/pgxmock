@@ -7,6 +7,7 @@ import (
 	pgx "github.com/jackc/pgx/v5"
 	pgconn "github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestBatch(t *testing.T) {
@@ -123,4 +124,34 @@ func TestUnorderedBatchExpectations(t *testing.T) {
 	err = processBatch(mock)
 	a.NoError(err)
 	a.NoError(mock.ExpectationsWereMet())
+}
+
+func TestBatchExpectedSeveralTimes(t *testing.T) {
+	mock, _ := NewConn()
+	// in order, the second SendBatch would still be awaited ahead of the Exec
+	mock.MatchExpectationsInOrder(false)
+	eb := mock.ExpectBatch().Times(2)
+	eb.ExpectExec("UPDATE").Times(2).WillReturnResult(NewResult("UPDATE", 1))
+
+	for range 2 {
+		b := &pgx.Batch{}
+		b.Queue("UPDATE")
+		assert.NoError(t, mock.SendBatch(ctx, b).Close())
+	}
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestBatchResultsAfterClose(t *testing.T) {
+	mock, _ := NewConn()
+	eb := mock.ExpectBatch()
+	eb.ExpectExec("UPDATE").WillReturnResult(NewResult("UPDATE", 1))
+
+	b := &pgx.Batch{}
+	b.Queue("UPDATE")
+	br := mock.SendBatch(ctx, b)
+	require.NoError(t, br.Close())
+	assert.NoError(t, br.Close(), "a second Close is a no-op")
+
+	_, err := br.Exec()
+	assert.ErrorIs(t, err, errBatchClosed)
 }
