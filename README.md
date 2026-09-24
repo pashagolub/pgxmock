@@ -29,6 +29,7 @@ See implementation examples:
 
 - [the simplest one](https://github.com/pashagolub/pgxmock/tree/master/examples/basic)
 - [blog API server](https://github.com/pashagolub/pgxmock/tree/master/examples/blog)
+- [copy from](https://github.com/pashagolub/pgxmock/tree/master/examples/copyfrom)
 - [batch](https://github.com/pashagolub/pgxmock/tree/master/examples/batch)
 
 
