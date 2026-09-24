@@ -773,7 +773,7 @@ func findExpectationFunc[ET expectationType[t], t any](c *pgxmock, method string
 			if err != nil {
 				return nil, err
 			}
-			return nil, fmt.Errorf("call to method %s, was not expected, next expectation is: %s", method, next)
+			return nil, fmt.Errorf("call to method %s was not expected, next expectation is: %s", method, next)
 		}
 	}
 
