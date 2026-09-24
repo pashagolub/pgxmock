@@ -96,6 +96,42 @@ func TestWillPanicIsChainable(t *testing.T) {
 	})
 }
 
+// modifiable is the set of CallModifier methods every expectation type
+// provides, each returning the expectation's own type.
+type modifiable[T any] interface {
+	Maybe() T
+	Times(uint) T
+	WillDelayFor(time.Duration) T
+	WillReturnError(error) T
+	WillPanic(any) T
+}
+
+// assertModifiersReturnReceiver checks that every modifier of e returns e.
+func assertModifiersReturnReceiver[T modifiable[T]](t *testing.T, e T) {
+	t.Helper()
+	for _, got := range []T{e.Maybe(), e.Times(1), e.WillDelayFor(0), e.WillReturnError(nil), e.WillPanic(nil)} {
+		assert.Same(t, any(e), any(got), "%T", e)
+	}
+}
+
+func TestEveryModifierReturnsItsReceiver(t *testing.T) {
+	mock, err := NewConn()
+	assert.NoError(t, err)
+
+	assertModifiersReturnReceiver(t, mock.ExpectBatch())
+	assertModifiersReturnReceiver(t, mock.ExpectBegin())
+	assertModifiersReturnReceiver(t, mock.ExpectClose())
+	assertModifiersReturnReceiver(t, mock.ExpectCommit())
+	assertModifiersReturnReceiver(t, mock.ExpectCopyFrom(pgx.Identifier{"t"}, nil))
+	assertModifiersReturnReceiver(t, mock.ExpectDeallocateAll())
+	assertModifiersReturnReceiver(t, mock.ExpectExec("q"))
+	assertModifiersReturnReceiver(t, mock.ExpectPing())
+	assertModifiersReturnReceiver(t, mock.ExpectPrepare("s", "q"))
+	assertModifiersReturnReceiver(t, mock.ExpectQuery("q"))
+	assertModifiersReturnReceiver(t, mock.ExpectReset())
+	assertModifiersReturnReceiver(t, mock.ExpectRollback())
+}
+
 // The modifiers still behave the way they did, only the return type changed.
 func TestModifierSemanticsUnchanged(t *testing.T) {
 	mock, err := NewConn()
