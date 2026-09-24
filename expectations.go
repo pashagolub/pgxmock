@@ -330,7 +330,6 @@ type ExpectedBatch struct {
 	commonExpectation
 	mock            *pgxmock
 	expectedQueries []*queryBasedExpectation
-	mustBeClosed    bool
 }
 
 // ExpectExec allows to expect Queue().Exec() on this batch.
@@ -352,9 +351,6 @@ func (e *ExpectedBatch) ExpectQuery(query string) *ExpectedQuery {
 // String returns string representation
 func (e *ExpectedBatch) String() string {
 	msg := "ExpectedBatch => expecting call to SendBatch()\n"
-	if e.mustBeClosed {
-		msg += "\t- batch must be closed\n"
-	}
 	return msg + e.commonExpectation.String()
 }
 
