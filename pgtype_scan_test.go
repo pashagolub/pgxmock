@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func columnOfType(name string, oid uint32) pgconn.FieldDescription {
@@ -166,4 +167,15 @@ func TestErrRowsTypeMap(t *testing.T) {
 	assert.Error(t, err)
 	assert.NotNil(t, rs, "Query must never return a nil pgx.Rows")
 	assert.Nil(t, rs.TypeMap())
+}
+
+func TestScannerFallsBackToTypeMap(t *testing.T) {
+	mock, _ := NewConn()
+	col := mock.NewColumn("id")
+	col.DataTypeOID = pgtype.Int4OID
+	mock.ExpectQuery("SELECT").WillReturnRows(NewRowsWithColumnDefinition(*col).AddRow(int32(5)))
+
+	var id pgtype.Int4
+	require.NoError(t, mock.QueryRow(ctx, "SELECT").Scan(&id))
+	assert.Equal(t, pgtype.Int4{Int32: 5, Valid: true}, id)
 }
