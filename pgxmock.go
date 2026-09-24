@@ -380,7 +380,7 @@ func (c *pgxmock) Close(ctx context.Context) error {
 }
 
 func (c *pgxmock) Conn() *pgx.Conn {
-	panic("Conn() is not available in pgxmock")
+	panic("pgxmock: Conn() cannot return a mocked *pgx.Conn, accept an interface such as pgxmock.PgxConnIface instead")
 }
 
 func (c *pgxmock) CopyFrom(ctx context.Context, tableName pgx.Identifier, columnNames []string, rowSrc pgx.CopyFromSource) (int64, error) {
