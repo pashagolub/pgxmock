@@ -138,6 +138,15 @@ func TestUnexpectedPing(t *testing.T) {
 	}
 }
 
+func TestSkippedOptionalExpectationDoesNotLeakItsError(t *testing.T) {
+	mock, _ := NewConn()
+	mock.ExpectExec("A").Maybe().WillReturnResult(NewResult("UPDATE", 1))
+	mock.ExpectBegin()
+
+	_, err := mock.Exec(ctx, "B")
+	assert.ErrorContains(t, err, "next expectation is: ExpectedBegin")
+}
+
 func TestUnexpectedPrepare(t *testing.T) {
 	mock, _ := NewConn()
 	_, err := mock.Prepare(ctx, "foo", "bar")
