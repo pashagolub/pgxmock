@@ -436,7 +436,7 @@ func (c *pgxmock) CopyFrom(ctx context.Context, tableName pgx.Identifier, column
 
 func (c *pgxmock) SendBatch(ctx context.Context, b *pgx.Batch) pgx.BatchResults {
 	if err := c.checkClosed(); err != nil {
-		return &batchResults{mock: c, batch: b, err: err}
+		return &batchResults{ctx: ctx, mock: c, batch: b, err: err}
 	}
 
 	ex, err := findExpectationFunc(c, "Batch()", func(batchExp *ExpectedBatch) error {
@@ -461,7 +461,7 @@ func (c *pgxmock) SendBatch(ctx context.Context, b *pgx.Batch) pgx.BatchResults 
 		}
 		return nil
 	})
-	br := &batchResults{mock: c, batch: b, expectedBatch: ex, err: err}
+	br := &batchResults{ctx: ctx, mock: c, batch: b, expectedBatch: ex, err: err}
 	if err != nil {
 		return br
 	}
