@@ -696,7 +696,10 @@ func (c *pgxmock) Exec(ctx context.Context, query string, args ...any) (pgconn.C
 	if err != nil {
 		return pgconn.NewCommandTag(""), err
 	}
-	return ex.result, ex.waitForDelay(ctx)
+	if err := ex.waitForDelay(ctx); err != nil {
+		return pgconn.NewCommandTag(""), err // pgx reports no command tag for a failed statement
+	}
+	return ex.result, nil
 }
 
 // WaitForNotification waits for a LISTEN/NOTIFY message from the server.
