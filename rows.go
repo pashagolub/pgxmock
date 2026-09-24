@@ -167,34 +167,43 @@ func (rs *rowSets) Scan(dest ...any) error {
 			}
 			continue
 		}
-		val := reflect.ValueOf(col)
-		if _, ok := dest[i].(*any); ok || val.Type().AssignableTo(destVal.Elem().Type()) {
-			if destElem := destVal.Elem(); destElem.CanSet() {
-				destElem.Set(val)
-			} else {
-				return fmt.Errorf("cannot set destination value for column %s", r.defs[i].Name)
-			}
-		} else if scanner, ok := destVal.Interface().(interface{ Scan(any) error }); ok {
-			// Try to use Scanner interface
-			if err := scanner.Scan(val.Interface()); err != nil {
-				return fmt.Errorf("scanning value error for column '%s': %w", string(r.defs[i].Name), err)
-			}
-		} else if val.CanConvert(destVal.Elem().Type()) {
-			if destElem := destVal.Elem(); destElem.CanSet() {
-				destElem.Set(val.Convert(destElem.Type()))
-			} else {
-				return fmt.Errorf("cannot set destination value for column %s", r.defs[i].Name)
-			}
-		} else if err := rs.scanViaTypeMap(r.defs[i], col, dest[i]); err != nil {
-			// a pgtype codec registered for the column's OID gets the last word
-			if errors.Is(err, errNoTypeMapping) {
-				return fmt.Errorf("destination kind '%v' not supported for value kind '%v' of column '%s'",
-					destVal.Elem().Kind(), val.Kind(), string(r.defs[i].Name))
-			}
-			return fmt.Errorf("scanning value error for column '%s': %w", string(r.defs[i].Name), err)
+		if err := rs.scanValue(r.defs[i], col, destVal); err != nil {
+			return err
 		}
 	}
 	return r.nextErr[r.recNo-1]
+}
+
+// scanValue stores the non-NULL col into destVal: assign, then Scanner or
+// conversion, then the column's pgtype codec as the last resort.
+func (rs *rowSets) scanValue(fd pgconn.FieldDescription, col any, destVal reflect.Value) error {
+	val := reflect.ValueOf(col)
+	if _, ok := destVal.Interface().(*any); ok || val.Type().AssignableTo(destVal.Elem().Type()) {
+		if destElem := destVal.Elem(); destElem.CanSet() {
+			destElem.Set(val)
+		} else {
+			return fmt.Errorf("cannot set destination value for column %s", fd.Name)
+		}
+	} else if scanner, ok := destVal.Interface().(interface{ Scan(any) error }); ok {
+		// Try to use Scanner interface
+		if err := scanner.Scan(val.Interface()); err != nil {
+			return fmt.Errorf("scanning value error for column '%s': %w", string(fd.Name), err)
+		}
+	} else if val.CanConvert(destVal.Elem().Type()) {
+		if destElem := destVal.Elem(); destElem.CanSet() {
+			destElem.Set(val.Convert(destElem.Type()))
+		} else {
+			return fmt.Errorf("cannot set destination value for column %s", fd.Name)
+		}
+	} else if err := rs.scanViaTypeMap(fd, col, destVal.Interface()); err != nil {
+		// a pgtype codec registered for the column's OID gets the last word
+		if errors.Is(err, errNoTypeMapping) {
+			return fmt.Errorf("destination kind '%v' not supported for value kind '%v' of column '%s'",
+				destVal.Elem().Kind(), val.Kind(), string(fd.Name))
+		}
+		return fmt.Errorf("scanning value error for column '%s': %w", string(fd.Name), err)
+	}
+	return nil
 }
 
 // scanNull assigns a SQL NULL to dest, mirroring how pgx treats NULL values:
