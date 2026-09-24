@@ -332,6 +332,7 @@ func (e *ExpectedExec) WillReturnResult(result pgconn.CommandTag) *ExpectedExec 
 type ExpectedBatch struct {
 	commonExpectation
 	mock            *pgxmock
+	returnsRows     []bool // per expectedQueries: set by ExpectQuery, read by Close
 	expectedQueries []*queryBasedExpectation
 }
 
@@ -340,6 +341,7 @@ func (e *ExpectedBatch) ExpectExec(query string) *ExpectedExec {
 	ee := &ExpectedExec{}
 	ee.expectSQL = query
 	e.expectedQueries = append(e.expectedQueries, &ee.queryBasedExpectation)
+	e.returnsRows = append(e.returnsRows, false)
 	return addExpectation(e.mock, ee)
 }
 
@@ -348,6 +350,7 @@ func (e *ExpectedBatch) ExpectQuery(query string) *ExpectedQuery {
 	eq := &ExpectedQuery{}
 	eq.expectSQL = query
 	e.expectedQueries = append(e.expectedQueries, &eq.queryBasedExpectation)
+	e.returnsRows = append(e.returnsRows, true)
 	return addExpectation(e.mock, eq)
 }
 

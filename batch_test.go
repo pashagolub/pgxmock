@@ -61,6 +61,33 @@ func TestBatch(t *testing.T) {
 	a.NoError(mock.ExpectationsWereMet())
 }
 
+// A failing queued query stops Close, as pgx does.
+func TestBatchCloseStopsAtFirstError(t *testing.T) {
+	errBoom := errors.New("boom")
+	mock, _ := NewConn()
+	eb := mock.ExpectBatch()
+	eb.ExpectQuery("SELECT").WillReturnError(errBoom)
+	eb.ExpectExec("UPDATE").Maybe().WillReturnResult(NewResult("UPDATE", 1))
+
+	b := &pgx.Batch{}
+	b.Queue("SELECT")
+	b.Queue("UPDATE")
+	assert.ErrorIs(t, mock.SendBatch(ctx, b).Close(), errBoom)
+}
+
+func TestBatchCloseReadsUnreadQueries(t *testing.T) {
+	mock, _ := NewConn()
+	eb := mock.ExpectBatch()
+	eb.ExpectQuery("SELECT").WillReturnRows(NewRows([]string{"id"}).AddRow(1)).RowsWillBeClosed()
+	eb.ExpectExec("UPDATE").WillReturnResult(NewResult("UPDATE", 1))
+
+	b := &pgx.Batch{}
+	b.Queue("SELECT")
+	b.Queue("UPDATE")
+	assert.NoError(t, mock.SendBatch(ctx, b).Close())
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
 func TestExplicitBatch(t *testing.T) {
 	t.Parallel()
 	mock, _ := NewConn()
