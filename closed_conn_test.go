@@ -68,6 +68,15 @@ func TestClosedConnRejectsOperations(t *testing.T) {
 	}
 }
 
+func TestWaitForNotificationOnClosedConn(t *testing.T) {
+	mock, _ := NewConn(ErrorOnClosedConnOption())
+	mock.ExpectClose()
+	require.NoError(t, mock.Close(ctx))
+
+	_, err := mock.WaitForNotification(ctx)
+	assert.ErrorIs(t, err, pgconn.ErrConnClosed)
+}
+
 // Without the option the previous, permissive behaviour is preserved.
 func TestClosedConnIsPermissiveByDefault(t *testing.T) {
 	mock, err := NewConn(QueryMatcherOption(QueryMatcherAny))

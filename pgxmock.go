@@ -708,6 +708,10 @@ func (c *pgxmock) Exec(ctx context.Context, query string, args ...any) (pgconn.C
 // combine WillDelayFor with a context deadline to exercise the timeout path
 // that pgx code normally takes around this call.
 func (c *pgxmock) WaitForNotification(ctx context.Context) (*pgconn.Notification, error) {
+	if err := c.checkClosed(); err != nil {
+		return nil, err
+	}
+
 	ex, err := findExpectation[*ExpectedWaitForNotification](c, "WaitForNotification()")
 	if err != nil {
 		return nil, err
