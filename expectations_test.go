@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var ctx = context.Background()
@@ -44,6 +45,29 @@ func TestMaybe(t *testing.T) {
 	a.Equal(cmdtag, res)
 	a.NoError(err)
 	a.NoError(mock.ExpectationsWereMet())
+}
+
+// Every String() lists the details common to all expectations, so a failure
+// message says what was arranged.
+func TestStringIncludesCommonDetails(t *testing.T) {
+	errBoom := errors.New("boom")
+	mock, err := NewConn()
+	require.NoError(t, err)
+
+	for _, e := range []interface{ String() string }{
+		mock.ExpectReset().WillDelayFor(time.Second).WillReturnError(errBoom),
+		mock.ExpectRollback().WillDelayFor(time.Second).WillReturnError(errBoom),
+		mock.ExpectCopyFrom(pgx.Identifier{"public", "users"}, []string{"id"}).
+			WillDelayFor(time.Second).WillReturnError(errBoom),
+	} {
+		assert.Contains(t, e.String(), "returns error: boom")
+		assert.Contains(t, e.String(), "delayed execution for: 1s")
+	}
+	assert.Contains(t, mock.ExpectRollback().WillPanic("tired").String(), "panics with: tired")
+
+	copyFrom := mock.ExpectCopyFrom(pgx.Identifier{"public", "users"}, []string{"id"}).WillReturnResult(3).String()
+	assert.Contains(t, copyFrom, `matches table name: '"public"."users"'`)
+	assert.Contains(t, copyFrom, "returns rows affected: 3")
 }
 
 func TestPanic(t *testing.T) {
