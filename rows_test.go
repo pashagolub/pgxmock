@@ -484,6 +484,20 @@ func TestRowsCloseEarlyError(t *testing.T) {
 	}
 }
 
+func TestRowErrorSurvivesClose(t *testing.T) {
+	errRow := errors.New("row")
+	mock, _ := NewConn()
+	mock.ExpectQuery("SELECT").WillReturnRows(NewRows([]string{"id"}).AddRow(1).AddRow(2).RowError(1, errRow))
+
+	rows, err := mock.Query(ctx, "SELECT")
+	require.NoError(t, err)
+	for rows.Next() {
+	}
+	assert.ErrorIs(t, rows.Err(), errRow, "the row error must be reported after the loop")
+	rows.Close()
+	assert.ErrorIs(t, rows.Err(), errRow, "the row error must be reported after Close")
+}
+
 func TestRowsClosed(t *testing.T) {
 	t.Parallel()
 	mock, err := NewConn()
