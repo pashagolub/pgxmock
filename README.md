@@ -11,7 +11,7 @@ It's based on the well-known [sqlmock](https://github.com/DATA-DOG/go-sqlmock) l
 
 - does not require any modifications to your source code;
 - has strict by default expectation order matching;
-- has no third party dependencies except **pgx** packages.
+- has no third party dependencies except **pgx** packages (testify is used only by its own tests).
 
 ## Install
 
@@ -42,15 +42,17 @@ import (
 	"context"
 
 	pgx "github.com/jackc/pgx/v5"
+	pgxpool "github.com/jackc/pgx/v5/pgxpool"
 )
 
 type PgxIface interface {
 	Begin(context.Context) (pgx.Tx, error)
-	Close(context.Context) error
+	Close()
 }
 
 func recordStats(db PgxIface, userID, productID int) (err error) {
-	if tx, err := db.Begin(context.Background()); err != nil {
+	tx, err := db.Begin(context.Background())
+	if err != nil {
 		return
 	}
 	defer func() {
@@ -74,11 +76,11 @@ func recordStats(db PgxIface, userID, productID int) (err error) {
 
 func main() {
 	// @NOTE: the real connection is not required for tests
-	db, err := pgx.Connect(context.Background(), "postgres://rolname@hostname/dbname")
+	db, err := pgxpool.New(context.Background(), "postgres://rolname@hostname/dbname")
 	if err != nil {
 		panic(err)
 	}
-	defer db.Close(context.Background())
+	defer db.Close()
 
 	if err = recordStats(db, 1 /*some user id*/, 5 /*some product id*/); err != nil {
 		panic(err)
@@ -164,8 +166,11 @@ This now allows to include some library, which would allow for example to parse 
 And create a custom QueryMatcher in order to validate SQL in sophisticated ways.
 
 By default, **pgxmock** is preserving backward compatibility and default query matcher is `pgxmock.QueryMatcherRegexp`
-which uses expected SQL string as a regular expression to match incoming query string. There is an equality matcher:
-`QueryMatcherEqual` which will do a full case sensitive match.
+which uses expected SQL string as a regular expression to match incoming query string. There are also:
+
+- `QueryMatcherEqual`, which does a full case sensitive match, ignoring differences in whitespace;
+- `QueryMatcherSubstring`, which checks that the query contains the expected string, without the escaping a regular expression needs;
+- `QueryMatcherAny`, which disables SQL matching altogether.
 
 In order to customize the QueryMatcher, use the following:
 
@@ -223,13 +228,130 @@ func TestAnyTimeArgument(t *testing.T) {
 }
 ```
 
-It only asserts that the argument is of `time.Time` type. For cases where any value
-is acceptable, the built-in `pgxmock.AnyArg()` matcher can be used instead of
-implementing a custom `Argument`.
+It only asserts that the argument is of `time.Time` type. The same is built in as
+`pgxmock.OfType[time.Time]()`, so a custom `Argument` is rarely needed:
+
+| Matcher | Matches |
+|---|---|
+| `pgxmock.AnyArg()` | any value |
+| `pgxmock.NotNil()` | any value that is not nil, including typed nil pointers, slices and maps |
+| `pgxmock.OfType[T]()` | any value of type `T` |
+| `pgxmock.AnyOf(values...)` | any of the values, which may themselves be matchers |
+| `pgxmock.ArgumentFunc(f)` | whatever the function `f(any) bool` accepts |
+
+``` go
+	mock.ExpectExec("UPDATE orders").
+		WithArgs(pgxmock.AnyOf("pending", "active"), pgxmock.OfType[time.Time](), pgxmock.NotNil()).
+		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+```
+
+`pgx.NamedArgs` are matched as well. Use `WithRewrittenSQL` to also check the SQL they are rewritten to.
+
+## Returning rows and errors
+
+``` go
+	rows := mock.NewRows([]string{"id", "title"}).
+		AddRow(1, "one").
+		AddRow(2, "two").
+		RowError(1, errors.New("row error")). // returned while reading row 1
+		CloseError(errors.New("close error")) // returned by Rows.Err after the rows are read
+	mock.ExpectQuery("SELECT id, title FROM articles").
+		WillReturnRows(rows).
+		RowsWillBeClosed() // fail ExpectationsWereMet if the code under test does not close them
+```
+
+Values assignable to the destination are stored as they are, `sql.Scanner` destinations and
+conversions are supported, and anything else goes through the pgtype codec of the column's
+`DataTypeOID`, see [custom types](#custom-types).
+
+To simulate a server-side failure, return the `*pgconn.PgError` the code under test will really see:
+
+``` go
+	mock.ExpectExec("INSERT INTO users").
+		WillReturnError(pgxmock.NewPgError("23505", `duplicate key value violates unique constraint "users_email_key"`))
+```
+
+## Modifiers
+
+Every expectation can be made optional, repeated, delayed, or made to fail or panic. The modifiers
+may be chained in any order with the builders specific to each expectation:
+
+``` go
+	mock.ExpectQuery("SELECT").
+		Times(2).                         // must be called twice
+		WillReturnRows(rows).
+		WillDelayFor(100 * time.Millisecond) // honours the context deadline
+	mock.ExpectPing().Maybe()               // may not be called at all
+```
+
+By default expectations must be met in the order they were declared. Call
+`mock.MatchExpectationsInOrder(false)` when the code under test runs queries concurrently.
+
+## Transactions
+
+`Begin` and `BeginTx` return the mock itself as the `pgx.Tx`, so expectations for the transaction are
+set on the mock.
+
+## Batches
+
+``` go
+	eb := mock.ExpectBatch()
+	eb.ExpectQuery("SELECT balance").WithArgs(1).WillReturnRows(mock.NewRows([]string{"balance"}).AddRow(100))
+	eb.ExpectExec("UPDATE accounts").WithArgs(1).WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+```
+
+Results are read in the order they were queued, through `BatchResults` or the `QueuedQuery` callbacks.
+
+## CopyFrom
+
+`ExpectCopyFrom` matches the table and columns. Add `WithRows` to assert the rows that were copied too:
+
+``` go
+	mock.ExpectCopyFrom(pgx.Identifier{"users"}, []string{"name", "age"}).
+		WithRows(pgxmock.NewCopyRows("name", "age").
+			AddRow("alice", 30).
+			AddRow("bob", 40).
+			Unordered()). // the rows may arrive in any order
+		WillReturnResult(2)
+```
+
+Values are compared by their encoded form, so an `int` matches the `int32` a `pgx.CopyFromSource` yields.
+
+## Custom types
+
+Every mock owns a `pgtype.Map`, returned by `TypeMap()` of a mocked connection just like
+`pgx.Conn.TypeMap` (for a mocked pool use `mock.AsConn().TypeMap()`). Register custom types on it and
+give the column a `DataTypeOID`, and scanning goes through their codec:
+
+``` go
+	mock.TypeMap().RegisterType(&pgtype.Type{Name: "status", OID: statusOID, Codec: &pgtype.EnumCodec{}})
+	col := mock.NewColumn("status")
+	col.DataTypeOID = statusOID
+	mock.ExpectQuery("SELECT status").WillReturnRows(mock.NewRowsWithColumnDefinition(*col).AddRow("active"))
+```
+
+## LISTEN/NOTIFY
+
+``` go
+	mock.ExpectExec("LISTEN chat").WillReturnResult(pgxmock.NewResult("LISTEN", 0))
+	mock.ExpectWaitForNotification().
+		WillReturnNotification(&pgconn.Notification{Channel: "chat", Payload: "hello"})
+```
+
+## Closed connections
+
+By default a closed mock keeps serving expectations. Create it with `pgxmock.ErrorOnClosedConnOption()`
+to have every operation after `Close` fail with `pgconn.ErrConnClosed`, as pgx does.
+
+## What cannot be mocked
+
+`Conn()`, `PgConn()` and the pool's `Acquire`, `AcquireFunc` and `AcquireAllIdle`
+hand out concrete pgx types that cannot be built outside of pgx. Accept an interface in the code under
+test instead, or use `PgxPoolIface.AsConn()` to get a mocked connection from a mocked pool.
 
 ## Run tests
 
-    go test -race
+    go test -race ./...
 
 ## Contributions
 
