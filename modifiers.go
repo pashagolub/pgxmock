@@ -432,3 +432,38 @@ func (e *ExpectedRollback) WillPanic(v any) *ExpectedRollback {
 	e.commonExpectation.WillPanic(v)
 	return e
 }
+
+// --- ExpectedWaitForNotification ---
+
+// Maybe allows the expected method call to be optional.
+// Not calling an optional method will not cause an error while asserting expectations.
+func (e *ExpectedWaitForNotification) Maybe() *ExpectedWaitForNotification {
+	e.commonExpectation.Maybe()
+	return e
+}
+
+// Times indicates that the expected method should only fire the indicated number of times.
+// Zero value is ignored and means the same as one.
+func (e *ExpectedWaitForNotification) Times(n uint) *ExpectedWaitForNotification {
+	e.commonExpectation.Times(n)
+	return e
+}
+
+// WillDelayFor allows to specify duration for which it will delay result.
+// May be used together with Context.
+func (e *ExpectedWaitForNotification) WillDelayFor(duration time.Duration) *ExpectedWaitForNotification {
+	e.commonExpectation.WillDelayFor(duration)
+	return e
+}
+
+// WillReturnError allows to set an error for the expected method.
+func (e *ExpectedWaitForNotification) WillReturnError(err error) *ExpectedWaitForNotification {
+	e.commonExpectation.WillReturnError(err)
+	return e
+}
+
+// WillPanic allows to force the expected method to panic.
+func (e *ExpectedWaitForNotification) WillPanic(v any) *ExpectedWaitForNotification {
+	e.commonExpectation.WillPanic(v)
+	return e
+}
