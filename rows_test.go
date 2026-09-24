@@ -618,6 +618,17 @@ func TestRowsScanError(t *testing.T) {
 	}
 }
 
+func TestScanIntoTypedNilPointer(t *testing.T) {
+	mock, _ := NewConn()
+	mock.ExpectQuery("SELECT").WillReturnRows(NewRows([]string{"id"}).AddRow(1))
+
+	var p *int
+	assert.NotPanics(t, func() {
+		err := mock.QueryRow(ctx, "SELECT").Scan(p)
+		assert.ErrorContains(t, err, "non-nil pointer")
+	})
+}
+
 type testScanner struct {
 	Value int64
 }
