@@ -11,7 +11,7 @@ It's based on the well-known [sqlmock](https://github.com/DATA-DOG/go-sqlmock) l
 
 - does not require any modifications to your source code;
 - has strict by default expectation order matching;
-- has no third party dependencies except **pgx** packages.
+- has no third party dependencies except **pgx** packages (testify is used only by its own tests).
 
 ## Install
 
@@ -42,15 +42,17 @@ import (
 	"context"
 
 	pgx "github.com/jackc/pgx/v5"
+	pgxpool "github.com/jackc/pgx/v5/pgxpool"
 )
 
 type PgxIface interface {
 	Begin(context.Context) (pgx.Tx, error)
-	Close(context.Context) error
+	Close()
 }
 
 func recordStats(db PgxIface, userID, productID int) (err error) {
-	if tx, err := db.Begin(context.Background()); err != nil {
+	tx, err := db.Begin(context.Background())
+	if err != nil {
 		return
 	}
 	defer func() {
@@ -74,11 +76,11 @@ func recordStats(db PgxIface, userID, productID int) (err error) {
 
 func main() {
 	// @NOTE: the real connection is not required for tests
-	db, err := pgx.Connect(context.Background(), "postgres://rolname@hostname/dbname")
+	db, err := pgxpool.New(context.Background(), "postgres://rolname@hostname/dbname")
 	if err != nil {
 		panic(err)
 	}
-	defer db.Close(context.Background())
+	defer db.Close()
 
 	if err = recordStats(db, 1 /*some user id*/, 5 /*some product id*/); err != nil {
 		panic(err)
@@ -229,7 +231,7 @@ implementing a custom `Argument`.
 
 ## Run tests
 
-    go test -race
+    go test -race ./...
 
 ## Contributions
 
