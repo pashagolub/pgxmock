@@ -166,8 +166,11 @@ This now allows to include some library, which would allow for example to parse 
 And create a custom QueryMatcher in order to validate SQL in sophisticated ways.
 
 By default, **pgxmock** is preserving backward compatibility and default query matcher is `pgxmock.QueryMatcherRegexp`
-which uses expected SQL string as a regular expression to match incoming query string. There is an equality matcher:
-`QueryMatcherEqual` which will do a full case sensitive match.
+which uses expected SQL string as a regular expression to match incoming query string. There are also:
+
+- `QueryMatcherEqual`, which does a full case sensitive match, ignoring differences in whitespace;
+- `QueryMatcherSubstring`, which checks that the query contains the expected string, without the escaping a regular expression needs;
+- `QueryMatcherAny`, which disables SQL matching altogether.
 
 In order to customize the QueryMatcher, use the following:
 
@@ -225,9 +228,24 @@ func TestAnyTimeArgument(t *testing.T) {
 }
 ```
 
-It only asserts that the argument is of `time.Time` type. For cases where any value
-is acceptable, the built-in `pgxmock.AnyArg()` matcher can be used instead of
-implementing a custom `Argument`.
+It only asserts that the argument is of `time.Time` type. The same is built in as
+`pgxmock.OfType[time.Time]()`, so a custom `Argument` is rarely needed:
+
+| Matcher | Matches |
+|---|---|
+| `pgxmock.AnyArg()` | any value |
+| `pgxmock.NotNil()` | any value that is not nil, including typed nil pointers, slices and maps |
+| `pgxmock.OfType[T]()` | any value of type `T` |
+| `pgxmock.AnyOf(values...)` | any of the values, which may themselves be matchers |
+| `pgxmock.ArgumentFunc(f)` | whatever the function `f(any) bool` accepts |
+
+``` go
+	mock.ExpectExec("UPDATE orders").
+		WithArgs(pgxmock.AnyOf("pending", "active"), pgxmock.OfType[time.Time](), pgxmock.NotNil()).
+		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+```
+
+`pgx.NamedArgs` are matched as well. Use `WithRewrittenSQL` to also check the SQL they are rewritten to.
 
 ## Run tests
 
