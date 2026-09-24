@@ -719,6 +719,7 @@ func findExpectationFunc[ET expectationType[t], t any](c *pgxmock, method string
 	var expected ET
 	var fulfilled int
 	var ok bool
+	var mismatch error // why the last expectation of the right type was rejected
 	defer func() {
 		if expected != nil {
 			expected.Unlock()
@@ -736,6 +737,7 @@ func findExpectationFunc[ET expectationType[t], t any](c *pgxmock, method string
 			if err = cmp(expected); err == nil {
 				break
 			}
+			mismatch = err
 		}
 		expected = nil
 		next.Unlock()
@@ -754,6 +756,9 @@ func findExpectationFunc[ET expectationType[t], t any](c *pgxmock, method string
 		msg := fmt.Sprintf("call to method %s was not expected", method)
 		if fulfilled == len(c.expectations) {
 			msg = "all expectations were already fulfilled, " + msg
+		}
+		if mismatch != nil {
+			return nil, fmt.Errorf("%s: %w", msg, mismatch)
 		}
 		return nil, errors.New(msg)
 	}

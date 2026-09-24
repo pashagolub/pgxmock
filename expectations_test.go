@@ -160,6 +160,16 @@ func TestUnexpectedPrepare(t *testing.T) {
 	}
 }
 
+func TestUnorderedMismatchIsReported(t *testing.T) {
+	mock, _ := NewConn()
+	mock.MatchExpectationsInOrder(false)
+	mock.ExpectExec("UPDATE").WithArgs(1).WillReturnResult(NewResult("UPDATE", 1))
+
+	_, err := mock.Exec(ctx, "UPDATE", 2)
+	assert.ErrorContains(t, err, "call to method Exec() was not expected: ")
+	assert.ErrorContains(t, err, "does not match actual")
+}
+
 func TestUnexpectedCopyFrom(t *testing.T) {
 	mock, _ := NewConn()
 	_, err := mock.CopyFrom(ctx, pgx.Identifier{"schema", "table"}, []string{"foo", "bar"}, nil)
