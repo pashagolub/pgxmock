@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func cancelOrder(db PgxCommonIface, orderID int) error {
@@ -975,6 +976,28 @@ func TestUnexpectedRollbackOrder(t *testing.T) {
 	if err := tx.Rollback(context.Background()); err == nil {
 		t.Error("an error was expected when calling rollback, but got none")
 	}
+}
+
+// The idiomatic `defer tx.Rollback(ctx)` runs after a successful Commit. pgx
+// reports pgx.ErrTxClosed there, which callers are expected to ignore.
+func TestRollbackAfterCommitReportsTxClosed(t *testing.T) {
+	mock, err := NewConn()
+	require.NoError(t, err)
+	mock.ExpectBegin()
+	mock.ExpectCommit()
+
+	tx, err := mock.Begin(ctx)
+	require.NoError(t, err)
+	require.NoError(t, tx.Commit(ctx))
+	assert.ErrorIs(t, tx.Rollback(ctx), pgx.ErrTxClosed)
+	assert.ErrorIs(t, tx.Commit(ctx), pgx.ErrTxClosed)
+	assert.NoError(t, mock.ExpectationsWereMet())
+
+	// a new transaction is open again
+	mock.ExpectBegin()
+	_, err = mock.Begin(ctx)
+	require.NoError(t, err)
+	assert.ErrorContains(t, mock.Rollback(ctx), "Rollback() was not expected")
 }
 
 func TestPrepareExec(t *testing.T) {

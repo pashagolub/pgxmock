@@ -174,6 +174,7 @@ type pgxmock struct {
 	expectations      []expectation
 	errorOnClosedConn bool
 	closed            atomic.Bool
+	txDone            atomic.Bool // tx ended, so a stray Commit/Rollback reports pgx.ErrTxClosed
 	typeMap           *lockedTypeMap
 }
 
@@ -493,6 +494,7 @@ func (c *pgxmock) BeginTx(ctx context.Context, txOptions pgx.TxOptions) (pgx.Tx,
 	if err = ex.waitForDelay(ctx); err != nil {
 		return nil, err
 	}
+	c.txDone.Store(false)
 	return c, nil
 }
 
@@ -563,9 +565,26 @@ func (c *pgxmock) Commit(ctx context.Context) error {
 
 	ex, err := findExpectation[*ExpectedCommit](c, "Commit()")
 	if err != nil {
-		return err
+		return c.txClosedOr(err)
 	}
-	return ex.waitForDelay(ctx)
+	return c.endTx(ex.waitForDelay(ctx))
+}
+
+// endTx records a successful Commit or Rollback, see pgxmock.txDone.
+func (c *pgxmock) endTx(err error) error {
+	if err == nil {
+		c.txDone.Store(true)
+	}
+	return err
+}
+
+// txClosedOr reports pgx.ErrTxClosed for an unexpected Commit or Rollback of
+// a transaction that has already ended, and err otherwise.
+func (c *pgxmock) txClosedOr(err error) error {
+	if c.txDone.Load() {
+		return pgx.ErrTxClosed
+	}
+	return err
 }
 
 func (c *pgxmock) Rollback(ctx context.Context) error {
@@ -575,9 +594,9 @@ func (c *pgxmock) Rollback(ctx context.Context) error {
 
 	ex, err := findExpectation[*ExpectedRollback](c, "Rollback()")
 	if err != nil {
-		return err
+		return c.txClosedOr(err)
 	}
-	return ex.waitForDelay(ctx)
+	return c.endTx(ex.waitForDelay(ctx))
 }
 
 // Implement the "QueryerContext" interface
