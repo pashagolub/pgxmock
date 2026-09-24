@@ -628,25 +628,21 @@ func (e *ExpectedCopyFrom) recordRowsError(err error) {
 
 // String returns string representation
 func (e *ExpectedCopyFrom) String() string {
-	msg := "ExpectedCopyFrom => expecting CopyFrom which:"
-	msg += "\n  - matches table name: '" + e.expectedTableName.Sanitize() + "'"
-	msg += fmt.Sprintf("\n  - matches column names: '%+v'", e.expectedColumns)
+	msg := "ExpectedCopyFrom => expecting call to CopyFrom():\n"
+	msg += fmt.Sprintf("\t- matches table name: '%s'\n", e.expectedTableName.Sanitize())
+	msg += fmt.Sprintf("\t- matches column names: '%+v'\n", e.expectedColumns)
 	if e.expectedRows != nil {
 		order := ""
 		if e.expectedRows.unordered {
 			order = " in any order"
 		}
-		msg += fmt.Sprintf("\n  - matches %d row(s)%s:", len(e.expectedRows.rows.rows), order)
+		msg += fmt.Sprintf("\t- matches %d row(s)%s:\n", len(e.expectedRows.rows.rows), order)
 		for i, row := range e.expectedRows.rows.rows {
-			msg += fmt.Sprintf("\n      row %d - %+v", i, row)
+			msg += fmt.Sprintf("\t\trow %d - %+v\n", i, row)
 		}
 	}
-
-	if e.err != nil {
-		msg += fmt.Sprintf("\n  - should returns error: %s", e.err)
-	}
-
-	return msg
+	msg += fmt.Sprintf("\t- returns rows affected: %d\n", e.rowsAffected)
+	return msg + e.commonExpectation.String()
 }
 
 // WillReturnResult arranges for an expected CopyFrom() to return a number of rows affected
@@ -660,8 +656,9 @@ type ExpectedReset struct {
 	commonExpectation
 }
 
+// String returns string representation
 func (e *ExpectedReset) String() string {
-	return "ExpectedReset => expecting database Reset"
+	return "ExpectedReset => expecting call to Reset()\n" + e.commonExpectation.String()
 }
 
 // ExpectedRollback is used to manage pgx.Tx.Rollback expectation
@@ -672,9 +669,5 @@ type ExpectedRollback struct {
 
 // String returns string representation
 func (e *ExpectedRollback) String() string {
-	msg := "ExpectedRollback => expecting transaction Rollback"
-	if e.err != nil {
-		msg += fmt.Sprintf(", which should return error: %s", e.err)
-	}
-	return msg
+	return "ExpectedRollback => expecting call to Tx.Rollback()\n" + e.commonExpectation.String()
 }
