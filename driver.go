@@ -19,8 +19,9 @@ func NewConn(options ...func(*pgxmock) error) (PgxConnIface, error) {
 	return smock, smock.open(options)
 }
 
+// Config returns a copy of the configuration set by ConnConfigOption.
 func (c *pgxmockConn) Config() *pgx.ConnConfig {
-	return &pgx.ConnConfig{}
+	return c.connConfig.Copy()
 }
 
 type pgxmockPool struct {
@@ -61,8 +62,9 @@ func (p *pgxmockPool) AcquireAllIdle(context.Context) []*pgxpool.Conn {
 	return []*pgxpool.Conn{}
 }
 
+// Config returns a copy of the configuration set by PoolConfigOption.
 func (p *pgxmockPool) Config() *pgxpool.Config {
-	return &pgxpool.Config{ConnConfig: &pgx.ConnConfig{}}
+	return p.poolConfig.Copy()
 }
 
 // AsConn is similar to Acquire but returns proper mocking interface.

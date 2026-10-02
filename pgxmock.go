@@ -202,6 +202,30 @@ type pgxmock struct {
 	closed            atomic.Bool
 	txDone            atomic.Bool // tx ended, so a stray Commit/Rollback reports pgx.ErrTxClosed
 	typeMap           *lockedTypeMap
+	connConfig        *pgx.ConnConfig // reported by Config(), never nil after open
+	poolConfig        *pgxpool.Config // shares connConfig, like a real pool and its connections
+}
+
+// normalizeConfig fills in the defaults and copies the configs the options passed.
+func (c *pgxmock) normalizeConfig() error {
+	if c.poolConfig == nil {
+		c.poolConfig = &pgxpool.Config{}
+	} else {
+		poolConfig := *c.poolConfig
+		c.poolConfig = &poolConfig
+	}
+	switch {
+	case c.connConfig == nil && c.poolConfig.ConnConfig == nil:
+		c.connConfig = &pgx.ConnConfig{}
+	case c.connConfig == nil:
+		c.connConfig = c.poolConfig.ConnConfig
+	case c.poolConfig.ConnConfig != nil && c.poolConfig.ConnConfig != c.connConfig:
+		return errors.New("pgxmock: ConnConfigOption and PoolConfigOption disagree " +
+			"about the connection configuration, pass only one of them")
+	}
+	c.connConfig = c.connConfig.Copy()
+	c.poolConfig.ConnConfig = c.connConfig
+	return nil
 }
 
 // TypeMap returns the pgtype.Map this mock decodes values with, the way
@@ -390,7 +414,7 @@ func (c *pgxmock) open(options []func(*pgxmock) error) error {
 		c.queryMatcher = QueryMatcherRegexp
 	}
 
-	return nil
+	return c.normalizeConfig()
 }
 
 // Close a mock database driver connection. It may or may not
