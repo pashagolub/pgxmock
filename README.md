@@ -154,6 +154,42 @@ func TestShouldRollbackStatUpdatesOnFailure(t *testing.T) {
 }
 ```
 
+## Loading custom types
+
+Code that uses PostgreSQL enums, composites, domains or ranges loads them at
+startup and registers them. `ExpectLoadTypes` (or `ExpectLoadType`) mocks the
+loading; as in pgx, registering stays with the code under test:
+
+``` go
+// the code under test
+type typeLoader interface {
+	LoadTypes(ctx context.Context, typeNames []string) ([]*pgtype.Type, error)
+	TypeMap() *pgtype.Map
+}
+
+func registerTypes(ctx context.Context, conn typeLoader) error {
+	types, err := conn.LoadTypes(ctx, []string{"status"})
+	if err != nil {
+		return err
+	}
+	conn.TypeMap().RegisterTypes(types)
+	return nil
+}
+
+// the test
+func TestRegisterTypes(t *testing.T) {
+	mock, err := pgxmock.NewConn()
+	require.NoError(t, err)
+	mock.ExpectLoadTypes("status").
+		WillReturnTypes(&pgtype.Type{Name: "status", OID: 100000, Codec: &pgtype.EnumCodec{}})
+
+	require.NoError(t, registerTypes(context.Background(), mock))
+	_, ok := mock.TypeMap().TypeForName("status")
+	assert.True(t, ok)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+```
+
 ## Customize SQL query matching
 
 There were plenty of requests from users regarding SQL query string validation or different matching option.
