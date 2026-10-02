@@ -12,6 +12,10 @@ jobs:
     if: true # false to skip job during debug
     name: Test and Build on Ubuntu
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # the two most recent Go releases, see the version support policy
+        go: ['1.25', '1.26']
     steps:
 
     - name: Check out code
@@ -20,7 +24,7 @@ jobs:
     - name: Set up Golang
       uses: actions/setup-go@v7
       with:
-        go-version: '1.26'      
+        go-version: ${{ matrix.go }}
 
     - name: Get dependencies
       run: |
@@ -28,6 +32,7 @@ jobs:
         go version
 
     - name: GolangCI-Lint
+      if: matrix.go == '1.26'
       uses: golangci/golangci-lint-action@v9
       with:
         version: latest      
@@ -39,6 +44,7 @@ jobs:
       run: go test -race -v ./... -coverprofile=profile.cov -coverpkg=github.com/pashagolub/pgxmock/v5
 
     - name: Coveralls
+      if: matrix.go == '1.26'
       uses: shogo82148/actions-goveralls@v1
       with:
         path-to-profile: profile.cov      
