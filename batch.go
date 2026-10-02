@@ -90,9 +90,27 @@ func (br *batchResults) Close() error {
 }
 
 func (br *batchResults) callQuedQueryFn(qq *pgx.QueuedQuery) error {
-	if qq.Fn != nil {
+	switch {
+	case qq.Fn != nil:
 		return qq.Fn(br)
+	case br.expectsRows(br.qqIdx):
+		// read and discard the result, the way it was expected
+		rows, err := br.Query()
+		if err != nil {
+			return err
+		}
+		for rows.Next() {
+		}
+		rows.Close()
+		return rows.Err()
+	default:
+		_, err := br.Exec()
+		return err
 	}
-	_, err := br.Exec()
-	return err
+}
+
+// expectsRows reports whether the queued query at idx was expected with
+// ExpectedBatch.ExpectQuery rather than ExpectedBatch.ExpectExec.
+func (br *batchResults) expectsRows(idx int) bool {
+	return br.expectedBatch != nil && idx < len(br.expectedBatch.returnsRows) && br.expectedBatch.returnsRows[idx]
 }
