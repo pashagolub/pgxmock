@@ -514,7 +514,7 @@ func (c *pgxmock) SendBatch(ctx context.Context, b *pgx.Batch) pgx.BatchResults 
 }
 
 func (c *pgxmock) LargeObjects() pgx.LargeObjects {
-	return pgx.LargeObjects{}
+	panic("pgxmock: large objects are not supported, store the data as bytea or mock an interface of your own")
 }
 
 func (c *pgxmock) Begin(ctx context.Context) (pgx.Tx, error) {
