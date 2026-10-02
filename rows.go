@@ -111,12 +111,18 @@ func (rs *rowSets) Close() {
 	rs.close()
 }
 
-// close marks the current rows closed, jumps to the last row, and sets the
-// close error.
+// close jumps to the last row and keeps the first error, as pgx does
 func (rs *rowSets) close() {
 	r := rs.sets[rs.RowSetNo]
+	if r.closed {
+		return
+	}
+	err := r.nextErr[r.recNo-1]
+	if err == nil {
+		err = r.closeErr
+	}
 	r.recNo = len(r.rows)
-	r.nextErr[r.recNo-1] = r.closeErr
+	r.nextErr[r.recNo-1] = err
 	r.closed = true
 }
 
