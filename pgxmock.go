@@ -409,10 +409,11 @@ func (c *pgxmock) CopyFrom(ctx context.Context, tableName pgx.Identifier, column
 		if err != nil {
 			return 0, err
 		}
-		if rowSrc.Err() != nil {
-			return 0, rowSrc.Err()
-		}
 		copied = append(copied, values)
+	}
+	// a source such as pgx.CopyFromFunc reports its failure by ending early
+	if err := rowSrc.Err(); err != nil {
+		return 0, err
 	}
 	if err := ex.rowsMatch(c.typeMap, copied); err != nil {
 		// the expectation was matched on table and columns and is already

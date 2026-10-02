@@ -141,6 +141,23 @@ func TestCopyFromReportsNoRowsOnFailure(t *testing.T) {
 	})
 }
 
+func TestCopyFromReportsSourceError(t *testing.T) {
+	errSource := errors.New("source")
+	mock, _ := NewConn()
+	mock.ExpectCopyFrom(pgx.Identifier{"t"}, []string{"id"}).WillReturnResult(1)
+
+	calls := 0
+	n, err := mock.CopyFrom(ctx, pgx.Identifier{"t"}, []string{"id"}, pgx.CopyFromFunc(func() ([]any, error) {
+		calls++
+		if calls == 1 {
+			return []any{1}, nil
+		}
+		return nil, errSource
+	}))
+	assert.ErrorIs(t, err, errSource)
+	assert.Zero(t, n)
+}
+
 // failingCopySource yields one row and then reports an error, the way a source
 // reading from somewhere that broke mid-copy does.
 type failingCopySource struct {
