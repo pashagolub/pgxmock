@@ -85,3 +85,23 @@ func TestQueryReturnsRowsAndErrorTogether(t *testing.T) {
 	assert.ErrorIs(t, rows.Err(), errBoom)
 	rows.Close()
 }
+
+func TestClosingFailedQueryRowsSatisfiesRowsWillBeClosed(t *testing.T) {
+	errQuery := errors.New("query")
+	mock, _ := NewConn()
+	mock.ExpectQuery("SELECT").WillReturnError(errQuery).RowsWillBeClosed()
+
+	rows, err := mock.Query(ctx, "SELECT")
+	assert.ErrorIs(t, err, errQuery)
+	rows.Close()
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestFailedQueryRowClosesRows(t *testing.T) {
+	mock, _ := NewConn()
+	mock.ExpectQuery("SELECT").WillReturnError(errors.New("query")).RowsWillBeClosed()
+
+	var id int
+	_ = mock.QueryRow(ctx, "SELECT").Scan(&id)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
