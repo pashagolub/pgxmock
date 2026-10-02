@@ -952,6 +952,25 @@ func TestConnRow(t *testing.T) {
 	a.NoError(mock.ExpectationsWereMet())
 }
 
+func TestQueryRowReportsCloseError(t *testing.T) {
+	errClose := errors.New("close")
+	mock, _ := NewConn()
+	mock.ExpectQuery("SELECT").WillReturnRows(NewRows([]string{"id"}).AddRow(1).CloseError(errClose))
+
+	var id int
+	assert.ErrorIs(t, mock.QueryRow(ctx, "SELECT").Scan(&id), errClose)
+	assert.Equal(t, 1, id)
+}
+
+func TestQueryRowNoRowsClosesRows(t *testing.T) {
+	mock, _ := NewConn()
+	mock.ExpectQuery("SELECT").RowsWillBeClosed().WillReturnRows(NewRows([]string{"id"}))
+
+	var id int
+	assert.ErrorIs(t, mock.QueryRow(ctx, "SELECT").Scan(&id), pgx.ErrNoRows)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
 func TestInvalidsQueryRow(t *testing.T) {
 	mock, _ := NewPool()
 	a := assert.New(t)

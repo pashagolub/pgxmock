@@ -32,6 +32,7 @@ type connRow rowSets
 
 func (r *connRow) Scan(dest ...any) (err error) {
 	rows := (*rowSets)(r)
+	defer rows.Close() // pgx closes the rows behind QueryRow on every path
 
 	if rows.Err() != nil {
 		return rows.Err()
@@ -39,7 +40,6 @@ func (r *connRow) Scan(dest ...any) (err error) {
 
 	for _, d := range dest {
 		if _, ok := d.(*pgtype.DriverBytes); ok {
-			rows.Close()
 			return fmt.Errorf("cannot scan into *pgtype.DriverBytes from QueryRow")
 		}
 	}
@@ -50,8 +50,13 @@ func (r *connRow) Scan(dest ...any) (err error) {
 		}
 		return rows.Err()
 	}
-	defer rows.Close()
-	return errors.Join(rows.Scan(dest...), rows.Err())
+	// like pgx, close before reporting, so that a CloseError is seen too
+	scanErr := rows.Scan(dest...)
+	rows.Close()
+	if scanErr != nil {
+		return scanErr
+	}
+	return rows.Err()
 }
 
 type rowSets struct {
