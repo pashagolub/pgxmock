@@ -58,6 +58,7 @@ type rowSets struct {
 	sets     []*Rows
 	RowSetNo int
 	ex       *ExpectedQuery
+	queryErr error // returned by the query, reported by Err ahead of row errors
 	// typeMap is the type map of the mock these rows were returned by. It is
 	// nil for rows built outside a query, e.g. through Rows.Kind().
 	typeMap *lockedTypeMap
@@ -84,6 +85,9 @@ func (rs *rowSets) Conn() *pgx.Conn {
 }
 
 func (rs *rowSets) Err() error {
+	if rs.queryErr != nil {
+		return rs.queryErr
+	}
 	r := rs.sets[rs.RowSetNo]
 	return r.nextErr[r.recNo-1]
 }
@@ -118,6 +122,10 @@ func (rs *rowSets) close() {
 
 // advances to next row
 func (rs *rowSets) Next() bool {
+	if rs.queryErr != nil {
+		rs.close()
+		return false
+	}
 	r := rs.sets[rs.RowSetNo]
 	if r.recNo == len(r.rows) && r.nextErr[r.recNo] == nil {
 		rs.close()

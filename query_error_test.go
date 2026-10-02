@@ -4,11 +4,25 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	pgx "github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestQueryErrorIsReportedByRows(t *testing.T) {
+	mock, _ := NewConn()
+	mock.ExpectQuery("SELECT").
+		WillReturnRows(NewRows([]string{"id"}).AddRow(1)).
+		WillDelayFor(time.Second)
+
+	timeout, cancel := context.WithTimeout(ctx, 10*time.Millisecond)
+	defer cancel()
+	rows, _ := mock.Query(timeout, "SELECT")
+	_, err := pgx.CollectRows(rows, pgx.RowTo[int])
+	assert.ErrorIs(t, err, context.DeadlineExceeded)
+}
 
 // pgx.Conn.Query always returns a usable pgx.Rows, even when it also returns
 // an error, so that the idiomatic `rows, err := Query(); defer rows.Close()`
@@ -55,8 +69,7 @@ func TestBatchQueryErrorReturnsRows(t *testing.T) {
 	rows.Close()
 }
 
-// Rows explicitly attached to an expectation are still returned alongside the
-// error, so tests that arrange both keep working.
+// As in pgx, rows returned with an error yield nothing and report the error.
 func TestQueryReturnsRowsAndErrorTogether(t *testing.T) {
 	errBoom := errors.New("boom")
 	mock, err := NewConn(QueryMatcherOption(QueryMatcherAny))
@@ -68,6 +81,7 @@ func TestQueryReturnsRowsAndErrorTogether(t *testing.T) {
 	rows, err := mock.Query(context.Background(), "SELECT id FROM t")
 	assert.ErrorIs(t, err, errBoom)
 	assert.NotNil(t, rows)
-	assert.True(t, rows.Next(), "the arranged rows must still be readable")
+	assert.False(t, rows.Next())
+	assert.ErrorIs(t, rows.Err(), errBoom)
 	rows.Close()
 }

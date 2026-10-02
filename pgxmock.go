@@ -628,6 +628,8 @@ func (c *pgxmock) Query(ctx context.Context, sql string, args ...any) (pgx.Rows,
 	if rs, ok := rows.(*rowSets); ok {
 		// each call gets its own rowSets, so this is not shared state
 		rs.typeMap = c.typeMap
+		// pgx allows checking Rows.Err instead of the error of Query
+		rs.queryErr = err
 	}
 	return rows, err
 }
