@@ -156,3 +156,9 @@ func TestBatchConsumesRewriterOnly(t *testing.T) {
 	assert.NoError(t, br.Close())
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
+
+func TestOptionalQueryNeedNotCloseRows(t *testing.T) {
+	mock, _ := NewConn()
+	mock.ExpectQuery("SELECT").Maybe().RowsWillBeClosed().WillReturnRows(NewRows([]string{"id"}))
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
