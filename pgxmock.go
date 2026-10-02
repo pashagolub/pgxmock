@@ -1,10 +1,14 @@
 /*
-package pgxmock is a mock library implementing pgx connector. Which has one and only
-purpose - to simulate pgx driver behavior in tests, without needing a real
-database connection. It helps to maintain correct **TDD** workflow.
+Package pgxmock is a mock library implementing the pgx connection, pool and
+transaction interfaces. Its one and only purpose is to simulate pgx behavior in
+tests, without needing a real database connection, which helps to maintain a
+correct TDD workflow.
 
-It does not require (almost) any modifications to your source code in order to test
-and mock database operations. Supports concurrency and multiple database mocking.
+It does not require (almost) any modifications to your source code in order to
+test and mock database operations: have the code under test accept a small
+interface of its own that *pgx.Conn or *pgxpool.Pool satisfies, and pass the
+mock created by NewConn or NewPool in tests. Almost any pgx method can be
+mocked. Supports concurrency and multiple database mocking.
 
 # Concurrency
 
@@ -17,8 +21,6 @@ Each expectation must be fully configured before the code under test can reach
 it, though: the builder methods (WillReturnRows, WillReturnError, ...) mutate
 the expectation after ExpectQuery and friends have already published it. Set an
 expectation up completely, then start the goroutines that will match it.
-
-The driver allows to mock any pgx driver method behavior.
 */
 package pgxmock
 
@@ -60,6 +62,9 @@ type Expecter interface {
 	// ExpectDeallocate expects Deallocate() to be called with expectedStmtName.
 	// The *ExpectedDeallocate allows to mock database response
 	ExpectDeallocate(expectedStmtName string) *ExpectedDeallocate
+
+	// ExpectDeallocateAll expects DeallocateAll() to be called.
+	// The *ExpectedDeallocate allows to mock database response
 	ExpectDeallocateAll() *ExpectedDeallocate
 
 	// ExpectQuery expects Query() or QueryRow() to be called with expectedSQL query.
@@ -100,7 +105,7 @@ type Expecter interface {
 	ExpectWaitForNotification() *ExpectedWaitForNotification
 
 	// ExpectCopyFrom expects pgx.CopyFrom to be called.
-	// The *ExpectCopyFrom allows to mock database response
+	// The *ExpectedCopyFrom allows to mock database response
 	ExpectCopyFrom(expectedTableName pgx.Identifier, expectedColumns []string) *ExpectedCopyFrom
 
 	// MatchExpectationsInOrder gives an option whether to match all
@@ -133,19 +138,31 @@ type Expecter interface {
 type PgxCommonIface interface {
 	Expecter
 	pgx.Tx
+	// BeginTx starts a transaction with the given options, see ExpectBeginTx.
+	// The returned pgx.Tx is the mock itself.
 	BeginTx(ctx context.Context, txOptions pgx.TxOptions) (pgx.Tx, error)
+	// Ping checks the connection, see ExpectPing.
 	Ping(context.Context) error
 }
 
 // PgxConnIface represents pgx.Conn specific interface
 type PgxConnIface interface {
 	PgxCommonIface
+	// Close closes the connection, see ExpectClose.
 	Close(ctx context.Context) error
+	// WaitForNotification waits for a LISTEN/NOTIFY message, see
+	// ExpectWaitForNotification.
 	WaitForNotification(ctx context.Context) (*pgconn.Notification, error)
+	// Deallocate releases a prepared statement, see ExpectDeallocate.
 	Deallocate(ctx context.Context, name string) error
+	// DeallocateAll releases all prepared statements, see ExpectDeallocateAll.
 	DeallocateAll(ctx context.Context) error
+	// Config returns the connection config.
 	Config() *pgx.ConnConfig
+	// PgConn returns an empty, unusable low level connection.
 	PgConn() *pgconn.PgConn
+	// TypeMap returns the type map the mock scans values with. Register
+	// custom types on it the way it is done with pgx.
 	TypeMap() *pgtype.Map
 	// IsClosed reports whether Close has been called.
 	IsClosed() bool
@@ -154,13 +171,22 @@ type PgxConnIface interface {
 // PgxPoolIface represents pgxpool.Pool specific interface
 type PgxPoolIface interface {
 	PgxCommonIface
+	// Acquire returns ErrAcquireNotSupported, use AsConn instead.
 	Acquire(ctx context.Context) (*pgxpool.Conn, error)
+	// AcquireAllIdle returns no connections.
 	AcquireAllIdle(ctx context.Context) []*pgxpool.Conn
+	// AcquireFunc returns ErrAcquireNotSupported without calling f, use
+	// AsConn instead.
 	AcquireFunc(ctx context.Context, f func(*pgxpool.Conn) error) error
+	// AsConn returns a mocked connection sharing the pool's expectations.
 	AsConn() PgxConnIface
+	// Close closes the pool, see ExpectClose.
 	Close()
+	// Stat returns empty statistics.
 	Stat() *pgxpool.Stat
+	// Reset closes all connections of the pool, see ExpectReset.
 	Reset()
+	// Config returns the pool config.
 	Config() *pgxpool.Config
 }
 
@@ -381,7 +407,7 @@ func (c *pgxmock) Close(ctx context.Context) error {
 }
 
 func (c *pgxmock) Conn() *pgx.Conn {
-	panic("pgxmock: Conn() cannot return a mocked *pgx.Conn, accept an interface such as pgxmock.PgxConnIface instead")
+	panic("pgxmock: Conn() cannot return a mocked *pgx.Conn, accept an interface of your own instead")
 }
 
 func (c *pgxmock) CopyFrom(ctx context.Context, tableName pgx.Identifier, columnNames []string, rowSrc pgx.CopyFromSource) (int64, error) {
