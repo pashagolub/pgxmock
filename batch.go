@@ -12,6 +12,7 @@ import (
 var errBatchClosed = errors.New("batch already closed")
 
 type batchResults struct {
+	ctx           context.Context // of SendBatch, used for every result like in pgx
 	mock          *pgxmock
 	batch         *pgx.Batch
 	expectedBatch *ExpectedBatch
@@ -45,7 +46,7 @@ func (br *batchResults) Exec() (pgconn.CommandTag, error) {
 	if err != nil {
 		return pgconn.NewCommandTag(""), err
 	}
-	return br.mock.Exec(context.Background(), query, arguments...)
+	return br.mock.Exec(br.ctx, query, arguments...)
 }
 
 func (br *batchResults) Query() (pgx.Rows, error) {
@@ -53,7 +54,7 @@ func (br *batchResults) Query() (pgx.Rows, error) {
 	if err != nil {
 		return &errRows{err: err}, err // pgx never returns nil rows, so a deferred Close is safe
 	}
-	return br.mock.Query(context.Background(), query, arguments...)
+	return br.mock.Query(br.ctx, query, arguments...)
 }
 
 func (br *batchResults) QueryRow() pgx.Row {
@@ -61,7 +62,7 @@ func (br *batchResults) QueryRow() pgx.Row {
 	if err != nil {
 		return errRow{err: err}
 	}
-	return br.mock.QueryRow(context.Background(), query, arguments...)
+	return br.mock.QueryRow(br.ctx, query, arguments...)
 }
 
 func (br *batchResults) Close() error {

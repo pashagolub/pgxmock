@@ -1260,6 +1260,18 @@ func TestQueryWithTimeout(t *testing.T) {
 	}
 }
 
+func TestBatchUsesSendBatchContext(t *testing.T) {
+	mock, _ := NewConn()
+	eb := mock.ExpectBatch()
+	eb.ExpectExec("UPDATE").WillReturnResult(NewResult("UPDATE", 1)).WillDelayFor(time.Second)
+
+	timeout, cancel := context.WithTimeout(ctx, 10*time.Millisecond)
+	defer cancel()
+	b := &pgx.Batch{}
+	b.Queue("UPDATE")
+	assert.ErrorIs(t, mock.SendBatch(timeout, b).Close(), context.DeadlineExceeded)
+}
+
 func queryWithTimeout(t time.Duration, db PgxCommonIface, query string, args ...any) (pgx.Rows, error) {
 	rowsChan := make(chan pgx.Rows, 1)
 	errChan := make(chan error, 1)
