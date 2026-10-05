@@ -6,7 +6,7 @@ import (
 
 	pgx "github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/pashagolub/pgxmock/v5"
+	"github.com/pashagolub/pgxmock/v6"
 )
 
 // orderReader is what orderStatus needs from *pgx.Conn or *pgxpool.Pool.

@@ -21,6 +21,6 @@ As CI runs them:
 
 ```bash
 go test -race ./...
-go test ./... -coverprofile=coverage.out -coverpkg=github.com/pashagolub/pgxmock/v5  # examples count toward coverage
+go test ./... -coverprofile=coverage.out -coverpkg=github.com/pashagolub/pgxmock/v6  # examples count toward coverage
 golangci-lint run ./...
 ```

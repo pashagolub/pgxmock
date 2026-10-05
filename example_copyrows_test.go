@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	pgx "github.com/jackc/pgx/v5"
-	"github.com/pashagolub/pgxmock/v5"
+	"github.com/pashagolub/pgxmock/v6"
 )
 
 // userCopier is what importUsers needs from *pgx.Conn or *pgxpool.Pool.
