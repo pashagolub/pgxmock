@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/pashagolub/pgxmock/v5"
+	"github.com/pashagolub/pgxmock/v6"
 )
 
 // orderUpdater is what setOrderPaid needs from *pgx.Conn or *pgxpool.Pool.

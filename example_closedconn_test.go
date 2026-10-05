@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/pashagolub/pgxmock/v5"
+	"github.com/pashagolub/pgxmock/v6"
 )
 
 // pinger is what isAlive needs from *pgx.Conn or *pgxpool.Pool.

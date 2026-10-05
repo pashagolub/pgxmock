@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	pgx "github.com/jackc/pgx/v5"
-	"github.com/pashagolub/pgxmock/v5"
+	"github.com/pashagolub/pgxmock/v6"
 )
 
 func TestImportUsers(t *testing.T) {

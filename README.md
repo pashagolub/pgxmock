@@ -1,4 +1,4 @@
-[![Go Reference](https://pkg.go.dev/badge/github.com/pashagolub/pgxmock.svg)](https://pkg.go.dev/github.com/pashagolub/pgxmock/v5)
+[![Go Reference](https://pkg.go.dev/badge/github.com/pashagolub/pgxmock.svg)](https://pkg.go.dev/github.com/pashagolub/pgxmock/v6)
 [![Coverage Status](https://coveralls.io/repos/github/pashagolub/pgxmock/badge.svg?branch=master)](https://coveralls.io/github/pashagolub/pgxmock?branch=master)
 [![Mentioned in Awesome Go](https://awesome.re/mentioned-badge.svg)](https://github.com/avelino/awesome-go)
 
@@ -15,7 +15,7 @@ It's based on the well-known [sqlmock](https://github.com/DATA-DOG/go-sqlmock) l
 
 ## Install
 
-    go get github.com/pashagolub/pgxmock/v5
+    go get github.com/pashagolub/pgxmock/v6
 
 ## Version support policy
 
@@ -23,7 +23,7 @@ It's based on the well-known [sqlmock](https://github.com/DATA-DOG/go-sqlmock) l
 
 ## Documentation and Examples
 
-Visit [godoc](http://pkg.go.dev/github.com/pashagolub/pgxmock/v5) for general examples and public api reference.
+Visit [godoc](http://pkg.go.dev/github.com/pashagolub/pgxmock/v6) for general examples and public api reference.
 
 See implementation examples:
 
@@ -98,7 +98,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/pashagolub/pgxmock/v5"
+	"github.com/pashagolub/pgxmock/v6"
 )
 
 // a successful case
@@ -248,7 +248,7 @@ For a connection mock use `pgxmock.ConnConfigOption` with a `*pgx.ConnConfig`.
 ## Matching arguments like time.Time
 
 There may be arguments which are of `struct` type and cannot be compared easily by value like `time.Time`. In this case
-**pgxmock** provides an [Argument](https://pkg.go.dev/github.com/pashagolub/pgxmock/v5#Argument) interface which
+**pgxmock** provides an [Argument](https://pkg.go.dev/github.com/pashagolub/pgxmock/v6#Argument) interface which
 can be used in more sophisticated matching. Here is a simple example of time argument matching:
 
 ``` go
@@ -257,7 +257,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pashagolub/pgxmock/v5"
+	"github.com/pashagolub/pgxmock/v6"
 )
 
 type AnyTime struct{}
