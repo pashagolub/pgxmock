@@ -293,3 +293,12 @@ func TestBatchResultsTxOfUnsentBatch(t *testing.T) {
 	require.NotNil(t, tx)
 	assert.ErrorIs(t, tx.Rollback(ctx), pgx.ErrTxClosed, "pgx closes the transaction of a batch it could not send")
 }
+
+func TestBatchResultsTxOfNilBatch(t *testing.T) {
+	mock, _ := NewConn(ErrorOnClosedConnOption())
+	mock.ExpectClose()
+	require.NoError(t, mock.Close(ctx))
+	br := mock.SendBatch(ctx, nil)
+	assert.Nil(t, br.Tx())
+	assert.ErrorIs(t, br.Close(), pgconn.ErrConnClosed)
+}
