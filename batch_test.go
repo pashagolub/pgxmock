@@ -302,3 +302,30 @@ func TestBatchResultsTxOfNilBatch(t *testing.T) {
 	assert.Nil(t, br.Tx())
 	assert.ErrorIs(t, br.Close(), pgconn.ErrConnClosed)
 }
+
+func TestBatchResultsTxAfterFailedQuery(t *testing.T) {
+	errBegin := errors.New("begin failed")
+	mock, _ := NewConn()
+	eb := mock.ExpectBatch()
+	eb.ExpectExec("begin").WillReturnError(errBegin)
+	eb.ExpectExec("UPDATE").Maybe()
+	b := &pgx.Batch{}
+	b.BeginTx(pgx.TxOptions{})
+	b.Queue("UPDATE")
+	br := mock.SendBatch(ctx, b)
+	assert.ErrorIs(t, br.Close(), errBegin)
+	assert.ErrorIs(t, br.Tx().Rollback(ctx), pgx.ErrTxClosed, "pgx closes the transaction when its begin query fails")
+
+	errUpdate := errors.New("update failed")
+	eb = mock.ExpectBatch()
+	eb.ExpectExec("begin").WillReturnResult(NewResult("BEGIN", 0))
+	eb.ExpectExec("UPDATE").WillReturnError(errUpdate)
+	mock.ExpectRollback()
+	b = &pgx.Batch{}
+	b.BeginTx(pgx.TxOptions{})
+	b.Queue("UPDATE")
+	br = mock.SendBatch(ctx, b)
+	assert.ErrorIs(t, br.Close(), errUpdate)
+	assert.NoError(t, br.Tx().Rollback(ctx), "the transaction stays open when a later query fails")
+	assert.NoError(t, mock.ExpectationsWereMet())
+}

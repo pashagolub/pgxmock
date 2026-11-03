@@ -20,6 +20,7 @@ type batchResults struct {
 	err           error
 	closed        bool // per results, so a reused expectation runs each batch in full
 	tx            pgx.Tx
+	beginFailed   bool // the begin query of pgx.Batch.BeginTx failed, so Close ends tx
 }
 
 func (br *batchResults) nextQueryAndArgs() (query string, args []any, err error) {
@@ -47,7 +48,8 @@ func (br *batchResults) Exec() (pgconn.CommandTag, error) {
 	if err != nil {
 		return pgconn.NewCommandTag(""), err
 	}
-	return br.mock.Exec(br.ctx, query, arguments...)
+	ct, err := br.mock.Exec(br.ctx, query, arguments...)
+	return ct, br.checkBegin(err)
 }
 
 func (br *batchResults) Query() (pgx.Rows, error) {
@@ -55,7 +57,8 @@ func (br *batchResults) Query() (pgx.Rows, error) {
 	if err != nil {
 		return &errRows{err: err}, err // pgx never returns nil rows, so a deferred Close is safe
 	}
-	return br.mock.Query(br.ctx, query, arguments...)
+	rows, err := br.mock.Query(br.ctx, query, arguments...)
+	return rows, br.checkBegin(err)
 }
 
 func (br *batchResults) QueryRow() pgx.Row {
@@ -87,7 +90,18 @@ func (br *batchResults) Close() error {
 		}
 	}
 	br.closed = true
+	if br.beginFailed {
+		br.mock.txDone.Store(true)
+	}
 	return br.err
+}
+
+// checkBegin records an error of the begin query of pgx.Batch.BeginTx and returns err.
+func (br *batchResults) checkBegin(err error) error {
+	if err != nil && br.qqIdx == 1 && br.tx == br.mock {
+		br.beginFailed = true
+	}
+	return err
 }
 
 func (br *batchResults) Tx() pgx.Tx {
