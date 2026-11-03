@@ -19,6 +19,7 @@ type batchResults struct {
 	qqIdx         int
 	err           error
 	closed        bool // per results, so a reused expectation runs each batch in full
+	tx            pgx.Tx
 }
 
 func (br *batchResults) nextQueryAndArgs() (query string, args []any, err error) {
@@ -87,6 +88,24 @@ func (br *batchResults) Close() error {
 	}
 	br.closed = true
 	return br.err
+}
+
+func (br *batchResults) Tx() pgx.Tx {
+	return br.tx
+}
+
+// batchTx returns what pgx gives for the transaction of b: none without pgx.Batch.BeginTx,
+// a closed one when err stops b before it is sent, otherwise the mock as from BeginTx.
+func (c *pgxmock) batchTx(b *pgx.Batch, err error) pgx.Tx {
+	if b == nil {
+		return nil
+	}
+	tx := pgx.FailedBatchResults(b, err).Tx()
+	if tx == nil || err != nil {
+		return tx
+	}
+	c.txDone.Store(false)
+	return c
 }
 
 func (br *batchResults) callQuedQueryFn(qq *pgx.QueuedQuery) error {

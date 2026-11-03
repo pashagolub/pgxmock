@@ -260,3 +260,36 @@ func TestBatchResultsAfterClose(t *testing.T) {
 	_, err := br.Exec()
 	assert.ErrorIs(t, err, errBatchClosed)
 }
+
+func TestBatchResultsTx(t *testing.T) {
+	mock, _ := NewConn()
+	mock.ExpectBatch().ExpectExec("UPDATE").WillReturnResult(NewResult("UPDATE", 1))
+	b := &pgx.Batch{}
+	b.Queue("UPDATE")
+	br := mock.SendBatch(ctx, b)
+	assert.Nil(t, br.Tx(), "a batch without BeginTx has no transaction")
+	require.NoError(t, br.Close())
+
+	eb := mock.ExpectBatch()
+	eb.ExpectExec("begin isolation level serializable").WillReturnResult(NewResult("BEGIN", 0))
+	eb.ExpectExec("UPDATE").WillReturnResult(NewResult("UPDATE", 1))
+	mock.ExpectCommit()
+	b = &pgx.Batch{}
+	b.BeginTx(pgx.TxOptions{IsoLevel: pgx.Serializable})
+	b.Queue("UPDATE")
+	br = mock.SendBatch(ctx, b)
+	tx := br.Tx()
+	require.NotNil(t, tx, "a batch with BeginTx has its transaction before Close")
+	require.NoError(t, br.Close())
+	assert.NoError(t, tx.Commit(ctx))
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestBatchResultsTxOfUnsentBatch(t *testing.T) {
+	mock, _ := NewConn() // no batch is expected, so SendBatch fails before sending b
+	b := &pgx.Batch{}
+	b.BeginTx(pgx.TxOptions{})
+	tx := mock.SendBatch(ctx, b).Tx()
+	require.NotNil(t, tx)
+	assert.ErrorIs(t, tx.Rollback(ctx), pgx.ErrTxClosed, "pgx closes the transaction of a batch it could not send")
+}

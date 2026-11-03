@@ -500,7 +500,7 @@ func (c *pgxmock) CopyFrom(ctx context.Context, tableName pgx.Identifier, column
 
 func (c *pgxmock) SendBatch(ctx context.Context, b *pgx.Batch) pgx.BatchResults {
 	if err := c.checkClosed(); err != nil {
-		return &batchResults{ctx: ctx, mock: c, batch: b, err: err}
+		return &batchResults{ctx: ctx, mock: c, batch: b, err: err, tx: c.batchTx(b, err)}
 	}
 
 	ex, err := findExpectationFunc(c, "Batch()", func(batchExp *ExpectedBatch) error {
@@ -525,12 +525,10 @@ func (c *pgxmock) SendBatch(ctx context.Context, b *pgx.Batch) pgx.BatchResults 
 		}
 		return nil
 	})
-	br := &batchResults{ctx: ctx, mock: c, batch: b, expectedBatch: ex, err: err}
-	if err != nil {
-		return br
+	if err == nil {
+		err = ex.waitForDelay(ctx)
 	}
-	br.err = ex.waitForDelay(ctx)
-	return br
+	return &batchResults{ctx: ctx, mock: c, batch: b, expectedBatch: ex, err: err, tx: c.batchTx(b, err)}
 }
 
 func (c *pgxmock) LargeObjects() pgx.LargeObjects {
