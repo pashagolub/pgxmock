@@ -49,7 +49,7 @@ func (br *batchResults) Exec() (pgconn.CommandTag, error) {
 		return pgconn.NewCommandTag(""), err
 	}
 	ct, err := br.mock.Exec(br.ctx, query, arguments...)
-	return ct, br.checkBegin(err)
+	return ct, br.checkBegin(err, br.qqIdx == 1)
 }
 
 func (br *batchResults) Query() (pgx.Rows, error) {
@@ -58,7 +58,7 @@ func (br *batchResults) Query() (pgx.Rows, error) {
 		return &errRows{err: err}, err // pgx never returns nil rows, so a deferred Close is safe
 	}
 	rows, err := br.mock.Query(br.ctx, query, arguments...)
-	return rows, br.checkBegin(err)
+	return rows, br.checkBegin(err, br.qqIdx == 1)
 }
 
 func (br *batchResults) QueryRow() pgx.Row {
@@ -66,7 +66,21 @@ func (br *batchResults) QueryRow() pgx.Row {
 	if err != nil {
 		return errRow{err: err}
 	}
-	return br.mock.QueryRow(br.ctx, query, arguments...)
+	row := br.mock.QueryRow(br.ctx, query, arguments...)
+	if br.qqIdx == 1 && br.tx == br.mock {
+		return beginRow{Row: row, br: br}
+	}
+	return row
+}
+
+// beginRow records an error of the begin query read through QueryRow.
+type beginRow struct {
+	pgx.Row
+	br *batchResults
+}
+
+func (r beginRow) Scan(dest ...any) error {
+	return r.br.checkBegin(r.Row.Scan(dest...), true)
 }
 
 func (br *batchResults) Close() error {
@@ -97,8 +111,8 @@ func (br *batchResults) Close() error {
 }
 
 // checkBegin records an error of the begin query of pgx.Batch.BeginTx and returns err.
-func (br *batchResults) checkBegin(err error) error {
-	if err != nil && br.qqIdx == 1 && br.tx == br.mock {
+func (br *batchResults) checkBegin(err error, isFirst bool) error {
+	if err != nil && isFirst && br.tx == br.mock {
 		br.beginFailed = true
 	}
 	return err

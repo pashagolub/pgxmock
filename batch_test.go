@@ -303,6 +303,19 @@ func TestBatchResultsTxOfNilBatch(t *testing.T) {
 	assert.ErrorIs(t, br.Close(), pgconn.ErrConnClosed)
 }
 
+func TestBatchResultsTxAfterFailedQueryRow(t *testing.T) {
+	errBegin := errors.New("begin failed")
+	mock, _ := NewConn()
+	eb := mock.ExpectBatch()
+	eb.ExpectQuery("begin").WillReturnError(errBegin)
+	b := &pgx.Batch{}
+	b.BeginTx(pgx.TxOptions{})
+	br := mock.SendBatch(ctx, b)
+	assert.ErrorIs(t, br.QueryRow().Scan(), errBegin)
+	assert.ErrorIs(t, br.Close(), nil)
+	assert.ErrorIs(t, br.Tx().Rollback(ctx), pgx.ErrTxClosed, "pgx closes the transaction when its begin query fails")
+}
+
 func TestBatchResultsTxAfterFailedQuery(t *testing.T) {
 	errBegin := errors.New("begin failed")
 	mock, _ := NewConn()
