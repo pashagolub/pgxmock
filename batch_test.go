@@ -260,3 +260,85 @@ func TestBatchResultsAfterClose(t *testing.T) {
 	_, err := br.Exec()
 	assert.ErrorIs(t, err, errBatchClosed)
 }
+
+func TestBatchResultsTx(t *testing.T) {
+	mock, _ := NewConn()
+	mock.ExpectBatch().ExpectExec("UPDATE").WillReturnResult(NewResult("UPDATE", 1))
+	b := &pgx.Batch{}
+	b.Queue("UPDATE")
+	br := mock.SendBatch(ctx, b)
+	assert.Nil(t, br.Tx(), "a batch without BeginTx has no transaction")
+	require.NoError(t, br.Close())
+
+	eb := mock.ExpectBatch()
+	eb.ExpectExec("begin isolation level serializable").WillReturnResult(NewResult("BEGIN", 0))
+	eb.ExpectExec("UPDATE").WillReturnResult(NewResult("UPDATE", 1))
+	mock.ExpectCommit()
+	b = &pgx.Batch{}
+	b.BeginTx(pgx.TxOptions{IsoLevel: pgx.Serializable})
+	b.Queue("UPDATE")
+	br = mock.SendBatch(ctx, b)
+	tx := br.Tx()
+	require.NotNil(t, tx, "a batch with BeginTx has its transaction before Close")
+	require.NoError(t, br.Close())
+	assert.NoError(t, tx.Commit(ctx))
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestBatchResultsTxOfUnsentBatch(t *testing.T) {
+	mock, _ := NewConn() // no batch is expected, so SendBatch fails before sending b
+	b := &pgx.Batch{}
+	b.BeginTx(pgx.TxOptions{})
+	tx := mock.SendBatch(ctx, b).Tx()
+	require.NotNil(t, tx)
+	assert.ErrorIs(t, tx.Rollback(ctx), pgx.ErrTxClosed, "pgx closes the transaction of a batch it could not send")
+}
+
+func TestBatchResultsTxOfNilBatch(t *testing.T) {
+	mock, _ := NewConn(ErrorOnClosedConnOption())
+	mock.ExpectClose()
+	require.NoError(t, mock.Close(ctx))
+	br := mock.SendBatch(ctx, nil)
+	assert.Nil(t, br.Tx())
+	assert.ErrorIs(t, br.Close(), pgconn.ErrConnClosed)
+}
+
+func TestBatchResultsTxAfterFailedQueryRow(t *testing.T) {
+	errBegin := errors.New("begin failed")
+	mock, _ := NewConn()
+	eb := mock.ExpectBatch()
+	eb.ExpectQuery("begin").WillReturnError(errBegin)
+	b := &pgx.Batch{}
+	b.BeginTx(pgx.TxOptions{})
+	br := mock.SendBatch(ctx, b)
+	assert.ErrorIs(t, br.QueryRow().Scan(), errBegin)
+	assert.ErrorIs(t, br.Close(), nil)
+	assert.ErrorIs(t, br.Tx().Rollback(ctx), pgx.ErrTxClosed, "pgx closes the transaction when its begin query fails")
+}
+
+func TestBatchResultsTxAfterFailedQuery(t *testing.T) {
+	errBegin := errors.New("begin failed")
+	mock, _ := NewConn()
+	eb := mock.ExpectBatch()
+	eb.ExpectExec("begin").WillReturnError(errBegin)
+	eb.ExpectExec("UPDATE").Maybe()
+	b := &pgx.Batch{}
+	b.BeginTx(pgx.TxOptions{})
+	b.Queue("UPDATE")
+	br := mock.SendBatch(ctx, b)
+	assert.ErrorIs(t, br.Close(), errBegin)
+	assert.ErrorIs(t, br.Tx().Rollback(ctx), pgx.ErrTxClosed, "pgx closes the transaction when its begin query fails")
+
+	errUpdate := errors.New("update failed")
+	eb = mock.ExpectBatch()
+	eb.ExpectExec("begin").WillReturnResult(NewResult("BEGIN", 0))
+	eb.ExpectExec("UPDATE").WillReturnError(errUpdate)
+	mock.ExpectRollback()
+	b = &pgx.Batch{}
+	b.BeginTx(pgx.TxOptions{})
+	b.Queue("UPDATE")
+	br = mock.SendBatch(ctx, b)
+	assert.ErrorIs(t, br.Close(), errUpdate)
+	assert.NoError(t, br.Tx().Rollback(ctx), "the transaction stays open when a later query fails")
+	assert.NoError(t, mock.ExpectationsWereMet())
+}

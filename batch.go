@@ -19,6 +19,8 @@ type batchResults struct {
 	qqIdx         int
 	err           error
 	closed        bool // per results, so a reused expectation runs each batch in full
+	tx            pgx.Tx
+	beginFailed   bool // the begin query of pgx.Batch.BeginTx failed, so Close ends tx
 }
 
 func (br *batchResults) nextQueryAndArgs() (query string, args []any, err error) {
@@ -46,7 +48,8 @@ func (br *batchResults) Exec() (pgconn.CommandTag, error) {
 	if err != nil {
 		return pgconn.NewCommandTag(""), err
 	}
-	return br.mock.Exec(br.ctx, query, arguments...)
+	ct, err := br.mock.Exec(br.ctx, query, arguments...)
+	return ct, br.checkBegin(err, br.qqIdx == 1)
 }
 
 func (br *batchResults) Query() (pgx.Rows, error) {
@@ -54,7 +57,8 @@ func (br *batchResults) Query() (pgx.Rows, error) {
 	if err != nil {
 		return &errRows{err: err}, err // pgx never returns nil rows, so a deferred Close is safe
 	}
-	return br.mock.Query(br.ctx, query, arguments...)
+	rows, err := br.mock.Query(br.ctx, query, arguments...)
+	return rows, br.checkBegin(err, br.qqIdx == 1)
 }
 
 func (br *batchResults) QueryRow() pgx.Row {
@@ -62,7 +66,21 @@ func (br *batchResults) QueryRow() pgx.Row {
 	if err != nil {
 		return errRow{err: err}
 	}
-	return br.mock.QueryRow(br.ctx, query, arguments...)
+	row := br.mock.QueryRow(br.ctx, query, arguments...)
+	if br.qqIdx == 1 && br.tx == br.mock {
+		return beginRow{Row: row, br: br}
+	}
+	return row
+}
+
+// beginRow records an error of the begin query read through QueryRow.
+type beginRow struct {
+	pgx.Row
+	br *batchResults
+}
+
+func (r beginRow) Scan(dest ...any) error {
+	return r.br.checkBegin(r.Row.Scan(dest...), true)
 }
 
 func (br *batchResults) Close() error {
@@ -86,7 +104,36 @@ func (br *batchResults) Close() error {
 		}
 	}
 	br.closed = true
+	if br.beginFailed {
+		br.mock.txDone.Store(true)
+	}
 	return br.err
+}
+
+// checkBegin records an error of the begin query of pgx.Batch.BeginTx and returns err.
+func (br *batchResults) checkBegin(err error, isFirst bool) error {
+	if err != nil && isFirst && br.tx == br.mock {
+		br.beginFailed = true
+	}
+	return err
+}
+
+func (br *batchResults) Tx() pgx.Tx {
+	return br.tx
+}
+
+// batchTx returns what pgx gives for the transaction of b: none without pgx.Batch.BeginTx,
+// a closed one when err stops b before it is sent, otherwise the mock as from BeginTx.
+func (c *pgxmock) batchTx(b *pgx.Batch, err error) pgx.Tx {
+	if b == nil {
+		return nil
+	}
+	tx := pgx.FailedBatchResults(b, err).Tx()
+	if tx == nil || err != nil {
+		return tx
+	}
+	c.txDone.Store(false)
+	return c
 }
 
 func (br *batchResults) callQuedQueryFn(qq *pgx.QueuedQuery) error {

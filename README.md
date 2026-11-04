@@ -389,6 +389,8 @@ set on the mock.
 ```
 
 Results are read in the order they were queued, through `BatchResults` or the `QueuedQuery` callbacks.
+A batch that calls `pgx.Batch.BeginTx` expects its begin query first, and `BatchResults.Tx` returns the mock
+as the `pgx.Tx`.
 
 ## CopyFrom
 
