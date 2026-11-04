@@ -1386,3 +1386,16 @@ func TestIssue258ErrRowsAllMethods(t *testing.T) {
 	a.Nil(er.RawValues())
 	a.Nil(er.Conn())
 }
+
+// A new Begin does not reopen a transaction that already ended.
+func TestEndedTxStaysClosedAfterNextBegin(t *testing.T) {
+	mock, _ := NewConn()
+	mock.ExpectBegin()
+	mock.ExpectCommit()
+	mock.ExpectBegin()
+	tx1, _ := mock.Begin(ctx)
+	require.NoError(t, tx1.Commit(ctx))
+	_, err := mock.Begin(ctx)
+	require.NoError(t, err)
+	assert.ErrorIs(t, tx1.Rollback(ctx), pgx.ErrTxClosed)
+}

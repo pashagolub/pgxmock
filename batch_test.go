@@ -342,3 +342,23 @@ func TestBatchResultsTxAfterFailedQuery(t *testing.T) {
 	assert.NoError(t, br.Tx().Rollback(ctx), "the transaction stays open when a later query fails")
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
+
+// Each transaction tracks its own end, so a failed BeginTx batch leaves an open Begin alone.
+func TestBatchTxFailureKeepsOtherTxOpen(t *testing.T) {
+	mock, _ := NewConn()
+	mock.ExpectBegin()
+	tx, err := mock.Begin(ctx)
+	require.NoError(t, err)
+
+	eb := mock.ExpectBatch()
+	eb.ExpectExec("begin").WillReturnError(errors.New("begin failed"))
+	mock.ExpectCommit()
+	b := &pgx.Batch{}
+	b.BeginTx(pgx.TxOptions{})
+	br := mock.SendBatch(ctx, b)
+	assert.Error(t, br.Close())
+	assert.ErrorIs(t, br.Tx().Rollback(ctx), pgx.ErrTxClosed)
+
+	assert.NoError(t, tx.Commit(ctx))
+	assert.NoError(t, mock.ExpectationsWereMet())
+}

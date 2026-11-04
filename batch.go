@@ -67,7 +67,7 @@ func (br *batchResults) QueryRow() pgx.Row {
 		return errRow{err: err}
 	}
 	row := br.mock.QueryRow(br.ctx, query, arguments...)
-	if br.qqIdx == 1 && br.tx == br.mock {
+	if br.qqIdx == 1 && br.isMockTx() {
 		return beginRow{Row: row, br: br}
 	}
 	return row
@@ -104,18 +104,24 @@ func (br *batchResults) Close() error {
 		}
 	}
 	br.closed = true
-	if br.beginFailed {
-		br.mock.txDone.Store(true)
+	if tx, ok := br.tx.(*mockTx); ok && br.beginFailed {
+		tx.done.Store(true)
 	}
 	return br.err
 }
 
 // checkBegin records an error of the begin query of pgx.Batch.BeginTx and returns err.
 func (br *batchResults) checkBegin(err error, isFirst bool) error {
-	if err != nil && isFirst && br.tx == br.mock {
+	if err != nil && isFirst && br.isMockTx() {
 		br.beginFailed = true
 	}
 	return err
+}
+
+// isMockTx reports whether the batch began a transaction of the mock.
+func (br *batchResults) isMockTx() bool {
+	_, ok := br.tx.(*mockTx)
+	return ok
 }
 
 func (br *batchResults) Tx() pgx.Tx {
@@ -132,8 +138,7 @@ func (c *pgxmock) batchTx(b *pgx.Batch, err error) pgx.Tx {
 	if tx == nil || err != nil {
 		return tx
 	}
-	c.txDone.Store(false)
-	return c
+	return &mockTx{pgxmock: c}
 }
 
 func (br *batchResults) callQuedQueryFn(qq *pgx.QueuedQuery) error {

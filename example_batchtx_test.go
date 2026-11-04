@@ -28,7 +28,7 @@ func addUser(ctx context.Context, db batchSender, name string) error {
 
 func ExampleExpectedBatch_beginTx() {
 	mock, _ := pgxmock.NewConn()
-	// the begin query comes first, and the mock itself is the transaction BatchResults.Tx returns
+	// the begin query comes first, and BatchResults.Tx returns a transaction of the mock
 	eb := mock.ExpectBatch()
 	eb.ExpectExec("begin").WillReturnResult(pgxmock.NewResult("BEGIN", 0))
 	eb.ExpectExec("INSERT INTO users").WithArgs("alice").WillReturnResult(pgxmock.NewResult("INSERT", 1))

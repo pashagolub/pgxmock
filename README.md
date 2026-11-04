@@ -377,7 +377,7 @@ By default expectations must be met in the order they were declared. Call
 
 ## Transactions
 
-`Begin` and `BeginTx` return the mock itself as the `pgx.Tx`, so expectations for the transaction are
+`Begin` and `BeginTx` return a `pgx.Tx` that forwards to the mock and tracks its own end, so expectations for the transaction are
 set on the mock.
 
 ## Batches
